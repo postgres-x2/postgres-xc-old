@@ -1,0 +1,447 @@
+<!-- $PostgreSQL$ -->
+
+<chapter id="high-availability">
+ <title>High Availability, Load Balancing, and Replication</title>
+
+ <indexterm><primary>high availability</></>
+ <indexterm><primary>failover</></>
+ <indexterm><primary>replication</></>
+ <indexterm><primary>load balancing</></>
+ <indexterm><primary>clustering</></>
+ <indexterm><primary>data partitioning</></>
+
+ <para>
+  Database servers can work together to allow a second server to
+  take over quickly if the primary server fails (high
+  availability), or to allow several computers to serve the same
+  data (load balancing).  Ideally, database servers could work
+  together seamlessly.  Web servers serving static web pages can
+  be combined quite easily by merely load-balancing web requests
+  to multiple machines.  In fact, read-only database servers can
+  be combined relatively easily too.  Unfortunately, most database
+  servers have a read/write mix of requests, and read/write servers
+  are much harder to combine.  This is because though read-only
+  data needs to be placed on each server only once, a write to any
+  server has to be propagated to all servers so that future read
+  requests to those servers return consistent results.
+ </para>
+
+ <para>
+  This synchronization problem is the fundamental difficulty for
+  servers working together.  Because there is no single solution
+  that eliminates the impact of the sync problem for all use cases,
+  there are multiple solutions.  Each solution addresses this
+  problem in a different way, and minimizes its impact for a specific
+  workload.
+ </para>
+
+ <para>
+  Some solutions deal with synchronization by allowing only one
+  server to modify the data.  Servers that can modify data are
+  called read/write or "master" servers.  Servers that can reply
+  to read-only queries are called "slave" servers.  Servers that
+  cannot be accessed until they are changed to master servers are
+  called "standby" servers.
+ </para>
+
+ <para>
+  Some solutions are synchronous,
+  meaning that a data-modifying transaction is not considered
+  committed until all servers have committed the transaction.  This
+  guarantees that a failover will not lose any data and that all
+  load-balanced servers will return consistent results no matter
+  which server is queried. In contrast, asynchronous solutions allow some
+  delay between the time of a commit and its propagation to the other servers,
+  opening the possibility that some transactions might be lost in
+  the switch to a backup server, and that load balanced servers
+  might return slightly stale results.  Asynchronous communication
+  is used when synchronous would be too slow.
+ </para>
+
+ <para>
+  Solutions can also be categorized by their granularity.  Some solutions
+  can deal only with an entire database server, while others allow control
+  at the per-table or per-database level.
+ </para>
+
+ <para>
+  Performance must be considered in any choice.  There is usually a
+  trade-off between functionality and
+  performance.  For example, a full synchronous solution over a slow
+  network might cut performance by more than half, while an asynchronous
+  one might have a minimal performance impact.
+ </para>
+
+ <para>
+  The remainder of this section outlines various failover, replication,
+  and load balancing solutions.  A <ulink
+  url="http://www.postgres-r.org/documentation/terms">glossary</ulink> is
+  also available.
+ </para>
+
+ <variablelist>
+
+  <varlistentry>
+   <term>Shared Disk Failover</term>
+   <listitem>
+
+    <para>
+     Shared disk failover avoids synchronization overhead by having only one
+     copy of the database.  It uses a single disk array that is shared by
+     multiple servers.  If the main database server fails, the standby server
+     is able to mount and start the database as though it was recovering from
+     a database crash.  This allows rapid failover with no data loss.
+    </para>
+
+    <para>
+     Shared hardware functionality is common in network storage devices.
+     Using a network file system is also possible, though care must be
+     taken that the file system has full <acronym>POSIX</> behavior (see <xref
+     linkend="creating-cluster-nfs">).  One significant limitation of this
+     method is that if the shared disk array fails or becomes corrupt, the
+     primary and standby servers are both nonfunctional.  Another issue is
+     that the standby server should never access the shared storage while
+     the primary server is running.
+    </para>
+
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>File System (Block-Device) Replication</term>
+   <listitem>
+
+    <para>
+     A modified version of shared hardware functionality is file system
+     replication, where all changes to a file system are mirrored to a file
+     system residing on another computer.  The only restriction is that
+     the mirroring must be done in a way that ensures the standby server
+     has a consistent copy of the file system &mdash; specifically, writes
+     to the standby must be done in the same order as those on the master.
+     <productname>DRBD</> is a popular file system replication solution
+     for Linux.
+    </para>
+
+<!--
+https://forge.continuent.org/pipermail/sequoia/2006-November/004070.html
+
+Oracle RAC is a shared disk approach and just send cache invalidations
+to other nodes but not actual data. As the disk is shared, data is
+only committed once to disk and there is a distributed locking
+protocol to make nodes agree on a serializable transactional order.
+-->
+
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Warm Standby Using Point-In-Time Recovery (<acronym>PITR</>)</term>
+   <listitem>
+
+    <para>
+     A warm standby server (see <xref linkend="warm-standby">) can
+     be kept current by reading a stream of write-ahead log (<acronym>WAL</>)
+     records.  If the main server fails, the warm standby contains
+     almost all of the data of the main server, and can be quickly
+     made the new master database server.  This is asynchronous and
+     can only be done for the entire database server.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Master-Slave Replication</term>
+   <listitem>
+
+    <para>
+     A master-slave replication setup sends all data modification
+     queries to the master server.  The master server asynchronously
+     sends data changes to the slave server.  The slave can answer
+     read-only queries while the master server is running.  The
+     slave server is ideal for data warehouse queries.
+    </para>
+
+    <para>
+     <productname>Slony-I</> is an example of this type of replication, with per-table
+     granularity, and support for multiple slaves.  Because it
+     updates the slave server asynchronously (in batches), there is
+     possible data loss during fail over.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Statement-Based Replication Middleware</term>
+   <listitem>
+
+    <para>
+     With statement-based replication middleware, a program intercepts
+     every SQL query and sends it to one or all servers.  Each server
+     operates independently.  Read-write queries are sent to all servers,
+     while read-only queries can be sent to just one server, allowing
+     the read workload to be distributed.
+    </para>
+
+    <para>
+     If queries are simply broadcast unmodified, functions like
+     <function>random()</>, <function>CURRENT_TIMESTAMP</>, and
+     sequences would have different values on different servers.
+     This is because each server operates independently, and because
+     SQL queries are broadcast (and not actual modified rows).  If
+     this is unacceptable, either the middleware or the application
+     must query such values from a single server and then use those
+     values in write queries.  Also, care must be taken that all
+     transactions either commit or abort on all servers, perhaps
+     using two-phase commit (<xref linkend="sql-prepare-transaction"
+     endterm="sql-prepare-transaction-title"> and <xref
+     linkend="sql-commit-prepared" endterm="sql-commit-prepared-title">.
+     <productname>Pgpool-II</> and <productname>Sequoia</> are examples of
+     this type of replication.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Asynchronous Multimaster Replication</term>
+   <listitem>
+
+    <para>
+     For servers that are not regularly connected, like laptops or
+     remote servers, keeping data consistent among servers is a
+     challenge.  Using asynchronous multimaster replication, each
+     server works independently, and periodically communicates with
+     the other servers to identify conflicting transactions.  The
+     conflicts can be resolved by users or conflict resolution rules.
+     Bucardo is an example of this type of replication.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Synchronous Multimaster Replication</term>
+   <listitem>
+
+    <para>
+     In synchronous multimaster replication, each server can accept
+     write requests, and modified data is transmitted from the
+     original server to every other server before each transaction
+     commits.  Heavy write activity can cause excessive locking,
+     leading to poor performance.  In fact, write performance is
+     often worse than that of a single server.  Read requests can
+     be sent to any server.  Some implementations use shared disk
+     to reduce the communication overhead.  Synchronous multimaster
+     replication is best for mostly read workloads, though its big
+     advantage is that any server can accept write requests &mdash;
+     there is no need to partition workloads between master and
+     slave servers, and because the data changes are sent from one
+     server to another, there is no problem with non-deterministic
+     functions like <function>random()</>.
+    </para>
+
+    <para>
+     <productname>PostgreSQL</> does not offer this type of replication,
+     though <productname>PostgreSQL</> two-phase commit (<xref
+     linkend="sql-prepare-transaction"
+     endterm="sql-prepare-transaction-title"> and <xref
+     linkend="sql-commit-prepared" endterm="sql-commit-prepared-title">)
+     can be used to implement this in application code or middleware.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Commercial Solutions</term>
+   <listitem>
+
+    <para>
+     Because <productname>PostgreSQL</> is open source and easily
+     extended, a number of companies have taken <productname>PostgreSQL</>
+     and created commercial closed-source solutions with unique
+     failover, replication, and load balancing capabilities.
+    </para>
+   </listitem>
+  </varlistentry>
+
+ </variablelist>
+
+ <para>
+  <xref linkend="high-availability-matrix"> summarizes
+  the capabilities of the various solutions listed above.
+ </para>
+
+ <table id="high-availability-matrix">
+  <title>High Availability, Load Balancing, and Replication Feature Matrix</title>
+  <tgroup cols="8">
+   <thead>
+    <row>
+     <entry>Feature</entry>
+     <entry>Shared Disk Failover</entry>
+     <entry>File System Replication</entry>
+     <entry>Warm Standby Using PITR</entry>
+     <entry>Master-Slave Replication</entry>
+     <entry>Statement-Based Replication Middleware</entry>
+     <entry>Asynchronous Multimaster Replication</entry>
+     <entry>Synchronous Multimaster Replication</entry>
+    </row>
+   </thead>
+
+   <tbody>
+
+    <row>
+     <entry>Most Common Implementation</entry>
+     <entry align="center">NAS</entry>
+     <entry align="center">DRBD</entry>
+     <entry align="center">PITR</entry>
+     <entry align="center">Slony</entry>
+     <entry align="center">pgpool-II</entry>
+     <entry align="center">Bucardo</entry>
+     <entry align="center"></entry>
+    </row>
+
+    <row>
+     <entry>Communication Method</entry>
+     <entry align="center">shared disk</entry>
+     <entry align="center">disk blocks</entry>
+     <entry align="center">WAL</entry>
+     <entry align="center">table rows</entry>
+     <entry align="center">SQL</entry>
+     <entry align="center">table rows</entry>
+     <entry align="center">table rows and row locks</entry>
+    </row>
+
+    <row>
+     <entry>No special hardware required</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+    <row>
+     <entry>Allows multiple master servers</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+    <row>
+     <entry>No master server overhead</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+    </row>
+
+    <row>
+     <entry>No waiting for multiple servers</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+    </row>
+
+    <row>
+     <entry>Master failure will never lose data</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+    <row>
+     <entry>Slaves accept read-only queries</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+    <row>
+     <entry>Per-table granularity</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+    <row>
+     <entry>No conflict resolution necessary</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center">&bull;</entry>
+     <entry align="center"></entry>
+     <entry align="center"></entry>
+     <entry align="center">&bull;</entry>
+    </row>
+
+   </tbody>
+  </tgroup>
+ </table>
+
+ <para>
+  There are a few solutions that do not fit into the above categories:
+ </para>
+
+ <variablelist>
+
+  <varlistentry>
+   <term>Data Partitioning</term>
+   <listitem>
+
+    <para>
+     Data partitioning splits tables into data sets.  Each set can
+     be modified by only one server.  For example, data can be
+     partitioned by offices, e.g., London and Paris, with a server
+     in each office.  If queries combining London and Paris data
+     are necessary, an application can query both servers, or
+     master/slave replication can be used to keep a read-only copy
+     of the other office's data on each server.
+    </para>
+   </listitem>
+  </varlistentry>
+
+  <varlistentry>
+   <term>Multiple-Server Parallel Query Execution</term>
+   <listitem>
+
+    <para>
+     Many of the above solutions allow multiple servers to handle multiple
+     queries, but none allow a single query to use multiple servers to
+     complete faster.  This solution allows multiple servers to work
+     concurrently on a single query.  It is usually accomplished by
+     splitting the data among servers and having each server execute its
+     part of the query and return results to a central server where they
+     are combined and returned to the user.  <productname>Pgpool-II</>
+     has this capability.  Also, this can be implemented using the
+     <productname>PL/Proxy</> toolset.
+    </para>
+
+   </listitem>
+  </varlistentry>
+
+ </variablelist>
+
+</chapter>

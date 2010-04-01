@@ -1,0 +1,120 @@
+<!-- $PostgreSQL$ -->
+
+<appendix id="contrib">
+ <title>Additional Supplied Modules</title>
+
+ <para>
+  This appendix contains information regarding the modules that
+  can be found in the <literal>contrib</literal> directory of the
+  <productname>PostgreSQL</> distribution.
+  These include porting tools, analysis utilities,
+  and plug-in features that are not part of the core PostgreSQL system,
+  mainly because they address a limited audience or are too experimental
+  to be part of the main source tree.  This does not preclude their
+  usefulness.
+ </para>
+
+ <para>
+  When building from the source distribution, these modules are not built
+  automatically.  You can build and install all of them by running:
+<screen>
+<userinput>gmake</userinput>
+<userinput>gmake install</userinput>
+</screen>
+  in the <literal>contrib</literal> directory of a configured source tree;
+  or to build and install
+  just one selected module, do the same in that module's subdirectory.
+  Many of the modules have regression tests, which can be executed by
+  running:
+<screen>
+<userinput>gmake installcheck</userinput>
+</screen>
+  once you have a <productname>PostgreSQL</> server running.  (Note that
+  <literal>gmake check</> is not supported; you must have an operational
+  database server to perform these tests, and you must have built and
+  installed the module(s) to be tested.)
+ </para>
+
+ <para>
+  If you are using a pre-packaged version of <productname>PostgreSQL</>,
+  these modules are typically made available as a separate subpackage,
+  such as <literal>postgresql-contrib</>.
+ </para>
+
+ <para>
+  Many modules supply new user-defined functions, operators, or types.
+  To make use of one of these modules, after you have installed the code
+  you need to register the new objects in the database
+  system by running the SQL commands in the <literal>.sql</> file
+  supplied by the module.  For example,
+
+<programlisting>
+psql -d dbname -f <replaceable>SHAREDIR</>/contrib/<replaceable>module</>.sql
+</programlisting>
+
+  Here, <replaceable>SHAREDIR</> means the installation's <quote>share</>
+  directory (<literal>pg_config --sharedir</> will tell you what this is).
+  In most cases the script must be run by a database superuser.
+ </para>
+
+ <para>
+  You need to run the <literal>.sql</> file in each database that you want
+  the module's facilities to be available in.  Alternatively, run it in
+  database <literal>template1</> so that the module will be copied into
+  subsequently-created databases by default.
+ </para>
+
+ <para>
+  You can modify the first command in the <literal>.sql</> file to determine
+  which schema within the database the module's objects will be created in.
+  By default, they will be placed in <literal>public</>.
+ </para>
+
+ <para>
+  After a major-version upgrade of <productname>PostgreSQL</>, run the
+  installation script again, even though the module's objects might have
+  been brought forward from the old installation by dump and restore.
+  This ensures that any new functions will be available and any needed
+  corrections will be applied.
+ </para>
+
+ &adminpack;
+ &auto-explain;
+ &btree-gin;
+ &btree-gist;
+ &chkpass;
+ &citext;
+ &cube;
+ &dblink;
+ &dict-int;
+ &dict-xsyn;
+ &earthdistance;
+ &fuzzystrmatch;
+ &hstore;
+ &intagg;
+ &intarray;
+ &isn;
+ &lo;
+ &ltree;
+ &oid2name;
+ &pageinspect;
+ &pgbench;
+ &pgbuffercache;
+ &pgcrypto;
+ &pgfreespacemap;
+ &pgrowlocks;
+ &pgstandby;
+ &pgstatstatements;
+ &pgstattuple;
+ &pgtrgm;
+ &seg;
+ &contrib-spi;
+ &sslinfo;
+ &tablefunc;
+ &test-parser;
+ &tsearch2;
+ &uuid-ossp;
+ &vacuumlo;
+ &xml2;
+
+</appendix>

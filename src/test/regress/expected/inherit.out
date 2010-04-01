@@ -1,0 +1,921 @@
+--
+-- Test inheritance features
+--
+CREATE TABLE a (aa TEXT);
+CREATE TABLE b (bb TEXT) INHERITS (a);
+CREATE TABLE c (cc TEXT) INHERITS (a);
+CREATE TABLE d (dd TEXT) INHERITS (b,c,a);
+NOTICE:  merging multiple inherited definitions of column "aa"
+NOTICE:  merging multiple inherited definitions of column "aa"
+INSERT INTO a(aa) VALUES('aaa');
+INSERT INTO a(aa) VALUES('aaaa');
+INSERT INTO a(aa) VALUES('aaaaa');
+INSERT INTO a(aa) VALUES('aaaaaa');
+INSERT INTO a(aa) VALUES('aaaaaaa');
+INSERT INTO a(aa) VALUES('aaaaaaaa');
+INSERT INTO b(aa) VALUES('bbb');
+INSERT INTO b(aa) VALUES('bbbb');
+INSERT INTO b(aa) VALUES('bbbbb');
+INSERT INTO b(aa) VALUES('bbbbbb');
+INSERT INTO b(aa) VALUES('bbbbbbb');
+INSERT INTO b(aa) VALUES('bbbbbbbb');
+INSERT INTO c(aa) VALUES('ccc');
+INSERT INTO c(aa) VALUES('cccc');
+INSERT INTO c(aa) VALUES('ccccc');
+INSERT INTO c(aa) VALUES('cccccc');
+INSERT INTO c(aa) VALUES('ccccccc');
+INSERT INTO c(aa) VALUES('cccccccc');
+INSERT INTO d(aa) VALUES('ddd');
+INSERT INTO d(aa) VALUES('dddd');
+INSERT INTO d(aa) VALUES('ddddd');
+INSERT INTO d(aa) VALUES('dddddd');
+INSERT INTO d(aa) VALUES('ddddddd');
+INSERT INTO d(aa) VALUES('dddddddd');
+SELECT relname, a.* FROM a, pg_class where a.tableoid = pg_class.oid;
+ relname |    aa    
+---------+----------
+ a       | aaa
+ a       | aaaa
+ a       | aaaaa
+ a       | aaaaaa
+ a       | aaaaaaa
+ a       | aaaaaaaa
+ b       | bbb
+ b       | bbbb
+ b       | bbbbb
+ b       | bbbbbb
+ b       | bbbbbbb
+ b       | bbbbbbbb
+ c       | ccc
+ c       | cccc
+ c       | ccccc
+ c       | cccccc
+ c       | ccccccc
+ c       | cccccccc
+ d       | ddd
+ d       | dddd
+ d       | ddddd
+ d       | dddddd
+ d       | ddddddd
+ d       | dddddddd
+(24 rows)
+
+SELECT relname, b.* FROM b, pg_class where b.tableoid = pg_class.oid;
+ relname |    aa    | bb 
+---------+----------+----
+ b       | bbb      | 
+ b       | bbbb     | 
+ b       | bbbbb    | 
+ b       | bbbbbb   | 
+ b       | bbbbbbb  | 
+ b       | bbbbbbbb | 
+ d       | ddd      | 
+ d       | dddd     | 
+ d       | ddddd    | 
+ d       | dddddd   | 
+ d       | ddddddd  | 
+ d       | dddddddd | 
+(12 rows)
+
+SELECT relname, c.* FROM c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+ d       | ddd      | 
+ d       | dddd     | 
+ d       | ddddd    | 
+ d       | dddddd   | 
+ d       | ddddddd  | 
+ d       | dddddddd | 
+(12 rows)
+
+SELECT relname, d.* FROM d, pg_class where d.tableoid = pg_class.oid;
+ relname |    aa    | bb | cc | dd 
+---------+----------+----+----+----
+ d       | ddd      |    |    | 
+ d       | dddd     |    |    | 
+ d       | ddddd    |    |    | 
+ d       | dddddd   |    |    | 
+ d       | ddddddd  |    |    | 
+ d       | dddddddd |    |    | 
+(6 rows)
+
+SELECT relname, a.* FROM ONLY a, pg_class where a.tableoid = pg_class.oid;
+ relname |    aa    
+---------+----------
+ a       | aaa
+ a       | aaaa
+ a       | aaaaa
+ a       | aaaaaa
+ a       | aaaaaaa
+ a       | aaaaaaaa
+(6 rows)
+
+SELECT relname, b.* FROM ONLY b, pg_class where b.tableoid = pg_class.oid;
+ relname |    aa    | bb 
+---------+----------+----
+ b       | bbb      | 
+ b       | bbbb     | 
+ b       | bbbbb    | 
+ b       | bbbbbb   | 
+ b       | bbbbbbb  | 
+ b       | bbbbbbbb | 
+(6 rows)
+
+SELECT relname, c.* FROM ONLY c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+(6 rows)
+
+SELECT relname, d.* FROM ONLY d, pg_class where d.tableoid = pg_class.oid;
+ relname |    aa    | bb | cc | dd 
+---------+----------+----+----+----
+ d       | ddd      |    |    | 
+ d       | dddd     |    |    | 
+ d       | ddddd    |    |    | 
+ d       | dddddd   |    |    | 
+ d       | ddddddd  |    |    | 
+ d       | dddddddd |    |    | 
+(6 rows)
+
+UPDATE a SET aa='zzzz' WHERE aa='aaaa';
+UPDATE ONLY a SET aa='zzzzz' WHERE aa='aaaaa';
+UPDATE b SET aa='zzz' WHERE aa='aaa';
+UPDATE ONLY b SET aa='zzz' WHERE aa='aaa';
+UPDATE a SET aa='zzzzzz' WHERE aa LIKE 'aaa%';
+SELECT relname, a.* FROM a, pg_class where a.tableoid = pg_class.oid;
+ relname |    aa    
+---------+----------
+ a       | zzzz
+ a       | zzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ b       | bbb
+ b       | bbbb
+ b       | bbbbb
+ b       | bbbbbb
+ b       | bbbbbbb
+ b       | bbbbbbbb
+ c       | ccc
+ c       | cccc
+ c       | ccccc
+ c       | cccccc
+ c       | ccccccc
+ c       | cccccccc
+ d       | ddd
+ d       | dddd
+ d       | ddddd
+ d       | dddddd
+ d       | ddddddd
+ d       | dddddddd
+(24 rows)
+
+SELECT relname, b.* FROM b, pg_class where b.tableoid = pg_class.oid;
+ relname |    aa    | bb 
+---------+----------+----
+ b       | bbb      | 
+ b       | bbbb     | 
+ b       | bbbbb    | 
+ b       | bbbbbb   | 
+ b       | bbbbbbb  | 
+ b       | bbbbbbbb | 
+ d       | ddd      | 
+ d       | dddd     | 
+ d       | ddddd    | 
+ d       | dddddd   | 
+ d       | ddddddd  | 
+ d       | dddddddd | 
+(12 rows)
+
+SELECT relname, c.* FROM c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+ d       | ddd      | 
+ d       | dddd     | 
+ d       | ddddd    | 
+ d       | dddddd   | 
+ d       | ddddddd  | 
+ d       | dddddddd | 
+(12 rows)
+
+SELECT relname, d.* FROM d, pg_class where d.tableoid = pg_class.oid;
+ relname |    aa    | bb | cc | dd 
+---------+----------+----+----+----
+ d       | ddd      |    |    | 
+ d       | dddd     |    |    | 
+ d       | ddddd    |    |    | 
+ d       | dddddd   |    |    | 
+ d       | ddddddd  |    |    | 
+ d       | dddddddd |    |    | 
+(6 rows)
+
+SELECT relname, a.* FROM ONLY a, pg_class where a.tableoid = pg_class.oid;
+ relname |   aa   
+---------+--------
+ a       | zzzz
+ a       | zzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+(6 rows)
+
+SELECT relname, b.* FROM ONLY b, pg_class where b.tableoid = pg_class.oid;
+ relname |    aa    | bb 
+---------+----------+----
+ b       | bbb      | 
+ b       | bbbb     | 
+ b       | bbbbb    | 
+ b       | bbbbbb   | 
+ b       | bbbbbbb  | 
+ b       | bbbbbbbb | 
+(6 rows)
+
+SELECT relname, c.* FROM ONLY c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+(6 rows)
+
+SELECT relname, d.* FROM ONLY d, pg_class where d.tableoid = pg_class.oid;
+ relname |    aa    | bb | cc | dd 
+---------+----------+----+----+----
+ d       | ddd      |    |    | 
+ d       | dddd     |    |    | 
+ d       | ddddd    |    |    | 
+ d       | dddddd   |    |    | 
+ d       | ddddddd  |    |    | 
+ d       | dddddddd |    |    | 
+(6 rows)
+
+UPDATE b SET aa='new';
+SELECT relname, a.* FROM a, pg_class where a.tableoid = pg_class.oid;
+ relname |    aa    
+---------+----------
+ a       | zzzz
+ a       | zzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ c       | ccc
+ c       | cccc
+ c       | ccccc
+ c       | cccccc
+ c       | ccccccc
+ c       | cccccccc
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+(24 rows)
+
+SELECT relname, b.* FROM b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa  | bb 
+---------+-----+----
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+(12 rows)
+
+SELECT relname, c.* FROM c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+ d       | new      | 
+ d       | new      | 
+ d       | new      | 
+ d       | new      | 
+ d       | new      | 
+ d       | new      | 
+(12 rows)
+
+SELECT relname, d.* FROM d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa  | bb | cc | dd 
+---------+-----+----+----+----
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+(6 rows)
+
+SELECT relname, a.* FROM ONLY a, pg_class where a.tableoid = pg_class.oid;
+ relname |   aa   
+---------+--------
+ a       | zzzz
+ a       | zzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+ a       | zzzzzz
+(6 rows)
+
+SELECT relname, b.* FROM ONLY b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa  | bb 
+---------+-----+----
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+(6 rows)
+
+SELECT relname, c.* FROM ONLY c, pg_class where c.tableoid = pg_class.oid;
+ relname |    aa    | cc 
+---------+----------+----
+ c       | ccc      | 
+ c       | cccc     | 
+ c       | ccccc    | 
+ c       | cccccc   | 
+ c       | ccccccc  | 
+ c       | cccccccc | 
+(6 rows)
+
+SELECT relname, d.* FROM ONLY d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa  | bb | cc | dd 
+---------+-----+----+----+----
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+(6 rows)
+
+UPDATE a SET aa='new';
+DELETE FROM ONLY c WHERE aa='new';
+SELECT relname, a.* FROM a, pg_class where a.tableoid = pg_class.oid;
+ relname | aa  
+---------+-----
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ b       | new
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+ d       | new
+(18 rows)
+
+SELECT relname, b.* FROM b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa  | bb 
+---------+-----+----
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+(12 rows)
+
+SELECT relname, c.* FROM c, pg_class where c.tableoid = pg_class.oid;
+ relname | aa  | cc 
+---------+-----+----
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+ d       | new | 
+(6 rows)
+
+SELECT relname, d.* FROM d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa  | bb | cc | dd 
+---------+-----+----+----+----
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+(6 rows)
+
+SELECT relname, a.* FROM ONLY a, pg_class where a.tableoid = pg_class.oid;
+ relname | aa  
+---------+-----
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+ a       | new
+(6 rows)
+
+SELECT relname, b.* FROM ONLY b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa  | bb 
+---------+-----+----
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+ b       | new | 
+(6 rows)
+
+SELECT relname, c.* FROM ONLY c, pg_class where c.tableoid = pg_class.oid;
+ relname | aa | cc 
+---------+----+----
+(0 rows)
+
+SELECT relname, d.* FROM ONLY d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa  | bb | cc | dd 
+---------+-----+----+----+----
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+ d       | new |    |    | 
+(6 rows)
+
+DELETE FROM a;
+SELECT relname, a.* FROM a, pg_class where a.tableoid = pg_class.oid;
+ relname | aa 
+---------+----
+(0 rows)
+
+SELECT relname, b.* FROM b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa | bb 
+---------+----+----
+(0 rows)
+
+SELECT relname, c.* FROM c, pg_class where c.tableoid = pg_class.oid;
+ relname | aa | cc 
+---------+----+----
+(0 rows)
+
+SELECT relname, d.* FROM d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa | bb | cc | dd 
+---------+----+----+----+----
+(0 rows)
+
+SELECT relname, a.* FROM ONLY a, pg_class where a.tableoid = pg_class.oid;
+ relname | aa 
+---------+----
+(0 rows)
+
+SELECT relname, b.* FROM ONLY b, pg_class where b.tableoid = pg_class.oid;
+ relname | aa | bb 
+---------+----+----
+(0 rows)
+
+SELECT relname, c.* FROM ONLY c, pg_class where c.tableoid = pg_class.oid;
+ relname | aa | cc 
+---------+----+----
+(0 rows)
+
+SELECT relname, d.* FROM ONLY d, pg_class where d.tableoid = pg_class.oid;
+ relname | aa | bb | cc | dd 
+---------+----+----+----+----
+(0 rows)
+
+-- Confirm PRIMARY KEY adds NOT NULL constraint to child table
+CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (a);
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "z_pkey" for table "z"
+INSERT INTO z VALUES (NULL, 'text'); -- should fail
+ERROR:  null value in column "aa" violates not-null constraint
+-- Check UPDATE with inherited target and an inherited source table
+create temp table foo(f1 int, f2 int);
+create temp table foo2(f3 int) inherits (foo);
+create temp table bar(f1 int, f2 int);
+create temp table bar2(f3 int) inherits (bar);
+insert into foo values(1,1);
+insert into foo values(3,3);
+insert into foo2 values(2,2,2);
+insert into foo2 values(3,3,3);
+insert into bar values(1,1);
+insert into bar values(2,2);
+insert into bar values(3,3);
+insert into bar values(4,4);
+insert into bar2 values(1,1,1);
+insert into bar2 values(2,2,2);
+insert into bar2 values(3,3,3);
+insert into bar2 values(4,4,4);
+update bar set f2 = f2 + 100 where f1 in (select f1 from foo);
+SELECT relname, bar.* FROM bar, pg_class where bar.tableoid = pg_class.oid
+order by 1,2;
+ relname | f1 | f2  
+---------+----+-----
+ bar     |  1 | 101
+ bar     |  2 | 102
+ bar     |  3 | 103
+ bar     |  4 |   4
+ bar2    |  1 | 101
+ bar2    |  2 | 102
+ bar2    |  3 | 103
+ bar2    |  4 |   4
+(8 rows)
+
+/* Test multiple inheritance of column defaults */
+CREATE TABLE firstparent (tomorrow date default now()::date + 1);
+CREATE TABLE secondparent (tomorrow date default  now() :: date  +  1);
+CREATE TABLE jointchild () INHERITS (firstparent, secondparent);  -- ok
+NOTICE:  merging multiple inherited definitions of column "tomorrow"
+CREATE TABLE thirdparent (tomorrow date default now()::date - 1);
+CREATE TABLE otherchild () INHERITS (firstparent, thirdparent);  -- not ok
+NOTICE:  merging multiple inherited definitions of column "tomorrow"
+ERROR:  column "tomorrow" inherits conflicting default values
+HINT:  To resolve the conflict, specify a default explicitly.
+CREATE TABLE otherchild (tomorrow date default now())
+  INHERITS (firstparent, thirdparent);  -- ok, child resolves ambiguous default
+NOTICE:  merging multiple inherited definitions of column "tomorrow"
+NOTICE:  merging column "tomorrow" with inherited definition
+DROP TABLE firstparent, secondparent, jointchild, thirdparent, otherchild;
+/* Test inheritance of structure (LIKE) */
+CREATE TABLE inhx (xx text DEFAULT 'text');
+/*
+ * Test double inheritance
+ *
+ * Ensure that defaults are NOT included unless
+ * INCLUDING DEFAULTS is specified 
+ */
+CREATE TABLE inhe (ee text, LIKE inhx) inherits (b);
+INSERT INTO inhe VALUES ('ee-col1', 'ee-col2', DEFAULT, 'ee-col4');
+SELECT * FROM inhe; /* Columns aa, bb, xx value NULL, ee */
+   aa    |   bb    | ee |   xx    
+---------+---------+----+---------
+ ee-col1 | ee-col2 |    | ee-col4
+(1 row)
+
+SELECT * FROM inhx; /* Empty set since LIKE inherits structure only */
+ xx 
+----
+(0 rows)
+
+SELECT * FROM b; /* Has ee entry */
+   aa    |   bb    
+---------+---------
+ ee-col1 | ee-col2
+(1 row)
+
+SELECT * FROM a; /* Has ee entry */
+   aa    
+---------
+ ee-col1
+(1 row)
+
+CREATE TABLE inhf (LIKE inhx, LIKE inhx); /* Throw error */
+ERROR:  column "xx" specified more than once
+CREATE TABLE inhf (LIKE inhx INCLUDING DEFAULTS INCLUDING CONSTRAINTS);
+INSERT INTO inhf DEFAULT VALUES;
+SELECT * FROM inhf; /* Single entry with value 'text' */
+  xx  
+------
+ text
+(1 row)
+
+ALTER TABLE inhx add constraint foo CHECK (xx = 'text');
+ALTER TABLE inhx ADD PRIMARY KEY (xx);
+NOTICE:  ALTER TABLE / ADD PRIMARY KEY will create implicit index "inhx_pkey" for table "inhx"
+CREATE TABLE inhg (LIKE inhx); /* Doesn't copy constraint */
+INSERT INTO inhg VALUES ('foo');
+DROP TABLE inhg;
+CREATE TABLE inhg (x text, LIKE inhx INCLUDING CONSTRAINTS, y text); /* Copies constraints */
+INSERT INTO inhg VALUES ('x', 'text', 'y'); /* Succeeds */
+INSERT INTO inhg VALUES ('x', 'text', 'y'); /* Succeeds -- Unique constraints not copied */
+INSERT INTO inhg VALUES ('x', 'foo',  'y');  /* fails due to constraint */
+ERROR:  new row for relation "inhg" violates check constraint "foo"
+SELECT * FROM inhg; /* Two records with three columns in order x=x, xx=text, y=y */
+ x |  xx  | y 
+---+------+---
+ x | text | y
+ x | text | y
+(2 rows)
+
+DROP TABLE inhg;
+CREATE TABLE inhg (x text, LIKE inhx INCLUDING INDEXES, y text); /* copies indexes */
+NOTICE:  CREATE TABLE / PRIMARY KEY will create implicit index "inhg_pkey" for table "inhg"
+INSERT INTO inhg VALUES (5, 10);
+INSERT INTO inhg VALUES (20, 10); -- should fail
+ERROR:  duplicate key value violates unique constraint "inhg_pkey"
+DROP TABLE inhg;
+/* Multiple primary keys creation should fail */
+CREATE TABLE inhg (x text, LIKE inhx INCLUDING INDEXES, PRIMARY KEY(x)); /* fails */
+ERROR:  multiple primary keys for table "inhg" are not allowed
+CREATE TABLE inhz (xx text DEFAULT 'text', yy int UNIQUE);
+NOTICE:  CREATE TABLE / UNIQUE will create implicit index "inhz_yy_key" for table "inhz"
+CREATE UNIQUE INDEX inhz_xx_idx on inhz (xx) WHERE xx <> 'test';
+/* Ok to create multiple unique indexes */
+CREATE TABLE inhg (x text UNIQUE, LIKE inhz INCLUDING INDEXES);
+NOTICE:  CREATE TABLE / UNIQUE will create implicit index "inhg_x_key" for table "inhg"
+NOTICE:  CREATE TABLE / UNIQUE will create implicit index "inhg_yy_key" for table "inhg"
+INSERT INTO inhg (xx, yy, x) VALUES ('test', 5, 10);
+INSERT INTO inhg (xx, yy, x) VALUES ('test', 10, 15);
+INSERT INTO inhg (xx, yy, x) VALUES ('foo', 10, 15); -- should fail
+ERROR:  duplicate key value violates unique constraint "inhg_x_key"
+DROP TABLE inhg;
+DROP TABLE inhz;
+-- Test changing the type of inherited columns
+insert into d values('test','one','two','three');
+alter table a alter column aa type integer using bit_length(aa);
+select * from d;
+ aa | bb  | cc  |  dd   
+----+-----+-----+-------
+ 32 | one | two | three
+(1 row)
+
+-- Tests for casting between the rowtypes of parent and child
+-- tables. See the pgsql-hackers thread beginning Dec. 4/04
+create table base (i integer);
+create table derived () inherits (base);
+insert into derived (i) values (0);
+select derived::base from derived;
+ derived 
+---------
+ (0)
+(1 row)
+
+drop table derived;
+drop table base;
+create table p1(ff1 int);
+create table p2(f1 text);
+create function p2text(p2) returns text as 'select $1.f1' language sql;
+create table c1(f3 int) inherits(p1,p2);
+insert into c1 values(123456789, 'hi', 42);
+select p2text(c1.*) from c1;
+ p2text 
+--------
+ hi
+(1 row)
+
+drop function p2text(p2);
+drop table c1;
+drop table p2;
+drop table p1;
+CREATE TABLE ac (aa TEXT);
+alter table ac add constraint ac_check check (aa is not null);
+CREATE TABLE bc (bb TEXT) INHERITS (ac);
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname  | contype | conislocal | coninhcount |      consrc      
+---------+----------+---------+------------+-------------+------------------
+ ac      | ac_check | c       | t          |           0 | (aa IS NOT NULL)
+ bc      | ac_check | c       | f          |           1 | (aa IS NOT NULL)
+(2 rows)
+
+insert into ac (aa) values (NULL);
+ERROR:  new row for relation "ac" violates check constraint "ac_check"
+insert into bc (aa) values (NULL);
+ERROR:  new row for relation "bc" violates check constraint "ac_check"
+alter table bc drop constraint ac_check;  -- fail, disallowed
+ERROR:  cannot drop inherited constraint "ac_check" of relation "bc"
+alter table ac drop constraint ac_check;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount | consrc 
+---------+---------+---------+------------+-------------+--------
+(0 rows)
+
+-- try the unnamed-constraint case
+alter table ac add check (aa is not null);
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname |   conname   | contype | conislocal | coninhcount |      consrc      
+---------+-------------+---------+------------+-------------+------------------
+ ac      | ac_aa_check | c       | t          |           0 | (aa IS NOT NULL)
+ bc      | ac_aa_check | c       | f          |           1 | (aa IS NOT NULL)
+(2 rows)
+
+insert into ac (aa) values (NULL);
+ERROR:  new row for relation "ac" violates check constraint "ac_aa_check"
+insert into bc (aa) values (NULL);
+ERROR:  new row for relation "bc" violates check constraint "ac_aa_check"
+alter table bc drop constraint ac_aa_check;  -- fail, disallowed
+ERROR:  cannot drop inherited constraint "ac_aa_check" of relation "bc"
+alter table ac drop constraint ac_aa_check;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount | consrc 
+---------+---------+---------+------------+-------------+--------
+(0 rows)
+
+alter table ac add constraint ac_check check (aa is not null);
+alter table bc no inherit ac;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname  | contype | conislocal | coninhcount |      consrc      
+---------+----------+---------+------------+-------------+------------------
+ ac      | ac_check | c       | t          |           0 | (aa IS NOT NULL)
+ bc      | ac_check | c       | t          |           0 | (aa IS NOT NULL)
+(2 rows)
+
+alter table bc drop constraint ac_check;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname  | contype | conislocal | coninhcount |      consrc      
+---------+----------+---------+------------+-------------+------------------
+ ac      | ac_check | c       | t          |           0 | (aa IS NOT NULL)
+(1 row)
+
+alter table ac drop constraint ac_check;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount | consrc 
+---------+---------+---------+------------+-------------+--------
+(0 rows)
+
+drop table bc;
+drop table ac;
+create table ac (a int constraint check_a check (a <> 0));
+create table bc (a int constraint check_a check (a <> 0), b int constraint check_b check (b <> 0)) inherits (ac);
+NOTICE:  merging column "a" with inherited definition
+NOTICE:  merging constraint "check_a" with inherited definition
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount |  consrc  
+---------+---------+---------+------------+-------------+----------
+ ac      | check_a | c       | t          |           0 | (a <> 0)
+ bc      | check_a | c       | t          |           1 | (a <> 0)
+ bc      | check_b | c       | t          |           0 | (b <> 0)
+(3 rows)
+
+drop table bc;
+drop table ac;
+create table ac (a int constraint check_a check (a <> 0));
+create table bc (b int constraint check_b check (b <> 0));
+create table cc (c int constraint check_c check (c <> 0)) inherits (ac, bc);
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc', 'cc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount |  consrc  
+---------+---------+---------+------------+-------------+----------
+ ac      | check_a | c       | t          |           0 | (a <> 0)
+ bc      | check_b | c       | t          |           0 | (b <> 0)
+ cc      | check_a | c       | f          |           1 | (a <> 0)
+ cc      | check_b | c       | f          |           1 | (b <> 0)
+ cc      | check_c | c       | t          |           0 | (c <> 0)
+(5 rows)
+
+alter table cc no inherit bc;
+select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc', 'cc') order by 1,2;
+ relname | conname | contype | conislocal | coninhcount |  consrc  
+---------+---------+---------+------------+-------------+----------
+ ac      | check_a | c       | t          |           0 | (a <> 0)
+ bc      | check_b | c       | t          |           0 | (b <> 0)
+ cc      | check_a | c       | f          |           1 | (a <> 0)
+ cc      | check_b | c       | t          |           0 | (b <> 0)
+ cc      | check_c | c       | t          |           0 | (c <> 0)
+(5 rows)
+
+drop table cc;
+drop table bc;
+drop table ac;
+create table p1(f1 int);
+create table p2(f2 int);
+create table c1(f3 int) inherits(p1,p2);
+insert into c1 values(1,-1,2);
+alter table p2 add constraint cc check (f2>0);  -- fail
+ERROR:  check constraint "cc" is violated by some row
+alter table p2 add check (f2>0);  -- check it without a name, too
+ERROR:  check constraint "p2_f2_check" is violated by some row
+delete from c1;
+insert into c1 values(1,1,2);
+alter table p2 add check (f2>0);
+insert into c1 values(1,-1,2);  -- fail
+ERROR:  new row for relation "c1" violates check constraint "p2_f2_check"
+create table c2(f3 int) inherits(p1,p2);
+\d c2
+      Table "public.c2"
+ Column |  Type   | Modifiers 
+--------+---------+-----------
+ f1     | integer | 
+ f2     | integer | 
+ f3     | integer | 
+Check constraints:
+    "p2_f2_check" CHECK (f2 > 0)
+Inherits: p1,
+          p2
+
+create table c3 (f4 int) inherits(c1,c2);
+NOTICE:  merging multiple inherited definitions of column "f1"
+NOTICE:  merging multiple inherited definitions of column "f2"
+NOTICE:  merging multiple inherited definitions of column "f3"
+\d c3
+      Table "public.c3"
+ Column |  Type   | Modifiers 
+--------+---------+-----------
+ f1     | integer | 
+ f2     | integer | 
+ f3     | integer | 
+ f4     | integer | 
+Check constraints:
+    "p2_f2_check" CHECK (f2 > 0)
+Inherits: c1,
+          c2
+
+drop table p1 cascade;
+NOTICE:  drop cascades to 3 other objects
+DETAIL:  drop cascades to table c1
+drop cascades to table c2
+drop cascades to table c3
+drop table p2 cascade;
+create table pp1 (f1 int);
+create table cc1 (f2 text, f3 int) inherits (pp1);
+alter table pp1 add column a1 int check (a1 > 0);
+\d cc1
+      Table "public.cc1"
+ Column |  Type   | Modifiers 
+--------+---------+-----------
+ f1     | integer | 
+ f2     | text    | 
+ f3     | integer | 
+ a1     | integer | 
+Check constraints:
+    "pp1_a1_check" CHECK (a1 > 0)
+Inherits: pp1
+
+create table cc2(f4 float) inherits(pp1,cc1);
+NOTICE:  merging multiple inherited definitions of column "f1"
+NOTICE:  merging multiple inherited definitions of column "a1"
+\d cc2
+          Table "public.cc2"
+ Column |       Type       | Modifiers 
+--------+------------------+-----------
+ f1     | integer          | 
+ a1     | integer          | 
+ f2     | text             | 
+ f3     | integer          | 
+ f4     | double precision | 
+Check constraints:
+    "pp1_a1_check" CHECK (a1 > 0)
+Inherits: pp1,
+          cc1
+
+alter table pp1 add column a2 int check (a2 > 0);
+NOTICE:  merging definition of column "a2" for child "cc2"
+NOTICE:  merging constraint "pp1_a2_check" with inherited definition
+\d cc2
+          Table "public.cc2"
+ Column |       Type       | Modifiers 
+--------+------------------+-----------
+ f1     | integer          | 
+ a1     | integer          | 
+ f2     | text             | 
+ f3     | integer          | 
+ f4     | double precision | 
+ a2     | integer          | 
+Check constraints:
+    "pp1_a1_check" CHECK (a1 > 0)
+    "pp1_a2_check" CHECK (a2 > 0)
+Inherits: pp1,
+          cc1
+
+drop table pp1 cascade;
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to table cc1
+drop cascades to table cc2
