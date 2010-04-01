@@ -6,6 +6,7 @@
  *
  * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
+ * Portions Copyright (c) 2010 Nippon Telegraph and Telephone Corporation
  *
  * $PostgreSQL$
  *
@@ -59,5 +60,9 @@ extern void AutovacuumLauncherIAm(void);
 /* shared memory stuff */
 extern Size AutoVacuumShmemSize(void);
 extern void AutoVacuumShmemInit(void);
+
+#ifdef PGXC  /* PGXC_DATANODE */
+bool IsAutoVacuumWorkerProcess(void);
+#endif
 
 #endif   /* AUTOVACUUM_H */

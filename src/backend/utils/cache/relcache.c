@@ -5,6 +5,7 @@
  *
  * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
+ * Portions Copyright (c) 2010 Nippon Telegraph and Telephone Corporation
  *
  *
  * IDENTIFICATION
@@ -33,6 +34,9 @@
 #include "access/heapam.h"
 #include "access/reloptions.h"
 #include "access/sysattr.h"
+#ifdef PGXC
+#include "access/transam.h"
+#endif
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/index.h"
@@ -56,6 +60,9 @@
 #include "optimizer/planmain.h"
 #include "optimizer/prep.h"
 #include "optimizer/var.h"
+#ifdef PGXC
+#include "pgxc/pgxc.h"
+#endif
 #include "rewrite/rewriteDefine.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
@@ -853,6 +860,10 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 	else
 		relation->trigdesc = NULL;
 
+#ifdef PGXC
+	if (IS_PGXC_COORDINATOR && relation->rd_id >= FirstNormalObjectId)
+		RelationBuildLocator(relation);
+#endif
 	/*
 	 * if it's an index, initialize index-related information
 	 */
@@ -1743,6 +1754,10 @@ RelationDestroyRelation(Relation relation)
 	list_free(relation->rd_indexlist);
 	bms_free(relation->rd_indexattr);
 	FreeTriggerDesc(relation->trigdesc);
+#ifdef PGXC
+	if (relation->rd_locator_info)
+		FreeRelationLocInfo(relation->rd_locator_info);
+#endif
 	if (relation->rd_options)
 		pfree(relation->rd_options);
 	if (relation->rd_indextuple)

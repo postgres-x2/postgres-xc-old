@@ -6,6 +6,7 @@
  *
  * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
+ * Portions Copyright (c) 2010 Nippon Telegraph and Telephone Corporation
  *
  * $PostgreSQL$
  *
@@ -146,6 +147,9 @@ typedef enum ObjectClass
 	OCLASS_FDW,					/* pg_foreign_data_wrapper */
 	OCLASS_FOREIGN_SERVER,		/* pg_foreign_server */
 	OCLASS_USER_MAPPING,		/* pg_user_mapping */
+#ifdef PGXC
+	OCLASS_PGXC_CLASS,		/* pgxc_class */
+#endif
 	MAX_OCLASS					/* MUST BE LAST */
 } ObjectClass;
 
