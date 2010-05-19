@@ -547,6 +547,8 @@ DefineRelation(CreateStmt *stmt, char relkind)
 	{
 		AddRelationDistribution (relationId, stmt->distributeby, inheritOids, descriptor);
 		CommandCounterIncrement();
+		/* Make sure locator info gets rebuilt */
+		RelationCacheInvalidateEntry(relationId);
 	}
 #endif
 
