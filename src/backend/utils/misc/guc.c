@@ -55,6 +55,7 @@
 #include "parser/scansup.h"
 #include "pgstat.h"
 #ifdef PGXC
+#include "pgxc/execRemote.h"
 #include "pgxc/locator.h"
 #include "pgxc/planner.h"
 #include "pgxc/poolmgr.h"
@@ -1262,7 +1263,7 @@ static struct config_bool ConfigureNamesBool[] =
 		{"strict_select_checking", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Forbid if SELECT has ORDER BY"),
 			gettext_noop("and is not safe for the cluster"),
-			GUC_NOT_IN_SAMPLE	
+			GUC_NOT_IN_SAMPLE
 		},
 		&StrictSelectChecking,
 		false, NULL, NULL
@@ -1302,7 +1303,7 @@ static struct config_int ConfigureNamesInt[] =
 			gettext_noop("This applies to table columns that have not had a "
 				"column-specific target set via ALTER TABLE SET STATISTICS.")
 		},
-		&default_statistics_target, 
+		&default_statistics_target,
 		100, 1, 10000, NULL, NULL
 	},
 	{
@@ -2019,8 +2020,8 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&NumDataNodes,
-		2, 1, 65535, NULL, NULL	
-	},	
+		2, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"min_pool_size", PGC_POSTMASTER, DATA_NODES,
@@ -2029,8 +2030,8 @@ static struct config_int ConfigureNamesInt[] =
 						 "new connections are established")
 		},
 		&MinPoolSize,
-		1, 1, 65535, NULL, NULL	
-	},	
+		1, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"max_pool_size", PGC_POSTMASTER, DATA_NODES,
@@ -2039,8 +2040,8 @@ static struct config_int ConfigureNamesInt[] =
 						 "other connection requests will be refused")
 		},
 		&MaxPoolSize,
-		100, 1, 65535, NULL, NULL	
-	},	
+		100, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"pooler_port", PGC_POSTMASTER, DATA_NODES,
@@ -2048,8 +2049,8 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&PoolerPort,
-		6667, 1, 65535, NULL, NULL	
-	},	
+		6667, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"gtm_port", PGC_POSTMASTER, GTM,
@@ -2057,8 +2058,8 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&GtmPort,
-		6666, 1, 65535, NULL, NULL	
-	},	
+		6666, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"gtm_coordinator_id", PGC_POSTMASTER, GTM,
@@ -2066,8 +2067,8 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&GtmCoordinatorId,
-		1, 1, INT_MAX, NULL, NULL	
-	},	
+		1, 1, INT_MAX, NULL, NULL
+	},
 
 	{
 		{"primary_data_node", PGC_POSTMASTER, DATA_NODES,
@@ -2075,8 +2076,8 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&primary_data_node,
-		1, 0, INT_MAX, NULL, NULL	
-	},	
+		1, 0, INT_MAX, NULL, NULL
+	},
 #endif
 	/* End-of-list marker */
 	{
@@ -2635,8 +2636,8 @@ static struct config_string ConfigureNamesString[] =
 			gettext_noop("A list of data nodes to read from replicated tables")
 		},
 		&PreferredDataNodes,
-		"", NULL, NULL	
-	},	
+		"", NULL, NULL
+	},
 
 	{
 		{"data_node_hosts", PGC_POSTMASTER, DATA_NODES,
