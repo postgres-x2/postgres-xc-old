@@ -58,7 +58,12 @@
 #include "utils/syscache.h"
 
 #ifdef PGXC
+#include "pgxc/locator.h"
 #include "pgxc/pgxc.h"
+#include "pgxc/planner.h"
+
+static void ExecUtilityStmtOnNodes(const char *queryString, Exec_Nodes *nodes,
+					   bool force_autocommit);
 #endif
 
 
@@ -302,6 +307,10 @@ ProcessUtility(Node *parsetree,
 						{
 							ListCell   *lc;
 
+#ifdef PGXC
+							if (IS_PGXC_COORDINATOR)
+								DataNodeBegin();
+#endif
 							BeginTransactionBlock();
 							foreach(lc, stmt->options)
 							{
@@ -320,6 +329,10 @@ ProcessUtility(Node *parsetree,
 						break;
 
 					case TRANS_STMT_COMMIT:
+#ifdef PGXC
+						if (IS_PGXC_COORDINATOR)
+							DataNodeCommit();
+#endif
 						if (!EndTransactionBlock())
 						{
 							/* report unsuccessful commit in completionTag */
@@ -348,6 +361,10 @@ ProcessUtility(Node *parsetree,
 						break;
 
 					case TRANS_STMT_ROLLBACK:
+#ifdef PGXC
+						if (IS_PGXC_COORDINATOR)
+							DataNodeBegin();
+#endif
 						UserAbortTransactionBlock();
 						break;
 
@@ -426,6 +443,10 @@ ProcessUtility(Node *parsetree,
 			 * relation and attribute manipulation
 			 */
 		case T_CreateSchemaStmt:
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			CreateSchemaCommand((CreateSchemaStmt *) parsetree,
 								queryString);
 			break;
@@ -436,6 +457,7 @@ ProcessUtility(Node *parsetree,
 				ListCell   *l;
 				Oid			relOid;
 
+				/* PGXC transformCreateStmt also adds T_RemoteQuery node */
 				/* Run parse analysis ... */
 				stmts = transformCreateStmt((CreateStmt *) parsetree,
 											queryString);
@@ -542,7 +564,6 @@ ProcessUtility(Node *parsetree,
 		case T_DropStmt:
 			{
 				DropStmt   *stmt = (DropStmt *) parsetree;
-
 				switch (stmt->removeType)
 				{
 					case OBJECT_TABLE:
@@ -586,11 +607,31 @@ ProcessUtility(Node *parsetree,
 							 (int) stmt->removeType);
 						break;
 				}
+#ifdef PGXC
+				/*
+				 * PGXCTODO
+				 * We may need to check details of the object being dropped and
+				 * run command on correct nodes
+				 */
+				if (IS_PGXC_COORDINATOR)
+					/* sequence exists only on coordinator */
+					if (stmt->removeType != OBJECT_SEQUENCE)
+						ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			}
 			break;
 
 		case T_TruncateStmt:
 			ExecuteTruncate((TruncateStmt *) parsetree);
+#ifdef PGXC
+			/*
+			 * PGXCTODO
+			 * We may need to check details of the object being truncated and
+			 * run command on correct nodes
+			 */
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CommentStmt:
@@ -600,11 +641,7 @@ ProcessUtility(Node *parsetree,
 		case T_CopyStmt:
 			{
 				uint64		processed;
-#ifdef PGXC
-				processed = DoCopy((CopyStmt *) parsetree, queryString, true);
-#else
-				processed = DoCopy((CopyStmt *) parsetree, queryString):
-#endif
+				processed = DoCopy((CopyStmt *) parsetree, queryString);
 				if (completionTag)
 					snprintf(completionTag, COMPLETION_TAG_BUFSIZE,
 							 "COPY " UINT64_FORMAT, processed);
@@ -630,10 +667,18 @@ ProcessUtility(Node *parsetree,
 			 * schema
 			 */
 		case T_RenameStmt:
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			ExecRenameStmt((RenameStmt *) parsetree);
 			break;
 
 		case T_AlterObjectSchemaStmt:
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
 			break;
 
@@ -646,6 +691,7 @@ ProcessUtility(Node *parsetree,
 				List	   *stmts;
 				ListCell   *l;
 
+				/* PGXC transformCreateStmt also adds T_RemoteQuery node */
 				/* Run parse analysis ... */
 				stmts = transformAlterTableStmt((AlterTableStmt *) parsetree,
 												queryString);
@@ -720,6 +766,10 @@ ProcessUtility(Node *parsetree,
 						break;
 				}
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_GrantStmt:
@@ -773,6 +823,10 @@ ProcessUtility(Node *parsetree,
 						break;
 				}
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CompositeTypeStmt:		/* CREATE TYPE (composite) */
@@ -781,10 +835,18 @@ ProcessUtility(Node *parsetree,
 
 				DefineCompositeType(stmt->typevar, stmt->coldeflist);
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreateEnumStmt:	/* CREATE TYPE (enum) */
 			DefineEnum((CreateEnumStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_ViewStmt:		/* CREATE VIEW */
@@ -793,10 +855,18 @@ ProcessUtility(Node *parsetree,
 
 		case T_CreateFunctionStmt:		/* CREATE FUNCTION */
 			CreateFunction((CreateFunctionStmt *) parsetree, queryString);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_AlterFunctionStmt:		/* ALTER FUNCTION */
 			AlterFunction((AlterFunctionStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_IndexStmt:		/* CREATE INDEX */
@@ -829,11 +899,20 @@ ProcessUtility(Node *parsetree,
 							false,		/* skip_build */
 							false,		/* quiet */
 							stmt->concurrent);	/* concurrent */
+#ifdef PGXC
+				if (IS_PGXC_COORDINATOR)
+					ExecUtilityStmtOnNodes(queryString, NULL,
+										   stmt->concurrent);
+#endif
 			}
 			break;
 
 		case T_RuleStmt:		/* CREATE RULE */
 			DefineRule((RuleStmt *) parsetree, queryString);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreateSeqStmt:
@@ -865,19 +944,35 @@ ProcessUtility(Node *parsetree,
 						break;
 				}
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreatedbStmt:
 			PreventTransactionChain(isTopLevel, "CREATE DATABASE");
 			createdb((CreatedbStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true);
+#endif
 			break;
 
 		case T_AlterDatabaseStmt:
 			AlterDatabase((AlterDatabaseStmt *) parsetree, isTopLevel);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_AlterDatabaseSetStmt:
 			AlterDatabaseSet((AlterDatabaseSetStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_DropdbStmt:
@@ -887,6 +982,10 @@ ProcessUtility(Node *parsetree,
 				PreventTransactionChain(isTopLevel, "DROP DATABASE");
 				dropdb(stmt->dbname, stmt->missing_ok);
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true);
+#endif
 			break;
 
 			/* Query-level asynchronous notification */
@@ -927,23 +1026,51 @@ ProcessUtility(Node *parsetree,
 				/* Allowed names are restricted if you're not superuser */
 				load_file(stmt->filename, !superuser());
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_ClusterStmt:
 			cluster((ClusterStmt *) parsetree, isTopLevel);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true);
+#endif
 			break;
 
 		case T_VacuumStmt:
+#ifdef PGXC
+			/*
+			 * We have to run the command on nodes before coordinator because
+			 * vacuum() pops active snapshot and we can not send it to nodes
+			 */
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true);
+#endif
 			vacuum((VacuumStmt *) parsetree, InvalidOid, true, NULL, false,
 				   isTopLevel);
 			break;
 
 		case T_ExplainStmt:
 			ExplainQuery((ExplainStmt *) parsetree, queryString, params, dest);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+			{
+				Exec_Nodes *nodes = (Exec_Nodes *) palloc0(sizeof(Exec_Nodes));
+				nodes->nodelist = GetAnyDataNode();
+				ExecUtilityStmtOnNodes(queryString, nodes, false);
+			}
+#endif
 			break;
 
 		case T_VariableSetStmt:
 			ExecSetVariableStmt((VariableSetStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_VariableShowStmt:
@@ -962,6 +1089,10 @@ ProcessUtility(Node *parsetree,
 
 		case T_CreateTrigStmt:
 			CreateTrigger((CreateTrigStmt *) parsetree, InvalidOid, true);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_DropPropertyStmt:
@@ -989,14 +1120,26 @@ ProcessUtility(Node *parsetree,
 						break;
 				}
 			}
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreatePLangStmt:
 			CreateProceduralLanguage((CreatePLangStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_DropPLangStmt:
 			DropProceduralLanguage((DropPLangStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 			/*
@@ -1004,6 +1147,10 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_CreateDomainStmt:
 			DefineDomain((CreateDomainStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 			/*
@@ -1053,6 +1200,10 @@ ProcessUtility(Node *parsetree,
 						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 						 errmsg("must be superuser to do CHECKPOINT")));
 			RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_FORCE | CHECKPOINT_WAIT);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true);
+#endif
 			break;
 
 		case T_ReindexStmt:
@@ -1085,56 +1236,122 @@ ProcessUtility(Node *parsetree,
 							 (int) stmt->kind);
 						break;
 				}
+#ifdef PGXC
+				if (IS_PGXC_COORDINATOR)
+					ExecUtilityStmtOnNodes(queryString, NULL,
+										   stmt->kind == OBJECT_DATABASE);
+#endif
 				break;
 			}
 			break;
 
 		case T_CreateConversionStmt:
 			CreateConversionCommand((CreateConversionStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreateCastStmt:
 			CreateCast((CreateCastStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_DropCastStmt:
 			DropCast((DropCastStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreateOpClassStmt:
 			DefineOpClass((CreateOpClassStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_CreateOpFamilyStmt:
 			DefineOpFamily((CreateOpFamilyStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_AlterOpFamilyStmt:
 			AlterOpFamily((AlterOpFamilyStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_RemoveOpClassStmt:
 			RemoveOpClass((RemoveOpClassStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_RemoveOpFamilyStmt:
 			RemoveOpFamily((RemoveOpFamilyStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_AlterTSDictionaryStmt:
 			AlterTSDictionary((AlterTSDictionaryStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
 
 		case T_AlterTSConfigurationStmt:
 			AlterTSConfiguration((AlterTSConfigurationStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false);
+#endif
 			break;
-
+#ifdef PGXC
+		case T_RemoteQuery:
+			Assert(IS_PGXC_COORDINATOR);
+			ExecRemoteUtility((RemoteQuery *) parsetree);
+			break;
+#endif
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(parsetree));
 			break;
 	}
 }
+
+#ifdef PGXC
+static void
+ExecUtilityStmtOnNodes(const char *queryString, Exec_Nodes *nodes,
+					   bool force_autocommit)
+{
+	RemoteQuery *step = makeNode(RemoteQuery);
+	step->combine_type = COMBINE_TYPE_SAME;
+	step->exec_nodes = nodes;
+	step->sql_statement = pstrdup(queryString);
+	step->force_autocommit = force_autocommit;
+	ExecRemoteUtility(step);
+	pfree(step->sql_statement);
+	pfree(step);
+}
+#endif
 
 /*
  * UtilityReturnsTuples
@@ -2102,7 +2319,7 @@ CreateCommandTag(Node *parsetree)
 				}
 			}
 			break;
-		
+
 		case T_ExecDirectStmt:
 			tag = "EXECUTE DIRECT";
 			break;
