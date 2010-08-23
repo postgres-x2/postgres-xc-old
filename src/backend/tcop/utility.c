@@ -306,7 +306,6 @@ ProcessUtility(Node *parsetree,
 					case TRANS_STMT_START:
 						{
 							ListCell   *lc;
-
 #ifdef PGXC
 							if (IS_PGXC_COORDINATOR)
 								DataNodeBegin();
@@ -329,10 +328,6 @@ ProcessUtility(Node *parsetree,
 						break;
 
 					case TRANS_STMT_COMMIT:
-#ifdef PGXC
-						if (IS_PGXC_COORDINATOR)
-							DataNodeCommit();
-#endif
 						if (!EndTransactionBlock())
 						{
 							/* report unsuccessful commit in completionTag */
@@ -361,10 +356,6 @@ ProcessUtility(Node *parsetree,
 						break;
 
 					case TRANS_STMT_ROLLBACK:
-#ifdef PGXC
-						if (IS_PGXC_COORDINATOR)
-							DataNodeBegin();
-#endif
 						UserAbortTransactionBlock();
 						break;
 
@@ -1055,21 +1046,16 @@ ProcessUtility(Node *parsetree,
 
 		case T_ExplainStmt:
 			ExplainQuery((ExplainStmt *) parsetree, queryString, params, dest);
-#ifdef PGXC
-			if (IS_PGXC_COORDINATOR)
-			{
-				Exec_Nodes *nodes = (Exec_Nodes *) palloc0(sizeof(Exec_Nodes));
-				nodes->nodelist = GetAnyDataNode();
-				ExecUtilityStmtOnNodes(queryString, nodes, false);
-			}
-#endif
 			break;
 
 		case T_VariableSetStmt:
 			ExecSetVariableStmt((VariableSetStmt *) parsetree);
 #ifdef PGXC
+/* PGXCTODO - this currently causes an assertion failure.
+ We should change when we add SET handling properly
 			if (IS_PGXC_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, false);
+*/
 #endif
 			break;
 
