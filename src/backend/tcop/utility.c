@@ -63,7 +63,7 @@
 #include "pgxc/planner.h"
 
 static void ExecUtilityStmtOnNodes(const char *queryString, ExecNodes *nodes,
-					   bool force_autocommit);
+								   bool force_autocommit, RemoteQueryExecType exec_type);
 #endif
 
 
@@ -280,6 +280,8 @@ ProcessUtility(Node *parsetree,
 			   DestReceiver *dest,
 			   char *completionTag)
 {
+	bool operation_local = false;
+
 	Assert(queryString != NULL);	/* required as of 8.4 */
 
 	check_xact_readonly(parsetree);
@@ -307,8 +309,12 @@ ProcessUtility(Node *parsetree,
 						{
 							ListCell   *lc;
 #ifdef PGXC
-							if (IS_PGXC_COORDINATOR)
-								DataNodeBegin();
+							/*
+							 * If a COMMIT PREPARED message is received from another Coordinator,
+							 * Don't send it down to Datanodes.
+							 */
+							if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
+								PGXCNodeBegin();
 #endif
 							BeginTransactionBlock();
 							foreach(lc, stmt->options)
@@ -339,15 +345,27 @@ ProcessUtility(Node *parsetree,
 					case TRANS_STMT_PREPARE:
 #ifdef PGXC
 						/*
-						 * If 2PC if invoked from application, transaction is first prepared on Datanodes.
+						 * If 2PC is invoked from application, transaction is first prepared on Datanodes.
 						 * 2PC file is not written for Coordinators to keep the possiblity
-						 * of a COMMIT PREPARED on a separate Coordinator
+						 * of a COMMIT PREPARED on a separate Coordinator.
 						 */
-						if (IS_PGXC_COORDINATOR)
-							DataNodePrepare(stmt->gid);
-#endif
+						if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
+							operation_local = PGXCNodePrepare(stmt->gid);
+
+						/*
+						 * On a Postgres-XC Datanode, a prepare command coming from Coordinator
+						 * has always to be executed.
+						 * On a Coordinator also when a DDL has been involved in the prepared transaction
+						 */
+						if (IsConnFromCoord())
+							operation_local = true;
+
+						if (!PrepareTransactionBlock(stmt->gid, operation_local))
+						{
+#else
 						if (!PrepareTransactionBlock(stmt->gid))
 						{
+#endif
 							/* report unsuccessful commit in completionTag */
 							if (completionTag)
 								strcpy(completionTag, "ROLLBACK");
@@ -356,18 +374,23 @@ ProcessUtility(Node *parsetree,
 
 					case TRANS_STMT_COMMIT_PREPARED:
 #ifdef PGXC
-						if (IS_PGXC_COORDINATOR)
-							DataNodeCommitPrepared(stmt->gid);
+						/*
+						 * If a COMMIT PREPARED message is received from another Coordinator,
+						 * Don't send it down to Datanodes.
+						 */
+						if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
+							operation_local = PGXCNodeCommitPrepared(stmt->gid);
 #endif
 						PreventTransactionChain(isTopLevel, "COMMIT PREPARED");
-
 #ifdef PGXC
-						if (IS_PGXC_DATANODE)
+						/*
+						 * A local Coordinator always commits if involved in Prepare.
+						 * 2PC file is created and flushed if a DDL has been involved in the transaction.
+						 * If remote connection is a Coordinator type, the commit prepared has to be done locally
+						 * if and only if the Coordinator number was in the node list received from GTM.
+						 */
+						if (operation_local || IsConnFromCoord())
 						{
-							/*
-							 * 2PC file of Coordinator is not flushed to disk when transaction is prepared
-							 * so just skip this part.
-							 */
 #endif
 						FinishPreparedTransaction(stmt->gid, true);
 #ifdef PGXC
@@ -377,19 +400,22 @@ ProcessUtility(Node *parsetree,
 
 					case TRANS_STMT_ROLLBACK_PREPARED:
 #ifdef PGXC
-						if (IS_PGXC_COORDINATOR)
-							DataNodeRollbackPrepared(stmt->gid);
+						/*
+						 * If a ROLLBACK PREPARED message is received from another Coordinator,
+						 * Don't send it down to Datanodes.
+						 */
+						if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
+							operation_local = PGXCNodeRollbackPrepared(stmt->gid);
 #endif
-
 						PreventTransactionChain(isTopLevel, "ROLLBACK PREPARED");
-
 #ifdef PGXC
-						if (IS_PGXC_DATANODE)
+						/*
+						 * Local coordinator rollbacks if involved in PREPARE
+						 * If remote connection is a Coordinator type, the commit prepared has to be done locally also.
+						 * This works for both Datanodes and Coordinators.
+						 */
+						if (operation_local || IsConnFromCoord())
 						{
-							/*
-							 * 2PC file of Coordinator is not flushed to disk when transaction is prepared
-							 * so just skip this part.
-							 */
 #endif
 						FinishPreparedTransaction(stmt->gid, false);
 #ifdef PGXC
@@ -478,7 +504,7 @@ ProcessUtility(Node *parsetree,
 		case T_CreateSchemaStmt:
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			CreateSchemaCommand((CreateSchemaStmt *) parsetree,
 								queryString);
@@ -647,9 +673,13 @@ ProcessUtility(Node *parsetree,
 				 * run command on correct nodes
 				 */
 				if (IS_PGXC_COORDINATOR)
-					/* sequence exists only on coordinator */
-					if (stmt->removeType != OBJECT_SEQUENCE)
-						ExecUtilityStmtOnNodes(queryString, NULL, false);
+				{
+					/* Sequence exists only on Coordinators */
+					if (stmt->removeType == OBJECT_SEQUENCE)
+						ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_COORDS);
+					else
+						ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+				}
 #endif
 			}
 			break;
@@ -663,7 +693,7 @@ ProcessUtility(Node *parsetree,
 			 * run command on correct nodes
 			 */
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -702,7 +732,7 @@ ProcessUtility(Node *parsetree,
 		case T_RenameStmt:
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			ExecRenameStmt((RenameStmt *) parsetree);
 			break;
@@ -710,7 +740,7 @@ ProcessUtility(Node *parsetree,
 		case T_AlterObjectSchemaStmt:
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
 			break;
@@ -801,7 +831,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -858,7 +888,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -870,7 +900,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -878,7 +908,7 @@ ProcessUtility(Node *parsetree,
 			DefineEnum((CreateEnumStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -890,7 +920,7 @@ ProcessUtility(Node *parsetree,
 			CreateFunction((CreateFunctionStmt *) parsetree, queryString);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -898,7 +928,7 @@ ProcessUtility(Node *parsetree,
 			AlterFunction((AlterFunctionStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -935,7 +965,7 @@ ProcessUtility(Node *parsetree,
 #ifdef PGXC
 				if (IS_PGXC_COORDINATOR)
 					ExecUtilityStmtOnNodes(queryString, NULL,
-										   stmt->concurrent);
+										   stmt->concurrent, EXEC_ON_ALL_NODES);
 #endif
 			}
 			break;
@@ -944,16 +974,24 @@ ProcessUtility(Node *parsetree,
 			DefineRule((RuleStmt *) parsetree, queryString);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
 		case T_CreateSeqStmt:
 			DefineSequence((CreateSeqStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_COORDS);
+#endif
 			break;
 
 		case T_AlterSeqStmt:
 			AlterSequence((AlterSeqStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_COORDS);
+#endif
 			break;
 
 		case T_RemoveFuncStmt:
@@ -979,7 +1017,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -988,7 +1026,7 @@ ProcessUtility(Node *parsetree,
 			createdb((CreatedbStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, true);
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -996,7 +1034,7 @@ ProcessUtility(Node *parsetree,
 			AlterDatabase((AlterDatabaseStmt *) parsetree, isTopLevel);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1004,7 +1042,7 @@ ProcessUtility(Node *parsetree,
 			AlterDatabaseSet((AlterDatabaseSetStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1017,7 +1055,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, true);
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1061,7 +1099,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_DATANODES);
 #endif
 			break;
 
@@ -1069,7 +1107,7 @@ ProcessUtility(Node *parsetree,
 			cluster((ClusterStmt *) parsetree, isTopLevel);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, true);
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_DATANODES);
 #endif
 			break;
 
@@ -1080,7 +1118,7 @@ ProcessUtility(Node *parsetree,
 			 * vacuum() pops active snapshot and we can not send it to nodes
 			 */
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, true);
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_DATANODES);
 #endif
 			vacuum((VacuumStmt *) parsetree, InvalidOid, true, NULL, false,
 				   isTopLevel);
@@ -1119,7 +1157,7 @@ ProcessUtility(Node *parsetree,
 			CreateTrigger((CreateTrigStmt *) parsetree, InvalidOid, true);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1150,7 +1188,7 @@ ProcessUtility(Node *parsetree,
 			}
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1158,7 +1196,7 @@ ProcessUtility(Node *parsetree,
 			CreateProceduralLanguage((CreatePLangStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1166,7 +1204,7 @@ ProcessUtility(Node *parsetree,
 			DropProceduralLanguage((DropPLangStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1177,7 +1215,7 @@ ProcessUtility(Node *parsetree,
 			DefineDomain((CreateDomainStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1186,26 +1224,50 @@ ProcessUtility(Node *parsetree,
 			 */
 		case T_CreateRoleStmt:
 			CreateRole((CreateRoleStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_AlterRoleStmt:
 			AlterRole((AlterRoleStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_AlterRoleSetStmt:
 			AlterRoleSet((AlterRoleSetStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_DropRoleStmt:
 			DropRole((DropRoleStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_DropOwnedStmt:
 			DropOwnedObjects((DropOwnedStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_ReassignOwnedStmt:
 			ReassignOwnedObjects((ReassignOwnedStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_LockStmt:
@@ -1216,6 +1278,10 @@ ProcessUtility(Node *parsetree,
 			 */
 			RequireTransactionChain(isTopLevel, "LOCK TABLE");
 			LockTableCommand((LockStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
+#endif
 			break;
 
 		case T_ConstraintsSetStmt:
@@ -1230,7 +1296,7 @@ ProcessUtility(Node *parsetree,
 			RequestCheckpoint(CHECKPOINT_IMMEDIATE | CHECKPOINT_FORCE | CHECKPOINT_WAIT);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, true);
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_DATANODES);
 #endif
 			break;
 
@@ -1267,7 +1333,7 @@ ProcessUtility(Node *parsetree,
 #ifdef PGXC
 				if (IS_PGXC_COORDINATOR)
 					ExecUtilityStmtOnNodes(queryString, NULL,
-										   stmt->kind == OBJECT_DATABASE);
+										   stmt->kind == OBJECT_DATABASE, EXEC_ON_ALL_NODES);
 #endif
 				break;
 			}
@@ -1277,7 +1343,7 @@ ProcessUtility(Node *parsetree,
 			CreateConversionCommand((CreateConversionStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1285,7 +1351,7 @@ ProcessUtility(Node *parsetree,
 			CreateCast((CreateCastStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1293,7 +1359,7 @@ ProcessUtility(Node *parsetree,
 			DropCast((DropCastStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1301,7 +1367,7 @@ ProcessUtility(Node *parsetree,
 			DefineOpClass((CreateOpClassStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1309,7 +1375,7 @@ ProcessUtility(Node *parsetree,
 			DefineOpFamily((CreateOpFamilyStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1317,7 +1383,7 @@ ProcessUtility(Node *parsetree,
 			AlterOpFamily((AlterOpFamilyStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1325,7 +1391,7 @@ ProcessUtility(Node *parsetree,
 			RemoveOpClass((RemoveOpClassStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1333,7 +1399,7 @@ ProcessUtility(Node *parsetree,
 			RemoveOpFamily((RemoveOpFamilyStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1341,7 +1407,7 @@ ProcessUtility(Node *parsetree,
 			AlterTSDictionary((AlterTSDictionaryStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 
@@ -1349,13 +1415,18 @@ ProcessUtility(Node *parsetree,
 			AlterTSConfiguration((AlterTSConfigurationStmt *) parsetree);
 #ifdef PGXC
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, false, EXEC_ON_ALL_NODES);
 #endif
 			break;
 #ifdef PGXC
 		case T_RemoteQuery:
 			Assert(IS_PGXC_COORDINATOR);
-			ExecRemoteUtility((RemoteQuery *) parsetree);
+			/*
+			 * Do not launch query on Other Datanodes if remote connection is a coordinator one
+			 * it will cause a deadlock in the cluster at Datanode levels.
+			 */
+			if (!IsConnFromCoord())
+				ExecRemoteUtility((RemoteQuery *) parsetree);
 			break;
 #endif
 		default:
@@ -1366,18 +1437,28 @@ ProcessUtility(Node *parsetree,
 }
 
 #ifdef PGXC
+/*
+ * Execute a Utility statement on nodes, including Coordinators
+ * If the DDL is received from a remote Coordinator,
+ * it is not possible to push down DDL to Datanodes
+ * as it is taken in charge by the remote Coordinator.
+ */
 static void
 ExecUtilityStmtOnNodes(const char *queryString, ExecNodes *nodes,
-					   bool force_autocommit)
+					   bool force_autocommit, RemoteQueryExecType exec_type)
 {
-	RemoteQuery *step = makeNode(RemoteQuery);
-	step->combine_type = COMBINE_TYPE_SAME;
-	step->exec_nodes = nodes;
-	step->sql_statement = pstrdup(queryString);
-	step->force_autocommit = force_autocommit;
-	ExecRemoteUtility(step);
-	pfree(step->sql_statement);
-	pfree(step);
+	if (!IsConnFromCoord())
+	{
+		RemoteQuery *step = makeNode(RemoteQuery);
+		step->combine_type = COMBINE_TYPE_SAME;
+		step->exec_nodes = nodes;
+		step->sql_statement = pstrdup(queryString);
+		step->force_autocommit = force_autocommit;
+		step->exec_type = exec_type;
+		ExecRemoteUtility(step);
+		pfree(step->sql_statement);
+		pfree(step);
+	}
 }
 #endif
 
