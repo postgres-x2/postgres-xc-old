@@ -687,6 +687,16 @@ static struct config_bool ConfigureNamesBool[] =
 		&enable_hashjoin,
 		true, NULL, NULL
 	},
+#ifdef PGXC
+	{       
+		{"enable_remotejoin", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of remote join plans."),
+			NULL
+		},  
+		&enable_remotejoin,
+		true, NULL, NULL
+	},      
+#endif
 	{
 		{"geqo", PGC_USERSET, QUERY_TUNING_GEQO,
 			gettext_noop("Enables genetic query optimization."),

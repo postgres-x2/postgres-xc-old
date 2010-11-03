@@ -923,6 +923,11 @@ addRangeTableEntry(ParseState *pstate,
 	rel = parserOpenTable(pstate, relation, lockmode);
 	rte->relid = RelationGetRelid(rel);
 
+#ifdef PGXC
+	rte->reltupdesc = CreateTupleDescCopyConstr(rel->rd_att);
+	rte->relname = RelationGetRelationName(rel);
+#endif
+
 	/*
 	 * Build the list of effective column names using user-supplied aliases
 	 * and/or actual column names.
@@ -984,6 +989,11 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	rte->rtekind = RTE_RELATION;
 	rte->alias = alias;
 	rte->relid = RelationGetRelid(rel);
+
+#ifdef PGXC
+	rte->reltupdesc = CreateTupleDescCopyConstr(rel->rd_att);
+	rte->relname = RelationGetRelationName(rel);
+#endif
 
 	/*
 	 * Build the list of effective column names using user-supplied aliases
