@@ -61,6 +61,7 @@
 #include "pgxc/locator.h"
 #include "pgxc/pgxc.h"
 #include "pgxc/planner.h"
+#include "pgxc/poolutils.h"
 
 static void ExecUtilityStmtOnNodes(const char *queryString, ExecNodes *nodes,
 								   bool force_autocommit, RemoteQueryExecType exec_type);
@@ -1428,6 +1429,14 @@ ProcessUtility(Node *parsetree,
 			if (!IsConnFromCoord())
 				ExecRemoteUtility((RemoteQuery *) parsetree);
 			break;
+
+		case T_CleanConnStmt:
+			Assert(IS_PGXC_COORDINATOR);
+			CleanConnection((CleanConnStmt *) parsetree);
+
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, true, EXEC_ON_COORDS);
+			break;
 #endif
 		default:
 			elog(ERROR, "unrecognized node type: %d",
@@ -2432,6 +2441,9 @@ CreateCommandTag(Node *parsetree)
 		case T_ExecDirectStmt:
 			tag = "EXECUTE DIRECT";
 			break;
+		case T_CleanConnStmt:
+			tag = "CLEAN CONNECTION";
+			break;
 
 		default:
 			elog(WARNING, "unrecognized node type: %d",
@@ -2862,6 +2874,11 @@ GetCommandLogLevel(Node *parsetree)
 
 			}
 			break;
+#ifdef PGXC
+		case T_CleanConnStmt:
+			lev = LOGSTMT_DDL;
+			break;
+#endif
 
 		default:
 			elog(WARNING, "unrecognized node type: %d",
