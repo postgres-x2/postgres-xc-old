@@ -1042,6 +1042,24 @@ PostmasterMain(int argc, char *argv[])
 	 */
 	whereToSendOutput = DestNone;
 
+#ifdef PGXC
+	/* Register node on GTM during Postmaster Startup. */
+	if (IS_PGXC_COORDINATOR)
+	{
+		if (RegisterGTM(PGXC_NODE_COORDINATOR, PostPortNumber, userDoption) < 0)
+			ereport(FATAL,
+				(errcode(ERRCODE_IO_ERROR),
+				 errmsg("Can not register Coordinator on GTM")));
+	}
+	if (IS_PGXC_DATANODE)
+	{
+		if (RegisterGTM(PGXC_NODE_DATANODE, PostPortNumber, userDoption) < 0)
+			ereport(FATAL,
+				(errcode(ERRCODE_IO_ERROR),
+				 errmsg("Can not register Datanode on GTM")));
+	}
+#endif
+
 	/*
 	 * Initialize stats collection subsystem (this does NOT start the
 	 * collector process!)
@@ -2188,6 +2206,12 @@ pmdie(SIGNAL_ARGS)
 				/* and the pool manager too */
 				if (IS_PGXC_COORDINATOR && PgPoolerPID != 0)
 					signal_child(PgPoolerPID, SIGTERM);
+
+				/* Unregister Node on GTM */
+				if (IS_PGXC_COORDINATOR)
+					UnregisterGTM(PGXC_NODE_COORDINATOR);
+				else if (IS_PGXC_DATANODE)
+					UnregisterGTM(PGXC_NODE_DATANODE);
 #endif
 				pmState = PM_WAIT_BACKUP;
 			}
@@ -2240,6 +2264,12 @@ pmdie(SIGNAL_ARGS)
 				/* and the pool manager too */
 				if (IS_PGXC_COORDINATOR && PgPoolerPID != 0)
 					signal_child(PgPoolerPID, SIGTERM);
+
+				/* Unregister Node on GTM */
+				if (IS_PGXC_COORDINATOR)
+					UnregisterGTM(PGXC_NODE_COORDINATOR);
+				else if (IS_PGXC_DATANODE)
+					UnregisterGTM(PGXC_NODE_DATANODE);
 #endif
 				pmState = PM_WAIT_BACKENDS;
 			}
