@@ -433,6 +433,12 @@ ProcessUtility(Node *parsetree,
 							ListCell   *cell;
 							char	   *name = NULL;
 
+#ifdef PGXC
+							ereport(ERROR,
+									(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+									 (errmsg("SAVEPOINT is not yet supported."))));
+#endif
+
 							RequireTransactionChain(isTopLevel, "SAVEPOINT");
 
 							foreach(cell, stmt->options)
