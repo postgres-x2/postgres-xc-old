@@ -112,14 +112,13 @@ typedef enum TBlockState
 	TBLOCK_BEGIN,				/* starting transaction block */
 	TBLOCK_INPROGRESS,			/* live transaction */
 	TBLOCK_END,					/* COMMIT received */
+#ifdef PGXC
+	TBLOCK_END_NOT_GTM,			/* COMMIT received but do not commit on GTM */
+#endif
 	TBLOCK_ABORT,				/* failed xact, awaiting ROLLBACK */
 	TBLOCK_ABORT_END,			/* failed xact, ROLLBACK received */
 	TBLOCK_ABORT_PENDING,		/* live xact, ROLLBACK received */
 	TBLOCK_PREPARE,				/* live xact, PREPARE received */
-#ifdef PGXC
-	TBLOCK_PREPARE_NO_2PC_FILE,	/* PREPARE receive but skip 2PC file creation
-								 * and Commit gxact */
-#endif
 	/* subtransaction states */
 	TBLOCK_SUBBEGIN,			/* starting a subtransaction */
 	TBLOCK_SUBINPROGRESS,		/* live subtransaction */
@@ -287,7 +286,7 @@ static void CallSubXactCallbacks(SubXactEvent event,
 					 SubTransactionId mySubid,
 					 SubTransactionId parentSubid);
 static void CleanupTransaction(void);
-static void CommitTransaction(void);
+static void CommitTransaction(bool contact_gtm);
 static TransactionId RecordTransactionAbort(bool isSubXact);
 static void StartTransaction(void);
 
@@ -312,7 +311,7 @@ static const char *TransStateAsString(TransState state);
 
 #ifdef PGXC  /* PGXC_COORD */
 static GlobalTransactionId GetGlobalTransactionId(TransactionState s);
-static void PrepareTransaction(bool write_2pc_file, bool is_implicit);
+static void PrepareTransaction(bool is_implicit);
 
 /* ----------------------------------------------------------------
  *	PG-XC Functions
@@ -1744,7 +1743,7 @@ StartTransaction(void)
  * NB: if you change this routine, better look at PrepareTransaction too!
  */
 static void
-CommitTransaction(void)
+CommitTransaction(bool contact_gtm)
 {
 	TransactionState s = CurrentTransactionState;
 	TransactionId latestXid;
@@ -1754,7 +1753,7 @@ CommitTransaction(void)
 	char implicitgid[256];
 	TransactionId xid = GetCurrentTransactionId();
 
-	if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
+	if (IS_PGXC_COORDINATOR && !IsConnFromCoord() && contact_gtm)
 		PreparePGXCNodes = PGXCNodeIsImplicit2PC(&PrepareLocalCoord);
 
 	if (PrepareLocalCoord || PreparePGXCNodes)
@@ -1768,7 +1767,7 @@ CommitTransaction(void)
 		 * If current transaction has a DDL, and involves more than 1 Coordinator,
 		 * PREPARE first on local Coordinator.
 		 */
-		PrepareTransaction(true, true);
+		PrepareTransaction(true);
 	}
 	else
 	{
@@ -1865,7 +1864,7 @@ CommitTransaction(void)
 	 *
 	 * This is called only if it is not necessary to prepare the nodes.
 	 */
-	if (IS_PGXC_COORDINATOR && !IsConnFromCoord() && !PreparePGXCNodes)
+	if (IS_PGXC_COORDINATOR && !IsConnFromCoord() && !PreparePGXCNodes && contact_gtm)
 		PGXCNodeCommit();
 #endif
 
@@ -1892,12 +1891,12 @@ CommitTransaction(void)
 	 *
 	 * Also do not commit a transaction that has already been prepared on Datanodes
 	 */
-	if (IS_PGXC_COORDINATOR && !IsConnFromCoord() && !PreparePGXCNodes)
+	if (IS_PGXC_COORDINATOR && !IsConnFromCoord() && !PreparePGXCNodes && contact_gtm)
 	{
 		CommitTranGTM(s->globalTransactionId);
 		latestXid = s->globalTransactionId;
 	}
-	else if (IS_PGXC_DATANODE || IsConnFromCoord())
+	else if ((IS_PGXC_DATANODE || IsConnFromCoord()) && contact_gtm)
 	{
 		/* If we are autovacuum, commit on GTM */
 		if ((IsAutoVacuumWorkerProcess() || GetForceXidFromGTM())
@@ -2086,7 +2085,7 @@ CommitTransaction(void)
  * this is made by CommitTransaction when transaction has been committed on Nodes.
  */
 static void
-PrepareTransaction(bool write_2pc_file, bool is_implicit)
+PrepareTransaction(bool is_implicit)
 #else
 static void
 PrepareTransaction(void)
@@ -2222,7 +2221,7 @@ PrepareTransaction(void)
 	 * updates, because the transaction manager might get confused if we lose
 	 * a global transaction.
 	 */
-	EndPrepare(gxact, write_2pc_file);
+	EndPrepare(gxact);
 
 	/*
 	 * Now we clean up backend-internal state and release internal resources.
@@ -2270,17 +2269,6 @@ PrepareTransaction(void)
 	PostPrepare_MultiXact(xid);
 
 	PostPrepare_Locks(xid);
-
-#ifdef PGXC
-	/*
-	 * We want to be able to commit a prepared transaction from another coordinator,
-	 * so clean up the gxact in shared memory also.
-	 */
-	if (!write_2pc_file)
-	{
-		RemoveGXactCoord(gxact);
-	}
-#endif
 
 #ifdef PGXC
 	/*
@@ -2665,6 +2653,9 @@ StartTransactionCommand(void)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT_END:
 		case TBLOCK_SUBABORT_END:
@@ -2673,9 +2664,6 @@ StartTransactionCommand(void)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(ERROR, "StartTransactionCommand: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -2714,7 +2702,11 @@ CommitTransactionCommand(void)
 			 * transaction commit, and return to the idle state.
 			 */
 		case TBLOCK_STARTED:
+#ifdef PGXC
+			CommitTransaction(true);
+#else
 			CommitTransaction();
+#endif
 			s->blockState = TBLOCK_DEFAULT;
 			break;
 
@@ -2743,10 +2735,20 @@ CommitTransactionCommand(void)
 			 * idle state.
 			 */
 		case TBLOCK_END:
+#ifdef PGXC
+			CommitTransaction(true);
+#else
 			CommitTransaction();
+#endif
 			s->blockState = TBLOCK_DEFAULT;
 			break;
 
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+			CommitTransaction(false);
+			s->blockState = TBLOCK_DEFAULT;
+			break;
+#endif
 			/*
 			 * Here we are in the middle of a transaction block but one of the
 			 * commands caused an abort so we do nothing but remain in the
@@ -2782,20 +2784,13 @@ CommitTransactionCommand(void)
 			 * return to the idle state.
 			 */
 		case TBLOCK_PREPARE:
-			PrepareTransaction(true, false);
-			s->blockState = TBLOCK_DEFAULT;
-			break;
-
 #ifdef PGXC
-			/*
-			 * We are complieting a PREPARE TRANSACTION for a pgxc transaction
-			 * that involved DDLs on a Coordinator.
-			 */
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-			PrepareTransaction(false, false);
+			PrepareTransaction(false);
+#else
+			PrepareTransaction();
+#endif
 			s->blockState = TBLOCK_DEFAULT;
 			break;
-#endif
 
 			/*
 			 * We were just issued a SAVEPOINT inside a transaction block.
@@ -2824,23 +2819,21 @@ CommitTransactionCommand(void)
 			if (s->blockState == TBLOCK_END)
 			{
 				Assert(s->parent == NULL);
+#ifdef PGXC
+				CommitTransaction(true);
+#else
 				CommitTransaction();
+#endif
 				s->blockState = TBLOCK_DEFAULT;
 			}
 			else if (s->blockState == TBLOCK_PREPARE)
 			{
 				Assert(s->parent == NULL);
-				PrepareTransaction(true, false);
-				s->blockState = TBLOCK_DEFAULT;
-			}
 #ifdef PGXC
-			else if (s->blockState == TBLOCK_PREPARE_NO_2PC_FILE)
-			{
-				Assert(s->parent == NULL);
-				PrepareTransaction(false, false);
+				PrepareTransaction(false);
+#endif
 				s->blockState = TBLOCK_DEFAULT;
 			}
-#endif
 			else
 			{
 				Assert(s->blockState == TBLOCK_INPROGRESS ||
@@ -2998,6 +2991,9 @@ AbortCurrentTransaction(void)
 			 * the transaction).
 			 */
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 			AbortTransaction();
 			CleanupTransaction();
 			s->blockState = TBLOCK_DEFAULT;
@@ -3038,9 +3034,6 @@ AbortCurrentTransaction(void)
 			 * the transaction).
 			 */
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			AbortTransaction();
 			CleanupTransaction();
 			s->blockState = TBLOCK_DEFAULT;
@@ -3384,6 +3377,9 @@ BeginTransactionBlock(void)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT_END:
 		case TBLOCK_SUBABORT_END:
@@ -3392,9 +3388,6 @@ BeginTransactionBlock(void)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "BeginTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3413,19 +3406,18 @@ BeginTransactionBlock(void)
  * We do it this way because it's not convenient to change memory context,
  * resource owner, etc while executing inside a Portal.
  */
-#ifdef PGXC
-bool
-PrepareTransactionBlock(char *gid, bool write_2pc_file)
-#else
 bool
 PrepareTransactionBlock(char *gid)
-#endif
 {
 	TransactionState s;
 	bool		result;
 
 	/* Set up to commit the current transaction */
+#ifdef PGXC
+	result = EndTransactionBlock(true);
+#else
 	result = EndTransactionBlock();
+#endif
 
 	/* If successful, change outer tblock state to PREPARE */
 	if (result)
@@ -3440,16 +3432,6 @@ PrepareTransactionBlock(char *gid)
 			/* Save GID where PrepareTransaction can find it again */
 			prepareGID = MemoryContextStrdup(TopTransactionContext, gid);
 
-#ifdef PGXC
-			/*
-			 * For a Postgres-XC Coordinator, prepare is done for a transaction
-			 * if and only if a DDL was involved in the transaction.
-			 * If not, it is enough to prepare it on Datanodes involved only.
-			 */
-			if (!write_2pc_file)
-				s->blockState = TBLOCK_PREPARE_NO_2PC_FILE;
-			else
-#endif
 			s->blockState = TBLOCK_PREPARE;
 		}
 		else
@@ -3480,7 +3462,11 @@ PrepareTransactionBlock(char *gid)
  * resource owner, etc while executing inside a Portal.
  */
 bool
+#ifdef PGXC
+EndTransactionBlock(bool contact_gtm)
+#else
 EndTransactionBlock(void)
+#endif
 {
 	TransactionState s = CurrentTransactionState;
 	bool		result = false;
@@ -3492,6 +3478,11 @@ EndTransactionBlock(void)
 			 * to COMMIT.
 			 */
 		case TBLOCK_INPROGRESS:
+#ifdef PGXC
+			if (!contact_gtm)
+				s->blockState = TBLOCK_END_NOT_GTM;
+			else
+#endif
 			s->blockState = TBLOCK_END;
 			result = true;
 			break;
@@ -3570,6 +3561,9 @@ EndTransactionBlock(void)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT_END:
 		case TBLOCK_SUBABORT_END:
@@ -3578,9 +3572,6 @@ EndTransactionBlock(void)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "EndTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3665,6 +3656,9 @@ UserAbortTransactionBlock(void)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT_END:
 		case TBLOCK_SUBABORT_END:
@@ -3673,9 +3667,6 @@ UserAbortTransactionBlock(void)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "UserAbortTransactionBlock: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3713,6 +3704,9 @@ DefineSavepoint(char *name)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT:
 		case TBLOCK_SUBABORT:
@@ -3723,9 +3717,6 @@ DefineSavepoint(char *name)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "DefineSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3772,6 +3763,9 @@ ReleaseSavepoint(List *options)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT:
 		case TBLOCK_SUBABORT:
@@ -3782,9 +3776,6 @@ ReleaseSavepoint(List *options)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "ReleaseSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3875,6 +3866,9 @@ RollbackToSavepoint(List *options)
 		case TBLOCK_BEGIN:
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT_END:
 		case TBLOCK_SUBABORT_END:
@@ -3883,9 +3877,6 @@ RollbackToSavepoint(List *options)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "RollbackToSavepoint: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -3968,10 +3959,10 @@ BeginInternalSubTransaction(char *name)
 		case TBLOCK_STARTED:
 		case TBLOCK_INPROGRESS:
 		case TBLOCK_END:
-		case TBLOCK_PREPARE:
 #ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
+		case TBLOCK_END_NOT_GTM:
 #endif
+		case TBLOCK_PREPARE:
 		case TBLOCK_SUBINPROGRESS:
 			/* Normal subtransaction start */
 			PushTransaction();
@@ -3984,7 +3975,6 @@ BeginInternalSubTransaction(char *name)
 			if (name)
 				s->name = MemoryContextStrdup(TopTransactionContext, name);
 			break;
-
 			/* These cases are invalid. */
 		case TBLOCK_DEFAULT:
 		case TBLOCK_BEGIN:
@@ -4055,6 +4045,9 @@ RollbackAndReleaseCurrentSubTransaction(void)
 		case TBLOCK_SUBBEGIN:
 		case TBLOCK_INPROGRESS:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_ABORT:
 		case TBLOCK_ABORT_END:
@@ -4064,9 +4057,6 @@ RollbackAndReleaseCurrentSubTransaction(void)
 		case TBLOCK_SUBRESTART:
 		case TBLOCK_SUBABORT_RESTART:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			elog(FATAL, "RollbackAndReleaseCurrentSubTransaction: unexpected state %s",
 				 BlockStateAsString(s->blockState));
 			break;
@@ -4113,11 +4103,11 @@ AbortOutOfAnyTransaction(void)
 			case TBLOCK_BEGIN:
 			case TBLOCK_INPROGRESS:
 			case TBLOCK_END:
+#ifdef PGXC
+			case TBLOCK_END_NOT_GTM:
+#endif
 			case TBLOCK_ABORT_PENDING:
 			case TBLOCK_PREPARE:
-#ifdef PGXC
-			case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 				/* In a transaction, so clean up */
 				AbortTransaction();
 				CleanupTransaction();
@@ -4207,11 +4197,11 @@ TransactionBlockStatusCode(void)
 		case TBLOCK_INPROGRESS:
 		case TBLOCK_SUBINPROGRESS:
 		case TBLOCK_END:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 		case TBLOCK_SUBEND:
 		case TBLOCK_PREPARE:
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 			return 'T';			/* in transaction */
 		case TBLOCK_ABORT:
 		case TBLOCK_SUBABORT:
@@ -4707,10 +4697,10 @@ BlockStateAsString(TBlockState blockState)
 			return "ABORT END";
 		case TBLOCK_ABORT_PENDING:
 			return "ABORT PEND";
-#ifdef PGXC
-		case TBLOCK_PREPARE_NO_2PC_FILE:
-#endif
 		case TBLOCK_PREPARE:
+#ifdef PGXC
+		case TBLOCK_END_NOT_GTM:
+#endif
 			return "PREPARE";
 		case TBLOCK_SUBBEGIN:
 			return "SUB BEGIN";
