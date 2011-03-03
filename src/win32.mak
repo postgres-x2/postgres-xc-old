@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/win32.mak
 
 # Top-file makefile for building Win32 libpq with Visual C++ 7.1.
 # (see src/tools/msvc for tools to build with Visual C++ 2005 and newer)

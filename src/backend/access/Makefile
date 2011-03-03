@@ -1,7 +1,7 @@
 #
 # Makefile for the access methods module
 #
-# $PostgreSQL$
+# src/backend/access/Makefile
 #
 
 subdir = src/backend/access

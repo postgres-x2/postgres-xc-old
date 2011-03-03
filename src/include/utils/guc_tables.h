@@ -5,9 +5,9 @@
  *
  * See src/backend/utils/misc/README for design notes.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
- *	  $PostgreSQL$
+ *	  src/include/utils/guc_tables.h
  *
  *-------------------------------------------------------------------------
  */
@@ -50,9 +50,15 @@ enum config_group
 	RESOURCES,
 	RESOURCES_MEM,
 	RESOURCES_KERNEL,
+	RESOURCES_VACUUM_DELAY,
+	RESOURCES_BGWRITER,
+	RESOURCES_ASYNCHRONOUS,
 	WAL,
 	WAL_SETTINGS,
 	WAL_CHECKPOINTS,
+	WAL_ARCHIVING,
+	WAL_REPLICATION,
+	WAL_STANDBY_SERVERS,
 	QUERY_TUNING,
 	QUERY_TUNING_METHOD,
 	QUERY_TUNING_COST,
@@ -76,10 +82,12 @@ enum config_group
 	COMPAT_OPTIONS_CLIENT,
 	PRESET_OPTIONS,
 	CUSTOM_OPTIONS,
-	DEVELOPER_OPTIONS,
-	DATA_NODES,
+	DEVELOPER_OPTIONS
+#ifdef PGXC
+	,DATA_NODES,
 	GTM,
 	COORDINATORS
+#endif
 };
 
 /*

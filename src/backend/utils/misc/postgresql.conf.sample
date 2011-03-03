@@ -69,6 +69,8 @@
 #unix_socket_group = ''			# (change requires restart)
 #unix_socket_permissions = 0777		# begin with 0 to use octal notation
 					# (change requires restart)
+#bonjour = off				# advertise server via Bonjour
+					# (change requires restart)
 #bonjour_name = ''			# defaults to the computer name
 					# (change requires restart)
 
@@ -107,7 +109,7 @@
 #shared_buffers = 32MB			# min 128kB
 					# (change requires restart)
 #temp_buffers = 8MB			# min 800kB
-#max_prepared_transactions = 10		# zero disables the feature
+#max_prepared_transactions = 0		# zero disables the feature
 					# (change requires restart)
 # Note:  Increasing max_prepared_transactions costs ~600 bytes of shared memory
 # per transaction slot, plus lock space (see max_locks_per_transaction).
@@ -148,12 +150,14 @@
 
 # - Settings -
 
+#wal_level = minimal			# minimal, archive, or hot_standby
+					# (change requires restart)
 #fsync = on				# turns forced synchronization on or off
 #synchronous_commit = on		# immediate fsync at commit
 #wal_sync_method = fsync		# the default is the first option 
 					# supported by the operating system:
 					#   open_datasync
-					#   fdatasync
+					#   fdatasync (default on Linux)
 					#   fsync
 					#   fsync_writethrough
 					#   open_sync
@@ -180,6 +184,25 @@
 #archive_timeout = 0		# force a logfile segment switch after this
 				# number of seconds; 0 disables
 
+# - Streaming Replication -
+
+#max_wal_senders = 0		# max number of walsender processes
+				# (change requires restart)
+#wal_sender_delay = 200ms	# walsender cycle time, 1-10000 milliseconds
+#wal_keep_segments = 0		# in logfile segments, 16MB each; 0 disables
+#vacuum_defer_cleanup_age = 0	# number of xacts by which cleanup is delayed
+
+# - Standby Servers -
+
+#hot_standby = off			# "on" allows queries during recovery
+					# (change requires restart)
+#max_standby_archive_delay = 30s	# max delay before canceling queries
+					# when reading WAL from archive;
+					# -1 allows indefinite delay
+#max_standby_streaming_delay = 30s	# max delay before canceling queries
+					# when reading streaming WAL;
+					# -1 allows indefinite delay
+
 
 #------------------------------------------------------------------------------
 # QUERY TUNING
@@ -191,6 +214,7 @@
 #enable_hashagg = on
 #enable_hashjoin = on
 #enable_indexscan = on
+#enable_material = on
 #enable_mergejoin = on
 #enable_nestloop = on
 #enable_seqscan = on
@@ -214,6 +238,7 @@
 #geqo_pool_size = 0			# selects default based on effort
 #geqo_generations = 0			# selects default based on effort
 #geqo_selection_bias = 2.0		# range 1.5-2.0
+#geqo_seed = 0.0			# range 0.0-1.0
 
 # - Other Planner Options -
 
@@ -232,7 +257,7 @@
 # - Where to Log -
 
 #log_destination = 'stderr'		# Valid values are combinations of
-					# stderr, csvlog, syslog and eventlog,
+					# stderr, csvlog, syslog, and eventlog,
 					# depending on platform.  csvlog
 					# requires logging_collector to be on.
 
@@ -298,8 +323,6 @@
 					#   fatal
 					#   panic
 
-#log_error_verbosity = default		# terse, default, or verbose messages
-
 #log_min_error_statement = error	# values in order of decreasing detail:
 				 	#   debug5
 					#   debug4
@@ -330,8 +353,10 @@
 #log_connections = off
 #log_disconnections = off
 #log_duration = off
+#log_error_verbosity = default		# terse, default, or verbose messages
 #log_hostname = off
 #log_line_prefix = ''			# special values:
+					#   %a = application name
 					#   %u = user name
 					#   %d = database name
 					#   %r = remote host and port
@@ -340,6 +365,7 @@
 					#   %t = timestamp without milliseconds
 					#   %m = timestamp with milliseconds
 					#   %i = command tag
+					#   %e = SQL state
 					#   %c = session ID
 					#   %l = session line number
 					#   %s = session start timestamp
@@ -367,7 +393,7 @@
 #track_activities = on
 #track_counts = on
 #track_functions = none			# none, pl, all
-#track_activity_query_size = 1024
+#track_activity_query_size = 1024 	# (change requires restart)
 #update_process_title = on
 #stats_temp_directory = 'pg_stat_tmp'
 
@@ -391,6 +417,7 @@
 					# actions running at least this number
 					# of milliseconds.
 #autovacuum_max_workers = 3		# max number of autovacuum subprocesses
+					# (change requires restart)
 #autovacuum_naptime = 1min		# time between autovacuum runs
 #autovacuum_vacuum_threshold = 50	# min number of row updates before
 					# vacuum
@@ -425,6 +452,7 @@
 #statement_timeout = 0			# in milliseconds, 0 is disabled
 #vacuum_freeze_min_age = 50000000
 #vacuum_freeze_table_age = 150000000
+#bytea_output = 'hex'			# hex, escape
 #xmlbinary = 'base64'
 #xmloption = 'content'
 
@@ -441,7 +469,7 @@
 					#   India
 					# You can create your own file in
 					# share/timezonesets/.
-#extra_float_digits = 0			# min -15, max 2
+#extra_float_digits = 0			# min -15, max 3
 #client_encoding = sql_ascii		# actually, defaults to database
 					# encoding
 
@@ -479,12 +507,11 @@
 
 # - Previous PostgreSQL Versions -
 
-#add_missing_from = off
 #array_nulls = on
 #backslash_quote = safe_encoding	# on, off, or safe_encoding
 #default_with_oids = off
 #escape_string_warning = on
-#regex_flavor = advanced		# advanced, extended, or basic
+#lo_compat_privileges = off
 #sql_inheritance = on
 #standard_conforming_strings = off
 #synchronize_seqscans = on
@@ -567,4 +594,3 @@
 #------------------------------------------------------------------------------
 
 #custom_variable_classes = ''		# list of custom variable class names
-

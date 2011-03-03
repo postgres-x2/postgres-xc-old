@@ -4,11 +4,11 @@
  *	  support for communication destinations
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/tcop/dest.c
  *
  *-------------------------------------------------------------------------
  */
@@ -142,9 +142,10 @@ EndCommand(const char *commandTag, CommandDest dest)
 	{
 		case DestRemote:
 		case DestRemoteExecute:
+
 			/*
-			 * We assume the commandTag is plain ASCII and therefore
-			 * requires no encoding conversion.
+			 * We assume the commandTag is plain ASCII and therefore requires
+			 * no encoding conversion.
 			 */
 			pq_putmessage('C', commandTag, strlen(commandTag) + 1);
 			break;

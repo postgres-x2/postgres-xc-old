@@ -1,5 +1,5 @@
 /******************************************************************************
-  $PostgreSQL$
+  contrib/cube/cube.c
 
   This file contains routines that can be bound to a Postgres backend and
   called by the backend in the process of processing queries.  The calling
@@ -615,7 +615,7 @@ g_cube_picksplit(PG_FUNCTION_ARGS)
 		else
 		{
 			datum_r = union_dr;
-			size_r = size_alpha;
+			size_r = size_beta;
 			*right++ = i;
 			v->spl_nright++;
 		}

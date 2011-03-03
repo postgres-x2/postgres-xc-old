@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/backend/storage/smgr/README
 
 Storage Manager
 ===============

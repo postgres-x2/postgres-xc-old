@@ -3,12 +3,12 @@
  * int.c
  *	  Functions for the built-in integer types (except int8).
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/utils/adt/int.c
  *
  *-------------------------------------------------------------------------
  */
@@ -146,10 +146,11 @@ int2vectorin(PG_FUNCTION_ARGS)
 
 	for (n = 0; *intString && n < FUNC_MAX_ARGS; n++)
 	{
-		if (sscanf(intString, "%hd", &result->values[n]) != 1)
-			break;
 		while (*intString && isspace((unsigned char) *intString))
 			intString++;
+		if (*intString == '\0')
+			break;
+		result->values[n] = pg_atoi(intString, sizeof(int16), ' ');
 		while (*intString && !isspace((unsigned char) *intString))
 			intString++;
 	}
@@ -225,13 +226,21 @@ int2vectorrecv(PG_FUNCTION_ARGS)
 
 	Assert(!locfcinfo.isnull);
 
-	/* sanity checks: int2vector must be 1-D, no nulls */
+	/* sanity checks: int2vector must be 1-D, 0-based, no nulls */
 	if (ARR_NDIM(result) != 1 ||
 		ARR_HASNULL(result) ||
-		ARR_ELEMTYPE(result) != INT2OID)
+		ARR_ELEMTYPE(result) != INT2OID ||
+		ARR_LBOUND(result)[0] != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
 				 errmsg("invalid int2vector data")));
+
+	/* check length for consistency with int2vectorin() */
+	if (ARR_DIMS(result)[0] > FUNC_MAX_ARGS)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+				 errmsg("oidvector has too many elements")));
+
 	PG_RETURN_POINTER(result);
 }
 

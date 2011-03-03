@@ -5,7 +5,7 @@
  *	  Functions to execute commands on multiple Data Nodes
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group ?
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group ?
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  * IDENTIFICATION
@@ -141,7 +141,6 @@ extern uint64 DataNodeCopyOut(ExecNodes *exec_nodes, PGXCNodeHandle** copy_conne
 extern void DataNodeCopyFinish(PGXCNodeHandle** copy_connections, int primary_data_node, CombineType combine_type);
 extern int DataNodeCopyInBinaryForAll(char *msg_buf, int len, PGXCNodeHandle** copy_connections);
 
-extern int ExecCountSlotsRemoteQuery(RemoteQuery *node);
 extern RemoteQueryState *ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags);
 extern TupleTableSlot* ExecRemoteQuery(RemoteQueryState *step);
 extern void ExecEndRemoteQuery(RemoteQueryState *step);

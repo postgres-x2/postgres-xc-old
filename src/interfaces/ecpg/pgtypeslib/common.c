@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/pgtypeslib/common.c */
 
 #include "postgres_fe.h"
 

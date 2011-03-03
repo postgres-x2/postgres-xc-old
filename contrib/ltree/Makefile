@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/ltree/Makefile
 
 PG_CPPFLAGS = -DLOWER_NODE
 MODULE_big = ltree

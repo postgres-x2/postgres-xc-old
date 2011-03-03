@@ -4,7 +4,7 @@
 #
 # Copyright (c) 1994, Regents of the University of California
 #
-# $PostgreSQL$
+# src/Makefile
 #
 #-------------------------------------------------------------------------
 
@@ -18,11 +18,12 @@ all install installdirs uninstall distprep:
 	$(MAKE) -C timezone $@
 	# GTM should be built before backend because of dependancy
 	$(MAKE) -C gtm $@
-	$(MAKE) -C interfaces $@
 	$(MAKE) -C backend $@
 	$(MAKE) -C backend/utils/mb/conversion_procs $@
 	$(MAKE) -C backend/snowball $@
 	$(MAKE) -C include $@
+	$(MAKE) -C interfaces $@
+	$(MAKE) -C backend/replication/libpqwalreceiver $@
 	$(MAKE) -C bin $@
 	$(MAKE) -C pl $@
 	$(MAKE) -C makefiles $@
@@ -39,7 +40,7 @@ install-local: installdirs-local
 installdirs: installdirs-local
 
 installdirs-local:
-	$(mkinstalldirs) '$(DESTDIR)$(pgxsdir)/$(subdir)'
+	$(MKDIR_P) '$(DESTDIR)$(pgxsdir)/$(subdir)'
 
 uninstall: uninstall-local
 
@@ -54,6 +55,7 @@ clean:
 	$(MAKE) -C backend/snowball $@
 	$(MAKE) -C include $@
 	$(MAKE) -C interfaces $@
+	$(MAKE) -C backend/replication/libpqwalreceiver $@
 	$(MAKE) -C bin $@
 	$(MAKE) -C pl $@
 	$(MAKE) -C makefiles $@
@@ -69,6 +71,7 @@ distclean maintainer-clean:
 	$(MAKE) -C backend/snowball $@
 	$(MAKE) -C include $@
 	$(MAKE) -C interfaces $@
+	$(MAKE) -C backend/replication/libpqwalreceiver $@
 	$(MAKE) -C bin $@
 	$(MAKE) -C pl $@
 	$(MAKE) -C makefiles $@
@@ -76,6 +79,16 @@ distclean maintainer-clean:
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	rm -f Makefile.port Makefile.global
+
+coverage:
+	$(MAKE) -C timezone $@
+	$(MAKE) -C backend $@
+	$(MAKE) -C backend/utils/mb/conversion_procs $@
+	$(MAKE) -C backend/snowball $@
+	$(MAKE) -C interfaces $@
+	$(MAKE) -C backend/replication/libpqwalreceiver $@
+	$(MAKE) -C bin $@
+	$(MAKE) -C pl $@
 
 
 .PHONY: install-local installdirs-local uninstall-local

@@ -1,1 +1,1 @@
-/* $PostgreSQL$ */
+/* src/include/port/openbsd.h

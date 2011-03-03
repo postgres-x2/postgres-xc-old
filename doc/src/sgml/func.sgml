@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/func.sgml
 
  <chapter id="functions">
   <title>Functions and Operators</title>
@@ -686,7 +686,7 @@
 
      <tbody>
       <row>
-       <entry><literal><function>abs</>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>abs(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>absolute value</entry>
        <entry><literal>abs(-17.4)</literal></entry>
@@ -694,7 +694,7 @@
       </row>
 
       <row>
-       <entry><literal><function>cbrt</function>(<type>dp</type>)</literal></entry>
+       <entry><literal><function>cbrt(<type>dp</type>)</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry>cube root</entry>
        <entry><literal>cbrt(27.0)</literal></entry>
@@ -702,7 +702,7 @@
       </row>
 
       <row>
-       <entry><literal><function>ceil</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>ceil(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>smallest integer not less than argument</entry>
        <entry><literal>ceil(-42.8)</literal></entry>
@@ -710,7 +710,7 @@
       </row>
 
       <row>
-       <entry><literal><function>ceiling</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>ceiling(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>smallest integer not less than argument (alias for <function>ceil</function>)</entry>
        <entry><literal>ceiling(-95.3)</literal></entry>
@@ -718,7 +718,7 @@
       </row>
 
       <row>
-       <entry><literal><function>degrees</function>(<type>dp</type>)</literal></entry>
+       <entry><literal><function>degrees(<type>dp</type>)</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry>radians to degrees</entry>
        <entry><literal>degrees(0.5)</literal></entry>
@@ -726,8 +726,8 @@
       </row>
 
       <row>
-       <entry><literal><function>div</function>(<parameter>y</parameter> <type>numeric</>,
-        <parameter>x</parameter> <type>numeric</>)</literal></entry>
+       <entry><literal><function>div(<parameter>y</parameter> <type>numeric</>,
+        <parameter>x</parameter> <type>numeric</>)</function></literal></entry>
        <entry><type>numeric</></entry>
        <entry>integer quotient of <parameter>y</parameter>/<parameter>x</parameter></entry>
        <entry><literal>div(9,4)</literal></entry>
@@ -735,7 +735,7 @@
       </row>
 
       <row>
-       <entry><literal><function>exp</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>exp(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>exponential</entry>
        <entry><literal>exp(1.0)</literal></entry>
@@ -743,7 +743,7 @@
       </row>
 
       <row>
-       <entry><literal><function>floor</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>floor(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>largest integer not greater than argument</entry>
        <entry><literal>floor(-42.8)</literal></entry>
@@ -751,7 +751,7 @@
       </row>
 
       <row>
-       <entry><literal><function>ln</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>ln(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>natural logarithm</entry>
        <entry><literal>ln(2.0)</literal></entry>
@@ -759,7 +759,7 @@
       </row>
 
       <row>
-       <entry><literal><function>log</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>log(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>base 10 logarithm</entry>
        <entry><literal>log(100.0)</literal></entry>
@@ -767,8 +767,8 @@
       </row>
 
       <row>
-       <entry><literal><function>log</function>(<parameter>b</parameter> <type>numeric</type>,
-        <parameter>x</parameter> <type>numeric</type>)</literal></entry>
+       <entry><literal><function>log(<parameter>b</parameter> <type>numeric</type>,
+        <parameter>x</parameter> <type>numeric</type>)</function></literal></entry>
        <entry><type>numeric</type></entry>
        <entry>logarithm to base <parameter>b</parameter></entry>
        <entry><literal>log(2.0, 64.0)</literal></entry>
@@ -776,8 +776,8 @@
       </row>
 
       <row>
-       <entry><literal><function>mod</function>(<parameter>y</parameter>,
-        <parameter>x</parameter>)</literal></entry>
+       <entry><literal><function>mod(<parameter>y</parameter>,
+        <parameter>x</parameter>)</function></literal></entry>
        <entry>(same as argument types)</entry>
        <entry>remainder of <parameter>y</parameter>/<parameter>x</parameter></entry>
        <entry><literal>mod(9,4)</literal></entry>
@@ -785,7 +785,7 @@
       </row>
 
       <row>
-       <entry><literal><function>pi</function>()</literal></entry>
+       <entry><literal><function>pi()</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry><quote>&pi;</quote> constant</entry>
        <entry><literal>pi()</literal></entry>
@@ -793,8 +793,8 @@
       </row>
 
       <row>
-       <entry><literal><function>power</function>(<parameter>a</parameter> <type>dp</type>,
-        <parameter>b</parameter> <type>dp</type>)</literal></entry>
+       <entry><literal><function>power(<parameter>a</parameter> <type>dp</type>,
+        <parameter>b</parameter> <type>dp</type>)</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry><parameter>a</> raised to the power of <parameter>b</parameter></entry>
        <entry><literal>power(9.0, 3.0)</literal></entry>
@@ -802,8 +802,8 @@
       </row>
 
       <row>
-       <entry><literal><function>power</function>(<parameter>a</parameter> <type>numeric</type>,
-        <parameter>b</parameter> <type>numeric</type>)</literal></entry>
+       <entry><literal><function>power(<parameter>a</parameter> <type>numeric</type>,
+        <parameter>b</parameter> <type>numeric</type>)</function></literal></entry>
        <entry><type>numeric</type></entry>
        <entry><parameter>a</> raised to the power of <parameter>b</parameter></entry>
        <entry><literal>power(9.0, 3.0)</literal></entry>
@@ -811,7 +811,7 @@
       </row>
 
       <row>
-       <entry><literal><function>radians</function>(<type>dp</type>)</literal></entry>
+       <entry><literal><function>radians(<type>dp</type>)</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry>degrees to radians</entry>
        <entry><literal>radians(45.0)</literal></entry>
@@ -819,7 +819,7 @@
       </row>
 
       <row>
-       <entry><literal><function>random</function>()</literal></entry>
+       <entry><literal><function>random()</function></literal></entry>
        <entry><type>dp</type></entry>
        <entry>random value in the range 0.0 &lt;= x &lt; 1.0</entry>
        <entry><literal>random()</literal></entry>
@@ -827,7 +827,7 @@
       </row>
 
       <row>
-       <entry><literal><function>round</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>round(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>round to nearest integer</entry>
        <entry><literal>round(42.4)</literal></entry>
@@ -835,7 +835,7 @@
       </row>
 
       <row>
-       <entry><literal><function>round</function>(<parameter>v</parameter> <type>numeric</type>, <parameter>s</parameter> <type>int</type>)</literal></entry>
+       <entry><literal><function>round(<parameter>v</parameter> <type>numeric</type>, <parameter>s</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>numeric</type></entry>
        <entry>round to <parameter>s</parameter> decimal places</entry>
        <entry><literal>round(42.4382, 2)</literal></entry>
@@ -843,7 +843,7 @@
       </row>
 
       <row>
-       <entry><literal><function>setseed</function>(<type>dp</type>)</literal></entry>
+       <entry><literal><function>setseed(<type>dp</type>)</function></literal></entry>
        <entry><type>void</type></entry>
        <entry>set seed for subsequent <literal>random()</literal> calls (value between -1.0 and
        1.0, inclusive)</entry>
@@ -852,7 +852,7 @@
       </row>
 
       <row>
-       <entry><literal><function>sign</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>sign(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>sign of the argument (-1, 0, +1)</entry>
        <entry><literal>sign(-8.4)</literal></entry>
@@ -860,7 +860,7 @@
       </row>
 
       <row>
-       <entry><literal><function>sqrt</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>sqrt(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>square root</entry>
        <entry><literal>sqrt(2.0)</literal></entry>
@@ -868,7 +868,7 @@
       </row>
 
       <row>
-       <entry><literal><function>trunc</function>(<type>dp</type> or <type>numeric</type>)</literal></entry>
+       <entry><literal><function>trunc(<type>dp</type> or <type>numeric</type>)</function></literal></entry>
        <entry>(same as input)</entry>
        <entry>truncate toward zero</entry>
        <entry><literal>trunc(42.8)</literal></entry>
@@ -876,7 +876,7 @@
       </row>
 
       <row>
-       <entry><literal><function>trunc</function>(<parameter>v</parameter> <type>numeric</type>, <parameter>s</parameter> <type>int</type>)</literal></entry>
+       <entry><literal><function>trunc(<parameter>v</parameter> <type>numeric</type>, <parameter>s</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>numeric</type></entry>
        <entry>truncate to <parameter>s</parameter> decimal places</entry>
        <entry><literal>trunc(42.4382, 2)</literal></entry>
@@ -884,7 +884,7 @@
       </row>
 
       <row>
-       <entry><literal><function>width_bucket</function>(<parameter>op</parameter> <type>numeric</type>, <parameter>b1</parameter> <type>numeric</type>, <parameter>b2</parameter> <type>numeric</type>, <parameter>count</parameter> <type>int</type>)</literal></entry>
+       <entry><literal><function>width_bucket(<parameter>op</parameter> <type>numeric</type>, <parameter>b1</parameter> <type>numeric</type>, <parameter>b2</parameter> <type>numeric</type>, <parameter>count</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>return the bucket to which <parameter>operand</> would
        be assigned in an equidepth histogram with <parameter>count</>
@@ -894,7 +894,7 @@
       </row>
 
       <row>
-       <entry><literal><function>width_bucket</function>(<parameter>op</parameter> <type>dp</type>, <parameter>b1</parameter> <type>dp</type>, <parameter>b2</parameter> <type>dp</type>, <parameter>count</parameter> <type>int</type>)</literal></entry>
+       <entry><literal><function>width_bucket(<parameter>op</parameter> <type>dp</type>, <parameter>b1</parameter> <type>dp</type>, <parameter>b2</parameter> <type>dp</type>, <parameter>count</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>return the bucket to which <parameter>operand</> would
        be assigned in an equidepth histogram with <parameter>count</>
@@ -910,7 +910,11 @@
    Finally, <xref linkend="functions-math-trig-table"> shows the
    available trigonometric functions.  All trigonometric functions
    take arguments and return values of type <type>double
-   precision</type>.
+   precision</type>. Trigonometric functions arguments are expressed
+   in radians. Inverse functions return values are expressed in
+   radians.  See unit transformation functions
+   <literal><function>radians()</function></literal> and
+   <literal><function>degrees()</function></literal> above.
   </para>
 
    <indexterm>
@@ -951,44 +955,44 @@
 
      <tbody>
       <row>
-       <entry><literal><function>acos</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>acos(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>inverse cosine</entry>
       </row>
 
       <row>
-       <entry><literal><function>asin</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>asin(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>inverse sine</entry>
       </row>
 
       <row>
-       <entry><literal><function>atan</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>atan(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>inverse tangent</entry>
       </row>
 
       <row>
-       <entry><literal><function>atan2</function>(<replaceable>y</replaceable>,
-        <replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>atan2(<replaceable>y</replaceable>,
+        <replaceable>x</replaceable>)</function></literal></entry>
        <entry>inverse tangent of
         <literal><replaceable>y</replaceable>/<replaceable>x</replaceable></literal></entry>
       </row>
 
       <row>
-       <entry><literal><function>cos</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>cos(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>cosine</entry>
       </row>
 
       <row>
-       <entry><literal><function>cot</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>cot(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>cotangent</entry>
       </row>
 
       <row>
-       <entry><literal><function>sin</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>sin(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>sine</entry>
       </row>
 
       <row>
-       <entry><literal><function>tan</function>(<replaceable>x</replaceable>)</literal></entry>
+       <entry><literal><function>tan(<replaceable>x</replaceable>)</function></literal></entry>
        <entry>tangent</entry>
       </row>
      </tbody>
@@ -1110,7 +1114,7 @@
       </row>
 
       <row>
-       <entry><literal><function>bit_length</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>bit_length(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Number of bits in string</entry>
        <entry><literal>bit_length('jose')</literal></entry>
@@ -1118,7 +1122,7 @@
       </row>
 
       <row>
-       <entry><literal><function>char_length</function>(<parameter>string</parameter>)</literal> or <literal><function>character_length</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>char_length(<parameter>string</parameter>)</function></literal> or <literal><function>character_length(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         Number of characters in string
@@ -1137,7 +1141,7 @@
       </row>
 
       <row>
-       <entry><literal><function>lower</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>lower(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>Convert string to lower case</entry>
        <entry><literal>lower('TOM')</literal></entry>
@@ -1145,7 +1149,7 @@
       </row>
 
       <row>
-       <entry><literal><function>octet_length</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>octet_length(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Number of bytes in string</entry>
        <entry><literal>octet_length('jose')</literal></entry>
@@ -1153,7 +1157,7 @@
       </row>
 
       <row>
-       <entry><literal><function>overlay</function>(<parameter>string</parameter> placing <parameter>string</parameter> from <type>int</type> <optional>for <type>int</type></optional>)</literal></entry>
+       <entry><literal><function>overlay(<parameter>string</parameter> placing <parameter>string</parameter> from <type>int</type> <optional>for <type>int</type></optional>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Replace substring
@@ -1163,7 +1167,7 @@
       </row>
 
       <row>
-       <entry><literal><function>position</function>(<parameter>substring</parameter> in <parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>position(<parameter>substring</parameter> in <parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Location of specified substring</entry>
        <entry><literal>position('om' in 'Thomas')</literal></entry>
@@ -1171,7 +1175,7 @@
       </row>
 
       <row>
-       <entry><literal><function>substring</function>(<parameter>string</parameter> <optional>from <type>int</type></optional> <optional>for <type>int</type></optional>)</literal></entry>
+       <entry><literal><function>substring(<parameter>string</parameter> <optional>from <type>int</type></optional> <optional>for <type>int</type></optional>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Extract substring
@@ -1181,7 +1185,7 @@
       </row>
 
       <row>
-       <entry><literal><function>substring</function>(<parameter>string</parameter> from <replaceable>pattern</replaceable>)</literal></entry>
+       <entry><literal><function>substring(<parameter>string</parameter> from <replaceable>pattern</replaceable>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Extract substring matching POSIX regular expression. See
@@ -1193,7 +1197,7 @@
       </row>
 
       <row>
-       <entry><literal><function>substring</function>(<parameter>string</parameter> from <replaceable>pattern</replaceable> for <replaceable>escape</replaceable>)</literal></entry>
+       <entry><literal><function>substring(<parameter>string</parameter> from <replaceable>pattern</replaceable> for <replaceable>escape</replaceable>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Extract substring matching <acronym>SQL</acronym> regular expression.
@@ -1206,9 +1210,9 @@
 
       <row>
        <entry>
-        <literal><function>trim</function>(<optional>leading | trailing | both</optional>
+        <literal><function>trim(<optional>leading | trailing | both</optional>
         <optional><parameter>characters</parameter></optional> from
-        <parameter>string</parameter>)</literal>
+        <parameter>string</parameter>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1221,9 +1225,9 @@
       </row>
 
       <row>
-       <entry><literal><function>upper</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>upper(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
-       <entry>Convert string to uppercase</entry>
+       <entry>Convert string to upper case</entry>
        <entry><literal>upper('tom')</literal></entry>
        <entry><literal>TOM</literal></entry>
       </row>
@@ -1331,7 +1335,7 @@
 
      <tbody>
       <row>
-       <entry><literal><function>ascii</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>ascii(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         <acronym>ASCII</acronym> code of the first character of the
@@ -1344,8 +1348,8 @@
       </row>
 
       <row>
-       <entry><literal><function>btrim</function>(<parameter>string</parameter> <type>text</type>
-       <optional>, <parameter>characters</parameter> <type>text</type></optional>)</literal></entry>
+       <entry><literal><function>btrim(<parameter>string</parameter> <type>text</type>
+       <optional>, <parameter>characters</parameter> <type>text</type></optional>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Remove the longest string consisting only of characters
@@ -1357,7 +1361,7 @@
       </row>
 
       <row>
-       <entry><literal><function>chr</function>(<type>int</type>)</literal></entry>
+       <entry><literal><function>chr(<type>int</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Character with the given code. For <acronym>UTF8</acronym> the
@@ -1372,9 +1376,9 @@
 
       <row>
        <entry>
-        <literal><function>convert</function>(<parameter>string</parameter> <type>bytea</type>,
+        <literal><function>convert(<parameter>string</parameter> <type>bytea</type>,
         <parameter>src_encoding</parameter> <type>name</type>,
-        <parameter>dest_encoding</parameter> <type>name</type>)</literal>
+        <parameter>dest_encoding</parameter> <type>name</type>)</function></literal>
        </entry>
        <entry><type>bytea</type></entry>
        <entry>
@@ -1393,8 +1397,8 @@
 
       <row>
        <entry>
-        <literal><function>convert_from</function>(<parameter>string</parameter> <type>bytea</type>,
-        <parameter>src_encoding</parameter> <type>name</type>)</literal>
+        <literal><function>convert_from(<parameter>string</parameter> <type>bytea</type>,
+        <parameter>src_encoding</parameter> <type>name</type>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1408,8 +1412,8 @@
 
       <row>
        <entry>
-        <literal><function>convert_to</function>(<parameter>string</parameter> <type>text</type>,
-        <parameter>dest_encoding</parameter> <type>name</type>)</literal>
+        <literal><function>convert_to(<parameter>string</parameter> <type>text</type>,
+        <parameter>dest_encoding</parameter> <type>name</type>)</function></literal>
        </entry>
        <entry><type>bytea</type></entry>
        <entry>
@@ -1421,8 +1425,8 @@
 
       <row>
        <entry>
-        <literal><function>decode</function>(<parameter>string</parameter> <type>text</type>,
-        <parameter>type</parameter> <type>text</type>)</literal>
+        <literal><function>decode(<parameter>string</parameter> <type>text</type>,
+        <parameter>type</parameter> <type>text</type>)</function></literal>
        </entry>
        <entry><type>bytea</type></entry>
        <entry>
@@ -1435,8 +1439,8 @@
 
       <row>
        <entry>
-        <literal><function>encode</function>(<parameter>data</parameter> <type>bytea</type>,
-        <parameter>type</parameter> <type>text</type>)</literal>
+        <literal><function>encode(<parameter>data</parameter> <type>bytea</type>,
+        <parameter>type</parameter> <type>text</type>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1450,11 +1454,11 @@
       </row>       
 
       <row>
-       <entry><literal><function>initcap</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>initcap(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
-        Convert the first letter of each word to uppercase and the
-        rest to lowercase. Words are sequences of alphanumeric
+        Convert the first letter of each word to upper case and the
+        rest to lower case. Words are sequences of alphanumeric
         characters separated by non-alphanumeric characters.
        </entry>
        <entry><literal>initcap('hi THOMAS')</literal></entry>
@@ -1462,7 +1466,7 @@
       </row>
 
       <row>
-       <entry><literal><function>length</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>length(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         Number of characters in <parameter>string</parameter>
@@ -1472,8 +1476,8 @@
       </row>
 
       <row>
-       <entry><literal><function>length</function>(<parameter>string</parameter><type>bytea</type>,
-        <parameter>encoding</parameter> <type>name</type> )</literal></entry>
+       <entry><literal><function>length(<parameter>string</parameter><type>bytea</type>,
+        <parameter>encoding</parameter> <type>name</type> )</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         Number of characters in <parameter>string</parameter> in the given
@@ -1486,9 +1490,9 @@
 
       <row>
        <entry>
-        <literal><function>lpad</function>(<parameter>string</parameter> <type>text</type>,
+        <literal><function>lpad(<parameter>string</parameter> <type>text</type>,
         <parameter>length</parameter> <type>int</type>
-        <optional>, <parameter>fill</parameter> <type>text</type></optional>)</literal>
+        <optional>, <parameter>fill</parameter> <type>text</type></optional>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1504,8 +1508,8 @@
       </row>
 
       <row>
-       <entry><literal><function>ltrim</function>(<parameter>string</parameter> <type>text</type>
-        <optional>, <parameter>characters</parameter> <type>text</type></optional>)</literal>
+       <entry><literal><function>ltrim(<parameter>string</parameter> <type>text</type>
+        <optional>, <parameter>characters</parameter> <type>text</type></optional>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1518,7 +1522,7 @@
       </row>
 
       <row>
-       <entry><literal><function>md5</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>md5(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Calculates the MD5 hash of <parameter>string</parameter>,
@@ -1529,7 +1533,7 @@
       </row>
 
       <row>
-       <entry><literal><function>pg_client_encoding</function>()</literal></entry>
+       <entry><literal><function>pg_client_encoding()</function></literal></entry>
        <entry><type>name</type></entry>
        <entry>
         Current client encoding name
@@ -1539,7 +1543,7 @@
       </row>
 
       <row>
-       <entry><literal><function>quote_ident</function>(<parameter>string</parameter> <type>text</type>)</literal></entry>
+       <entry><literal><function>quote_ident(<parameter>string</parameter> <type>text</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Return the given string suitably quoted to be used as an identifier
@@ -1554,7 +1558,7 @@
       </row>
 
       <row>
-       <entry><literal><function>quote_literal</function>(<parameter>string</parameter> <type>text</type>)</literal></entry>
+       <entry><literal><function>quote_literal(<parameter>string</parameter> <type>text</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Return the given string suitably quoted to be used as a string literal
@@ -1570,7 +1574,7 @@
       </row>
 
       <row>
-       <entry><literal><function>quote_literal</function>(<parameter>value</parameter> <type>anyelement</type>)</literal></entry>
+       <entry><literal><function>quote_literal(<parameter>value</parameter> <type>anyelement</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Coerce the given value to text and then quote it as a literal.
@@ -1581,7 +1585,7 @@
       </row>
 
       <row>
-       <entry><literal><function>quote_nullable</function>(<parameter>string</parameter> <type>text</type>)</literal></entry>
+       <entry><literal><function>quote_nullable(<parameter>string</parameter> <type>text</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Return the given string suitably quoted to be used as a string literal
@@ -1595,7 +1599,7 @@
       </row>
 
       <row>
-       <entry><literal><function>quote_nullable</function>(<parameter>value</parameter> <type>anyelement</type>)</literal></entry>
+       <entry><literal><function>quote_nullable(<parameter>value</parameter> <type>anyelement</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Coerce the given value to text and then quote it as a literal;
@@ -1607,7 +1611,7 @@
       </row>
 
       <row>
-       <entry><literal><function>regexp_matches</function>(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</literal></entry>
+       <entry><literal><function>regexp_matches(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</function></literal></entry>
        <entry><type>setof text[]</type></entry>
        <entry>
         Return all captured substrings resulting from matching a POSIX regular
@@ -1619,7 +1623,7 @@
       </row>
 
       <row>
-       <entry><literal><function>regexp_replace</function>(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type>, <parameter>replacement</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</literal></entry>
+       <entry><literal><function>regexp_replace(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type>, <parameter>replacement</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Replace substring(s) matching a POSIX regular expression. See
@@ -1630,7 +1634,7 @@
       </row>
 
       <row>
-       <entry><literal><function>regexp_split_to_array</function>(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type> ])</literal></entry>
+       <entry><literal><function>regexp_split_to_array(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type> ])</function></literal></entry>
        <entry><type>text[]</type></entry>
        <entry>
         Split <parameter>string</parameter> using a POSIX regular expression as
@@ -1642,7 +1646,7 @@
       </row>
 
       <row>
-       <entry><literal><function>regexp_split_to_table</function>(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</literal></entry>
+       <entry><literal><function>regexp_split_to_table(<parameter>string</parameter> <type>text</type>, <parameter>pattern</parameter> <type>text</type> [, <parameter>flags</parameter> <type>text</type>])</function></literal></entry>
        <entry><type>setof text</type></entry>
        <entry>
         Split <parameter>string</parameter> using a POSIX regular expression as
@@ -1654,7 +1658,7 @@
       </row>
 
       <row>
-       <entry><literal><function>repeat</function>(<parameter>string</parameter> <type>text</type>, <parameter>number</parameter> <type>int</type>)</literal></entry>
+       <entry><literal><function>repeat(<parameter>string</parameter> <type>text</type>, <parameter>number</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>Repeat <parameter>string</parameter> the specified
        <parameter>number</parameter> of times</entry>
@@ -1663,9 +1667,9 @@
       </row>
 
       <row>
-       <entry><literal><function>replace</function>(<parameter>string</parameter> <type>text</type>,
+       <entry><literal><function>replace(<parameter>string</parameter> <type>text</type>,
        <parameter>from</parameter> <type>text</type>,
-       <parameter>to</parameter> <type>text</type>)</literal></entry>
+       <parameter>to</parameter> <type>text</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>Replace all occurrences in <parameter>string</parameter> of substring
         <parameter>from</parameter> with substring <parameter>to</parameter>
@@ -1676,9 +1680,9 @@
 
       <row>
        <entry>
-        <literal><function>rpad</function>(<parameter>string</parameter> <type>text</type>,
+        <literal><function>rpad(<parameter>string</parameter> <type>text</type>,
         <parameter>length</parameter> <type>int</type>
-        <optional>, <parameter>fill</parameter> <type>text</type></optional>)</literal>
+        <optional>, <parameter>fill</parameter> <type>text</type></optional>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1693,8 +1697,8 @@
       </row>
 
       <row>
-       <entry><literal><function>rtrim</function>(<parameter>string</parameter> <type>text</type>
-        <optional>, <parameter>characters</parameter> <type>text</type></optional>)</literal>
+       <entry><literal><function>rtrim(<parameter>string</parameter> <type>text</type>
+        <optional>, <parameter>characters</parameter> <type>text</type></optional>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1707,9 +1711,9 @@
       </row>
 
       <row>
-       <entry><literal><function>split_part</function>(<parameter>string</parameter> <type>text</type>,
+       <entry><literal><function>split_part(<parameter>string</parameter> <type>text</type>,
        <parameter>delimiter</parameter> <type>text</type>,
-       <parameter>field</parameter> <type>int</type>)</literal></entry>
+       <parameter>field</parameter> <type>int</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>Split <parameter>string</parameter> on <parameter>delimiter</parameter>
         and return the given field (counting from one)
@@ -1719,7 +1723,7 @@
       </row>
 
       <row>
-       <entry><literal><function>strpos</function>(<parameter>string</parameter>, <parameter>substring</parameter>)</literal></entry>
+       <entry><literal><function>strpos(<parameter>string</parameter>, <parameter>substring</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         Location of specified substring (same as
@@ -1732,7 +1736,7 @@
       </row>
 
       <row>
-       <entry><literal><function>substr</function>(<parameter>string</parameter>, <parameter>from</parameter> <optional>, <parameter>count</parameter></optional>)</literal></entry>
+       <entry><literal><function>substr(<parameter>string</parameter>, <parameter>from</parameter> <optional>, <parameter>count</parameter></optional>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>
         Extract substring (same as
@@ -1743,8 +1747,8 @@
       </row>
 
       <row>
-       <entry><literal><function>to_ascii</function>(<parameter>string</parameter> <type>text</type>
-        <optional>, <parameter>encoding</parameter> <type>text</type></optional>)</literal></entry>
+       <entry><literal><function>to_ascii(<parameter>string</parameter> <type>text</type>
+        <optional>, <parameter>encoding</parameter> <type>text</type></optional>)</function></literal></entry>
        <entry><type>text</type></entry>
 
        <entry>
@@ -1758,8 +1762,8 @@
       </row>
 
       <row>
-       <entry><literal><function>to_hex</function>(<parameter>number</parameter> <type>int</type>
-       or <type>bigint</type>)</literal></entry>
+       <entry><literal><function>to_hex(<parameter>number</parameter> <type>int</type>
+       or <type>bigint</type>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>Convert <parameter>number</parameter> to its equivalent hexadecimal
         representation
@@ -1770,9 +1774,9 @@
 
       <row>
        <entry>
-        <literal><function>translate</function>(<parameter>string</parameter> <type>text</type>,
+        <literal><function>translate(<parameter>string</parameter> <type>text</type>,
         <parameter>from</parameter> <type>text</type>,
-        <parameter>to</parameter> <type>text</type>)</literal>
+        <parameter>to</parameter> <type>text</type>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>
@@ -1789,6 +1793,10 @@
     </tgroup>
    </table>
 
+   <para>
+   See also the aggregate function <function>string_agg</function> in
+   <xref linkend="functions-aggregate">.
+   </para>
 
    <table id="conversion-names">
     <title>Built-in Conversions</title>
@@ -2620,7 +2628,7 @@
        <entry>Return Type</entry>
        <entry>Description</entry>
        <entry>Example</entry>
-       <entry>Result</entry>  
+       <entry>Result</entry>
       </row>
      </thead>
 
@@ -2641,33 +2649,7 @@
       </row>
 
       <row>
-       <entry><function>get_bit</function>(<parameter>string</parameter>, <parameter>offset</parameter>)</entry>
-       <entry><type>int</type></entry>
-       <entry>
-        Extract bit from string
-        <indexterm>
-         <primary>get_bit</primary>
-        </indexterm>
-       </entry>
-       <entry><literal>get_bit(E'Th\\000omas'::bytea, 45)</literal></entry>
-       <entry><literal>1</literal></entry>
-      </row>
-
-      <row>
-       <entry><function>get_byte</function>(<parameter>string</parameter>, <parameter>offset</parameter>)</entry>
-       <entry><type>int</type></entry>
-       <entry>
-        Extract byte from string
-        <indexterm>
-         <primary>get_byte</primary>
-        </indexterm>
-       </entry>
-       <entry><literal>get_byte(E'Th\\000omas'::bytea, 4)</literal></entry>
-       <entry><literal>109</literal></entry>
-      </row>
-
-      <row>
-       <entry><literal><function>octet_length</function>(<parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>octet_length(<parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Number of bytes in binary string</entry>
        <entry><literal>octet_length(E'jo\\000se'::bytea)</literal></entry>
@@ -2675,7 +2657,17 @@
       </row>
 
       <row>
-       <entry><literal><function>position</function>(<parameter>substring</parameter> in <parameter>string</parameter>)</literal></entry>
+       <entry><literal><function>overlay(<parameter>string</parameter> placing <parameter>string</parameter> from <type>int</type> <optional>for <type>int</type></optional>)</function></literal></entry>
+       <entry><type>bytea</type></entry>
+       <entry>
+        Replace substring
+       </entry>
+       <entry><literal>overlay(E'Th\\000omas'::bytea placing E'\\002\\003'::bytea from 2 for 3)</literal></entry>
+       <entry><literal>T\\002\\003mas</literal></entry>
+      </row>
+
+      <row>
+       <entry><literal><function>position(<parameter>substring</parameter> in <parameter>string</parameter>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Location of specified substring</entry>
       <entry><literal>position(E'\\000om'::bytea in E'Th\\000omas'::bytea)</literal></entry>
@@ -2683,35 +2675,7 @@
       </row>
 
       <row>
-       <entry><function>set_bit</function>(<parameter>string</parameter>,
-       <parameter>offset</parameter>, <parameter>newvalue</>)</entry>
-       <entry><type>bytea</type></entry>
-       <entry>
-        Set bit in string
-        <indexterm>
-         <primary>set_bit</primary>
-        </indexterm>
-       </entry>
-       <entry><literal>set_bit(E'Th\\000omas'::bytea, 45, 0)</literal></entry>
-       <entry><literal>Th\000omAs</literal></entry>
-      </row>
-
-      <row>
-       <entry><function>set_byte</function>(<parameter>string</parameter>,
-       <parameter>offset</parameter>, <parameter>newvalue</>)</entry>
-       <entry><type>bytea</type></entry>
-       <entry>
-        Set byte in string
-        <indexterm>
-         <primary>set_byte</primary>
-        </indexterm>
-       </entry>
-       <entry><literal>set_byte(E'Th\\000omas'::bytea, 4, 64)</literal></entry>
-       <entry><literal>Th\000o@as</literal></entry>
-      </row>
-
-      <row>
-       <entry><literal><function>substring</function>(<parameter>string</parameter> <optional>from <type>int</type></optional> <optional>for <type>int</type></optional>)</literal></entry>
+       <entry><literal><function>substring(<parameter>string</parameter> <optional>from <type>int</type></optional> <optional>for <type>int</type></optional>)</function></literal></entry>
        <entry><type>bytea</type></entry>
        <entry>
         Extract substring
@@ -2725,9 +2689,9 @@
 
       <row>
        <entry>
-        <literal><function>trim</function>(<optional>both</optional>
+        <literal><function>trim(<optional>both</optional>
         <parameter>bytes</parameter> from
-        <parameter>string</parameter>)</literal>
+        <parameter>string</parameter>)</function></literal>
        </entry>
        <entry><type>bytea</type></entry>
        <entry>
@@ -2765,8 +2729,8 @@
 
      <tbody>
       <row>
-       <entry><literal><function>btrim</function>(<parameter>string</parameter>
-        <type>bytea</type>, <parameter>bytes</parameter> <type>bytea</type>)</literal></entry>
+       <entry><literal><function>btrim(<parameter>string</parameter>
+        <type>bytea</type>, <parameter>bytes</parameter> <type>bytea</type>)</function></literal></entry>
        <entry><type>bytea</type></entry>
        <entry>
         Remove the longest string consisting only of bytes
@@ -2779,12 +2743,12 @@
 
      <row>
       <entry>
-       <literal><function>decode</function>(<parameter>string</parameter> <type>text</type>,
-              <parameter>type</parameter> <type>text</type>)</literal>
+       <literal><function>decode(<parameter>string</parameter> <type>text</type>,
+              <parameter>type</parameter> <type>text</type>)</function></literal>
       </entry>
       <entry><type>bytea</type></entry>
       <entry>
-       Decode binary string from <parameter>string</parameter> previously 
+       Decode binary string from <parameter>string</parameter> previously
        encoded with <function>encode</>.  Parameter type is same as in <function>encode</>.
       </entry>
       <entry><literal>decode(E'123\\000456', 'escape')</literal></entry>
@@ -2793,8 +2757,8 @@
 
      <row>
       <entry>
-       <literal><function>encode</function>(<parameter>string</parameter> <type>bytea</type>,
-              <parameter>type</parameter> <type>text</type>)</literal>
+       <literal><function>encode(<parameter>string</parameter> <type>bytea</type>,
+              <parameter>type</parameter> <type>text</type>)</function></literal>
       </entry>
       <entry><type>text</type></entry>
       <entry>
@@ -2805,8 +2769,38 @@
       <entry><literal>123\000456</literal></entry>
      </row>
 
+      <row>
+       <entry>
+        <literal><function>get_bit(<parameter>string</parameter>, <parameter>offset</parameter>)</function></literal>
+       </entry>
+       <entry><type>int</type></entry>
+       <entry>
+        Extract bit from string
+        <indexterm>
+         <primary>get_bit</primary>
+        </indexterm>
+       </entry>
+       <entry><literal>get_bit(E'Th\\000omas'::bytea, 45)</literal></entry>
+       <entry><literal>1</literal></entry>
+      </row>
+
+      <row>
+       <entry>
+        <literal><function>get_byte(<parameter>string</parameter>, <parameter>offset</parameter>)</function></literal>
+       </entry>
+       <entry><type>int</type></entry>
+       <entry>
+        Extract byte from string
+        <indexterm>
+         <primary>get_byte</primary>
+        </indexterm>
+       </entry>
+       <entry><literal>get_byte(E'Th\\000omas'::bytea, 4)</literal></entry>
+       <entry><literal>109</literal></entry>
+      </row>
+
      <row>
-      <entry><literal><function>length</function>(<parameter>string</parameter>)</literal></entry>
+      <entry><literal><function>length(<parameter>string</parameter>)</function></literal></entry>
       <entry><type>int</type></entry>
       <entry>
        Length of binary string
@@ -2825,7 +2819,7 @@
      </row>
 
      <row>
-      <entry><literal><function>md5</function>(<parameter>string</parameter>)</literal></entry>
+      <entry><literal><function>md5(<parameter>string</parameter>)</function></literal></entry>
       <entry><type>text</type></entry>
       <entry>
        Calculates the MD5 hash of <parameter>string</parameter>,
@@ -2834,10 +2828,49 @@
       <entry><literal>md5(E'Th\\000omas'::bytea)</literal></entry>
       <entry><literal>8ab2d3c9689aaf18 b4958c334c82d8b1</literal></entry>
      </row>
+
+      <row>
+       <entry>
+        <literal><function>set_bit(<parameter>string</parameter>,
+        <parameter>offset</parameter>, <parameter>newvalue</>)</function></literal>
+       </entry>
+       <entry><type>bytea</type></entry>
+       <entry>
+        Set bit in string
+        <indexterm>
+         <primary>set_bit</primary>
+        </indexterm>
+       </entry>
+       <entry><literal>set_bit(E'Th\\000omas'::bytea, 45, 0)</literal></entry>
+       <entry><literal>Th\000omAs</literal></entry>
+      </row>
+
+      <row>
+       <entry>
+        <literal><function>set_byte(<parameter>string</parameter>,
+        <parameter>offset</parameter>, <parameter>newvalue</>)</function></literal>
+       </entry>
+       <entry><type>bytea</type></entry>
+       <entry>
+        Set byte in string
+        <indexterm>
+         <primary>set_byte</primary>
+        </indexterm>
+       </entry>
+       <entry><literal>set_byte(E'Th\\000omas'::bytea, 4, 64)</literal></entry>
+       <entry><literal>Th\000o@as</literal></entry>
+      </row>
     </tbody>
    </tgroup>
   </table>
 
+  <para>
+   <function>get_byte</> and <function>set_byte</> number the first byte
+   of a binary string as byte 0.
+   <function>get_bit</> and <function>set_bit</> number bits from the
+   right within each byte; for example bit 0 is the least significant bit of
+   the first byte, and bit 15 is the most significant bit of the second byte.
+  </para>
  </sect1>
 
 
@@ -2934,7 +2967,17 @@
     <literal><function>bit_length</function></literal>,
     <literal><function>octet_length</function></literal>,
     <literal><function>position</function></literal>,
-    <literal><function>substring</function></literal>.
+    <literal><function>substring</function></literal>,
+    <literal><function>overlay</function></literal>.
+   </para>
+
+   <para>
+    The following functions work on bit strings as well as binary
+    strings:
+    <literal><function>get_bit</function></literal>,
+    <literal><function>set_bit</function></literal>.
+    When working with a bit string, these functions number the first
+    (leftmost) bit of the string as bit 0.
    </para>
 
    <para>
@@ -3156,6 +3199,31 @@ cast(-44 as bit(12))           <lineannotation>111111010100</lineannotation>
     </listitem>
     <listitem>
      <para>
+      <literal>?</literal> denotes repetition of the previous item zero
+      or one time.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+      <literal>{</><replaceable>m</><literal>}</literal> denotes repetition
+      of the previous item exactly <replaceable>m</> times.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+      <literal>{</><replaceable>m</><literal>,}</literal> denotes repetition
+      of the previous item <replaceable>m</> or more times.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+      <literal>{</><replaceable>m</><literal>,</><replaceable>n</><literal>}</>
+      denotes repetition of the previous item at least <replaceable>m</> and
+      not more than <replaceable>n</> times.
+     </para>
+    </listitem>
+    <listitem>
+     <para>
       Parentheses <literal>()</literal> can be used to group items into
       a single logical item.
      </para>
@@ -3168,9 +3236,8 @@ cast(-44 as bit(12))           <lineannotation>111111010100</lineannotation>
     </listitem>
    </itemizedlist>
 
-    Notice that bounded repetition operators (<literal>?</> and
-    <literal>{...}</>) are not provided, though they exist in POSIX.
-    Also, the period (<literal>.</>) is not a metacharacter.
+    Notice that the period (<literal>.</>) is not a metacharacter
+    for <function>SIMILAR TO</>.
    </para>
 
    <para>
@@ -3206,7 +3273,7 @@ cast(-44 as bit(12))           <lineannotation>111111010100</lineannotation>
    </para>
 
    <para>
-    Some examples, with <literal>#"</> delimiting the return string:
+    Some examples, with <literal>#&quot;</> delimiting the return string:
 <programlisting>
 substring('foobar' from '%#"o_b#"%' for '#')   <lineannotation>oob</lineannotation>
 substring('foobar' from '#"o_b#"%' for '#')    <lineannotation>NULL</lineannotation>
@@ -3284,8 +3351,7 @@ substring('foobar' from '#"o_b#"%' for '#')    <lineannotation>NULL</lineannotat
 
     <para>
      <acronym>POSIX</acronym> regular expressions provide a more
-     powerful means for 
-     pattern matching than the <function>LIKE</function> and
+     powerful means for pattern matching than the <function>LIKE</function> and
      <function>SIMILAR TO</> operators.
      Many Unix tools such as <command>egrep</command>,
      <command>sed</command>, or <command>awk</command> use a pattern
@@ -3388,19 +3454,22 @@ regexp_replace('foobarbaz', 'b(..)', E'X\\1Y', 'g')
    </para>
 
     <para>
-     The <function>regexp_matches</> function returns all of the captured
-     substrings resulting from matching a POSIX regular expression pattern.
-     It has the syntax
+     The <function>regexp_matches</> function returns a text array of
+     all of the captured substrings resulting from matching a POSIX
+     regular expression pattern.  It has the syntax
      <function>regexp_matches</function>(<replaceable>string</>, <replaceable>pattern</>
      <optional>, <replaceable>flags</> </optional>).
-     If there is no match to the <replaceable>pattern</>, the function returns
-     no rows.  If there is a match, the function returns a text array whose
+     The function can return no rows, one row, or multiple rows (see
+     the <literal>g</> flag below).  If the <replaceable>pattern</>
+     does not match, the function returns no rows.  If the pattern
+     contains no parenthesized subexpressions, then each row
+     returned is a single-element text array containing the substring
+     matching the whole pattern.  If the pattern contains parenthesized
+     subexpressions, the function returns a text array whose
      <replaceable>n</>'th element is the substring matching the
      <replaceable>n</>'th parenthesized subexpression of the pattern
      (not counting <quote>non-capturing</> parentheses; see below for
-     details).  If the pattern does not contain any parenthesized
-     subexpressions, then the result is a single-element text array containing
-     the substring matching the whole pattern.
+     details).
      The <replaceable>flags</> parameter is an optional text
      string containing zero or more single-letter flags that change the
      function's behavior.  Flag <literal>g</> causes the function to find
@@ -3430,6 +3499,16 @@ SELECT regexp_matches('foobarbequebaz', 'barbeque');
 ----------------
  {barbeque}
 (1 row)
+</programlisting>
+   </para>
+
+   <para>
+    It is possible to force <function>regexp_matches()</> to always
+    return one row by using a sub-select;  this is particularly useful
+    in a <literal>SELECT</> target list when you want all rows
+    returned, even non-matching ones:
+<programlisting>
+SELECT col1, (SELECT regexp_matches(col2, '(bar)(beque)')) FROM tab;
 </programlisting>
    </para>
 
@@ -3548,12 +3627,12 @@ SELECT foo FROM regexp_split_to_table('the quick brown fox', E'\\s*') AS foo;
 
    <note>
     <para>
-     The form of regular expressions accepted by
-     <productname>PostgreSQL</> can be chosen by setting the <xref
-     linkend="guc-regex-flavor"> run-time parameter.  The usual
-     setting is <literal>advanced</>, but one might choose
-     <literal>extended</> for backwards compatibility with
-     pre-7.4 releases of <productname>PostgreSQL</>.
+     <productname>PostgreSQL</> always initially presumes that a regular
+     expression follows the ARE rules.  However, the more limited ERE or
+     BRE rules can be chosen by prepending an <firstterm>embedded option</>
+     to the RE pattern, as described in <xref linkend="posix-metasyntax">.
+     This can be useful for compatibility with applications that expect
+     exactly the <acronym>POSIX</acronym> 1003.2 rules.
     </para>
    </note>
 
@@ -4254,7 +4333,7 @@ SELECT foo FROM regexp_split_to_table('the quick brown fox', E'\\s*') AS foo;
        <entry> (where <replaceable>m</> is a nonzero digit, and
        <replaceable>nn</> is some more digits, and the decimal value
        <replaceable>mnn</> is not greater than the number of closing capturing
-       parentheses seen so far) 
+       parentheses seen so far)
        a back reference to the <replaceable>mnn</>'th subexpression </entry>
        </row>
       </tbody>
@@ -4286,12 +4365,12 @@ SELECT foo FROM regexp_split_to_table('the quick brown fox', E'\\s*') AS foo;
    </para>
 
    <para>
-    Normally the flavor of RE being used is determined by
-    <varname>regex_flavor</>.
-    However, this can be overridden by a <firstterm>director</> prefix.
+    An RE can begin with one of two special <firstterm>director</> prefixes.
     If an RE begins with <literal>***:</>,
-    the rest of the RE is taken as an ARE regardless of
-    <varname>regex_flavor</>.
+    the rest of the RE is taken as an ARE.  (This normally has no effect in
+    <productname>PostgreSQL</>, since REs are assumed to be AREs;
+    but it does have an effect if ERE or BRE mode had been specified by
+    the <replaceable>flags</> parameter to a regex function.)
     If an RE begins with <literal>***=</>,
     the rest of the RE is taken to be a literal string,
     with all characters considered ordinary characters.
@@ -4302,10 +4381,14 @@ SELECT foo FROM regexp_split_to_table('the quick brown fox', E'\\s*') AS foo;
     a sequence <literal>(?</><replaceable>xyz</><literal>)</>
     (where <replaceable>xyz</> is one or more alphabetic characters)
     specifies options affecting the rest of the RE.
-    These options override any previously determined options (including
-    both the RE flavor and case sensitivity).
+    These options override any previously determined options &mdash;
+    in particular, they can override the case-sensitivity behavior implied by
+    a regex operator, or the <replaceable>flags</> parameter to a regex
+    function.
     The available option letters are
     shown in <xref linkend="posix-embedded-options-table">.
+    Note that these same option letters are used in the <replaceable>flags</>
+    parameters of regex functions.
    </para>
 
    <table id="posix-embedded-options-table">
@@ -4676,10 +4759,6 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
       </para>
      </listitem>
     </itemizedlist>
-
-    While these differences are unlikely to create a problem for most
-    applications, you can avoid them if necessary by
-    setting <varname>regex_flavor</> to <literal>extended</>.
    </para>
    </sect3>
 
@@ -4772,19 +4851,19 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>to_char</function>(<type>timestamp</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_char(<type>timestamp</type>, <type>text</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>convert time stamp to string</entry>
         <entry><literal>to_char(current_timestamp, 'HH12:MI:SS')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_char</function>(<type>interval</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_char(<type>interval</type>, <type>text</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>convert interval to string</entry>
         <entry><literal>to_char(interval '15h&nbsp;2m&nbsp;12s', 'HH24:MI:SS')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_char</function>(<type>int</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_char(<type>int</type>, <type>text</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>convert integer to string</entry>
         <entry><literal>to_char(125, '999')</literal></entry>
@@ -4797,31 +4876,31 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
         <entry><literal>to_char(125.8::real, '999D9')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_char</function>(<type>numeric</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_char(<type>numeric</type>, <type>text</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>convert numeric to string</entry>
         <entry><literal>to_char(-125.8, '999D99S')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_date</function>(<type>text</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_date(<type>text</type>, <type>text</type>)</function></literal></entry>
         <entry><type>date</type></entry>
         <entry>convert string to date</entry>
         <entry><literal>to_date('05&nbsp;Dec&nbsp;2000', 'DD&nbsp;Mon&nbsp;YYYY')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_number</function>(<type>text</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_number(<type>text</type>, <type>text</type>)</function></literal></entry>
         <entry><type>numeric</type></entry>
         <entry>convert string to numeric</entry>
         <entry><literal>to_number('12,454.8-', '99G999D9S')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_timestamp</function>(<type>text</type>, <type>text</type>)</literal></entry>
+        <entry><literal><function>to_timestamp(<type>text</type>, <type>text</type>)</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>convert string to time stamp</entry>
         <entry><literal>to_timestamp('05&nbsp;Dec&nbsp;2000', 'DD&nbsp;Mon&nbsp;YYYY')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_timestamp</function>(<type>double precision</type>)</literal></entry>
+        <entry><literal><function>to_timestamp(<type>double precision</type>)</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>convert Unix epoch to time stamp</entry>
         <entry><literal>to_timestamp(1284352323)</literal></entry>
@@ -4944,7 +5023,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>MONTH</literal></entry>
-        <entry>full uppercase month name (blank-padded to 9 chars)</entry>
+        <entry>full upper case month name (blank-padded to 9 chars)</entry>
        </row>
        <row>
         <entry><literal>Month</literal></entry>
@@ -4952,11 +5031,11 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>month</literal></entry>
-        <entry>full lowercase month name (blank-padded to 9 chars)</entry>
+        <entry>full lower case month name (blank-padded to 9 chars)</entry>
        </row>
        <row>
         <entry><literal>MON</literal></entry>
-        <entry>abbreviated uppercase month name (3 chars in English, localized lengths vary)</entry>
+        <entry>abbreviated upper case month name (3 chars in English, localized lengths vary)</entry>
        </row>
        <row>
         <entry><literal>Mon</literal></entry>
@@ -4964,7 +5043,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>mon</literal></entry>
-        <entry>abbreviated lowercase month name (3 chars in English, localized lengths vary)</entry>
+        <entry>abbreviated lower case month name (3 chars in English, localized lengths vary)</entry>
        </row>
        <row>
         <entry><literal>MM</literal></entry>
@@ -4972,7 +5051,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>DAY</literal></entry>
-        <entry>full uppercase day name (blank-padded to 9 chars)</entry>
+        <entry>full upper case day name (blank-padded to 9 chars)</entry>
        </row>
        <row>
         <entry><literal>Day</literal></entry>
@@ -4980,11 +5059,11 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>day</literal></entry>
-        <entry>full lowercase day name (blank-padded to 9 chars)</entry>
+        <entry>full lower case day name (blank-padded to 9 chars)</entry>
        </row>
        <row>
         <entry><literal>DY</literal></entry>
-        <entry>abbreviated uppercase day name (3 chars in English, localized lengths vary)</entry>
+        <entry>abbreviated upper case day name (3 chars in English, localized lengths vary)</entry>
        </row>
        <row>
         <entry><literal>Dy</literal></entry>
@@ -4992,7 +5071,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>dy</literal></entry>
-        <entry>abbreviated lowercase day name (3 chars in English, localized lengths vary)</entry>
+        <entry>abbreviated lower case day name (3 chars in English, localized lengths vary)</entry>
        </row>
        <row>
         <entry><literal>DDD</literal></entry>
@@ -5036,23 +5115,23 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>Q</literal></entry>
-        <entry>quarter</entry>
+        <entry>quarter (ignored by <function>to_date</> and <function>to_timestamp</>)</entry>
        </row>
        <row>
         <entry><literal>RM</literal></entry>
-        <entry>month in uppercase Roman numerals (I-XII; I=January)</entry>
+        <entry>month in upper case Roman numerals (I-XII; I=January)</entry>
        </row>
        <row>
         <entry><literal>rm</literal></entry>
-        <entry>month in lowercase Roman numerals (i-xii; i=January)</entry>
+        <entry>month in lower case Roman numerals (i-xii; i=January)</entry>
        </row>
        <row>
         <entry><literal>TZ</literal></entry>
-        <entry>uppercase time-zone name</entry>
+        <entry>upper case time-zone name</entry>
        </row>
        <row>
         <entry><literal>tz</literal></entry>
-        <entry>lowercase time-zone name</entry>
+        <entry>lower case time-zone name</entry>
        </row>
       </tbody>
      </tgroup>
@@ -5085,12 +5164,12 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>TH</literal> suffix</entry>
-        <entry>uppercase ordinal number suffix</entry>
+        <entry>upper case ordinal number suffix</entry>
         <entry><literal>DDTH</literal>, e.g., <literal>12TH</></entry>
        </row>   
        <row>
         <entry><literal>th</literal> suffix</entry>
-        <entry>lowercase ordinal number suffix</entry>
+        <entry>lower case ordinal number suffix</entry>
         <entry><literal>DDth</literal>, e.g., <literal>12th</></entry>
        </row>
        <row>
@@ -5121,7 +5200,11 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
       <para>
        <literal>FM</literal> suppresses leading zeroes and trailing blanks
        that would otherwise be added to make the output of a pattern be
-       fixed-width.
+       fixed-width.  In <productname>PostgreSQL</productname>,
+       <literal>FM</literal> modifies only the next specification, while in
+       Oracle <literal>FM</literal> affects all subsequent
+       specifications, and repeated <literal>FM</literal> modifiers
+       toggle fill mode on and off.
       </para>
      </listitem>
 
@@ -5152,7 +5235,10 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        even if it contains pattern key words.  For example, in
        <literal>'"Hello Year "YYYY'</literal>, the <literal>YYYY</literal>
        will be replaced by the year data, but the single <literal>Y</literal> in <literal>Year</literal>
-       will not be.
+       will not be.  In <function>to_date</>, <function>to_number</>,
+       and <function>to_timestamp</>, double-quoted strings skip the number of
+       input characters contained in the string, e.g. <literal>"XX"</>
+       skips two input characters.
       </para>
      </listitem>
 
@@ -5260,8 +5346,9 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
      <listitem>
       <para>
         <function>to_char(interval)</function> formats <literal>HH</> and
-        <literal>HH12</> as hours in a single day, while <literal>HH24</>
-        can output hours exceeding a single day, e.g., &gt;24.
+        <literal>HH12</> as shown on a 12-hour clock, i.e. zero hours
+        and 36 hours output as <literal>12</>, while <literal>HH24</>
+        outputs the full hour value, which can exceed 23 for intervals.
       </para>
      </listitem>
 
@@ -5345,7 +5432,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>EEEE</literal></entry>
-        <entry>scientific notation (not implemented)</entry>
+        <entry>exponent for scientific notation</entry>
        </row>
       </tbody>
      </tgroup>
@@ -5404,6 +5491,15 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        (e.g., <literal>99.9V99</literal> is not allowed).
       </para>
      </listitem>
+
+     <listitem>
+      <para>
+       <literal>EEEE</literal> (scientific notation) cannot be used in
+       combination with any of the other formatting patterns or
+       modifiers other than digit and decimal point patterns, and must be at the end of the format string
+       (e.g., <literal>9.99EEEE</literal> is a valid pattern).
+      </para>
+     </listitem>
     </itemizedlist>
    </para>
 
@@ -5434,12 +5530,12 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
        <row>
         <entry><literal>TH</literal> suffix</entry>
-        <entry>uppercase ordinal number suffix</entry>
+        <entry>upper case ordinal number suffix</entry>
         <entry><literal>999TH</literal></entry>
        </row>   
        <row>
         <entry><literal>th</literal> suffix</entry>
-        <entry>lowercase ordinal number suffix</entry>
+        <entry>lower case ordinal number suffix</entry>
         <entry><literal>999th</literal></entry>
        </row>
       </tbody>
@@ -5604,6 +5700,10 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        <row>            
         <entry><literal>to_char(12.45, '99V9')</literal></entry>
         <entry><literal>'&nbsp;125'</literal></entry>
+       </row>
+       <row>
+        <entry><literal>to_char(0.0004859, '9.99EEEE')</literal></entry>
+        <entry><literal>' 4.86e-04'</literal></entry>
        </row>
       </tbody>
      </tgroup>
@@ -5837,7 +5937,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
 
       <tbody>
        <row>
-        <entry><literal><function>age</function>(<type>timestamp</type>, <type>timestamp</type>)</literal></entry>
+        <entry><literal><function>age(<type>timestamp</type>, <type>timestamp</type>)</function></literal></entry>
         <entry><type>interval</type></entry>
         <entry>Subtract arguments, producing a <quote>symbolic</> result that
         uses years and months</entry>
@@ -5846,7 +5946,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>age</function>(<type>timestamp</type>)</literal></entry>
+        <entry><literal><function>age(<type>timestamp</type>)</function></literal></entry>
         <entry><type>interval</type></entry>
         <entry>Subtract from <function>current_date</function> (at midnight)</entry>
         <entry><literal>age(timestamp '1957-06-13')</literal></entry>
@@ -5854,7 +5954,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>clock_timestamp</function>()</literal></entry>
+        <entry><literal><function>clock_timestamp()</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>Current date and time (changes during statement execution);
          see <xref linkend="functions-datetime-current">
@@ -5894,7 +5994,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>date_part</function>(<type>text</type>, <type>timestamp</type>)</literal></entry>
+        <entry><literal><function>date_part(<type>text</type>, <type>timestamp</type>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>Get subfield (equivalent to <function>extract</function>);
          see <xref linkend="functions-datetime-extract">
@@ -5904,7 +6004,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>date_part</function>(<type>text</type>, <type>interval</type>)</literal></entry>
+        <entry><literal><function>date_part(<type>text</type>, <type>interval</type>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>Get subfield (equivalent to
          <function>extract</function>); see <xref linkend="functions-datetime-extract">
@@ -5914,7 +6014,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>date_trunc</function>(<type>text</type>, <type>timestamp</type>)</literal></entry>
+        <entry><literal><function>date_trunc(<type>text</type>, <type>timestamp</type>)</function></literal></entry>
         <entry><type>timestamp</type></entry>
         <entry>Truncate to specified precision; see also <xref linkend="functions-datetime-trunc">
         </entry>
@@ -5943,7 +6043,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>isfinite</function>(<type>date</type>)</literal></entry>
+        <entry><literal><function>isfinite(<type>date</type>)</function></literal></entry>
         <entry><type>boolean</type></entry>
         <entry>Test for finite date (not +/-infinity)</entry>
         <entry><literal>isfinite(date '2001-02-16')</literal></entry>
@@ -5951,7 +6051,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>isfinite</function>(<type>timestamp</type>)</literal></entry>
+        <entry><literal><function>isfinite(<type>timestamp</type>)</function></literal></entry>
         <entry><type>boolean</type></entry>
         <entry>Test for finite time stamp (not +/-infinity)</entry>
         <entry><literal>isfinite(timestamp '2001-02-16 21:28:30')</literal></entry>
@@ -5959,7 +6059,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>isfinite</function>(<type>interval</type>)</literal></entry>
+        <entry><literal><function>isfinite(<type>interval</type>)</function></literal></entry>
         <entry><type>boolean</type></entry>
         <entry>Test for finite interval</entry>
         <entry><literal>isfinite(interval '4 hours')</literal></entry>
@@ -5967,7 +6067,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>justify_days</function>(<type>interval</type>)</literal></entry>
+        <entry><literal><function>justify_days(<type>interval</type>)</function></literal></entry>
         <entry><type>interval</type></entry>
         <entry>Adjust interval so 30-day time periods are represented as months</entry>
         <entry><literal>justify_days(interval '35 days')</literal></entry>
@@ -5975,7 +6075,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>justify_hours</function>(<type>interval</type>)</literal></entry>
+        <entry><literal><function>justify_hours(<type>interval</type>)</function></literal></entry>
         <entry><type>interval</type></entry>
         <entry>Adjust interval so 24-hour time periods are represented as days</entry>
         <entry><literal>justify_hours(interval '27 hours')</literal></entry>
@@ -5983,7 +6083,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>justify_interval</function>(<type>interval</type>)</literal></entry>
+        <entry><literal><function>justify_interval(<type>interval</type>)</function></literal></entry>
         <entry><type>interval</type></entry>
         <entry>Adjust interval using <function>justify_days</> and <function>justify_hours</>, with additional sign adjustments</entry>
         <entry><literal>justify_interval(interval '1 mon -1 hour')</literal></entry>
@@ -6011,7 +6111,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>now</function>()</literal></entry>
+        <entry><literal><function>now()</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>Current date and time (start of current transaction);
          see <xref linkend="functions-datetime-current">
@@ -6021,7 +6121,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>statement_timestamp</function>()</literal></entry>
+        <entry><literal><function>statement_timestamp()</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>Current date and time (start of current statement);
          see <xref linkend="functions-datetime-current">
@@ -6031,7 +6131,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>timeofday</function>()</literal></entry>
+        <entry><literal><function>timeofday()</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>Current date and time
          (like <function>clock_timestamp</>, but as a <type>text</> string);
@@ -6042,7 +6142,7 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
        </row>
 
        <row>
-        <entry><literal><function>transaction_timestamp</function>()</literal></entry>
+        <entry><literal><function>transaction_timestamp()</function></literal></entry>
         <entry><type>timestamp with time zone</type></entry>
         <entry>Current date and time (start of current transaction);
          see <xref linkend="functions-datetime-current">
@@ -6064,7 +6164,15 @@ SELECT SUBSTRING('XY1234Z', 'Y*?([0-9]{1,3})');
     This expression yields true when two time periods (defined by their
     endpoints) overlap, false when they do not overlap.  The endpoints
     can be specified as pairs of dates, times, or time stamps; or as
-    a date, time, or time stamp followed by an interval.
+    a date, time, or time stamp followed by an interval.  When a pair
+    of values is provided, either the start or the end can be written
+    first; <literal>OVERLAPS</> automatically takes the earlier value
+    of the pair as the start.  Each time period is considered to
+    represent the half-open interval <replaceable>start</> <literal>&lt;=</>
+    <replaceable>time</> <literal>&lt;</> <replaceable>end</>, unless
+    <replaceable>start</> and <replaceable>end</> are equal in which case it
+    represents that single time instant.  This means for instance that two
+    time periods with only an endpoint in common do not overlap.
    </para>
 
 <screen>
@@ -6074,6 +6182,12 @@ SELECT (DATE '2001-02-16', DATE '2001-12-21') OVERLAPS
 SELECT (DATE '2001-02-16', INTERVAL '100 days') OVERLAPS
        (DATE '2001-10-30', DATE '2002-10-30');
 <lineannotation>Result: </lineannotation><computeroutput>false</computeroutput>
+SELECT (DATE '2001-10-29', DATE '2001-10-30') OVERLAPS
+       (DATE '2001-10-30', DATE '2001-10-31');
+<lineannotation>Result: </lineannotation><computeroutput>false</computeroutput>
+SELECT (DATE '2001-10-30', DATE '2001-10-30') OVERLAPS
+       (DATE '2001-10-30', DATE '2001-10-31');
+<lineannotation>Result: </lineannotation><computeroutput>true</computeroutput>
 </screen>
 
   <para>
@@ -6239,8 +6353,8 @@ SELECT EXTRACT(DOY FROM TIMESTAMP '2001-02-16 20:38:40');
        </para>
 
 <screen>
-SELECT EXTRACT(EPOCH FROM TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-08');
-<lineannotation>Result: </lineannotation><computeroutput>982384720</computeroutput>
+SELECT EXTRACT(EPOCH FROM TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40.12-08');
+<lineannotation>Result: </lineannotation><computeroutput>982384720.12</computeroutput>
 
 SELECT EXTRACT(EPOCH FROM INTERVAL '5 days 3 hours');
 <lineannotation>Result: </lineannotation><computeroutput>442800</computeroutput>
@@ -6250,10 +6364,13 @@ SELECT EXTRACT(EPOCH FROM INTERVAL '5 days 3 hours');
         Here is how you can convert an epoch value back to a time
         stamp:
        </para>
-
 <screen>
-SELECT TIMESTAMP WITH TIME ZONE 'epoch' + 982384720 * INTERVAL '1 second';
+SELECT TIMESTAMP WITH TIME ZONE 'epoch' + 982384720.12 * INTERVAL '1 second';
 </screen>
+       <para>
+        (The <function>to_timestamp</> function encapsulates the above
+        conversion.)
+       </para>
       </listitem>
      </varlistentry>
 
@@ -7053,7 +7170,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
        </row>
        <row>
         <entry> <literal>&amp;&amp;</literal> </entry>
-        <entry>Overlaps?</entry>
+        <entry>Overlaps?  (One point in common makes this true.)</entry>
         <entry><literal>box '((0,0),(1,1))' &amp;&amp; box '((0,0),(2,2))'</literal></entry>
        </row>
        <row>
@@ -7219,61 +7336,61 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>area</function>(<replaceable>object</>)</literal></entry>
+        <entry><literal><function>area(<replaceable>object</>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>area</entry>
         <entry><literal>area(box '((0,0),(1,1))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>center</function>(<replaceable>object</>)</literal></entry>
+        <entry><literal><function>center(<replaceable>object</>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>center</entry>
         <entry><literal>center(box '((0,0),(1,2))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>diameter</function>(<type>circle</>)</literal></entry>
+        <entry><literal><function>diameter(<type>circle</>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>diameter of circle</entry>
         <entry><literal>diameter(circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>height</function>(<type>box</>)</literal></entry>
+        <entry><literal><function>height(<type>box</>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>vertical size of box</entry>
         <entry><literal>height(box '((0,0),(1,1))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>isclosed</function>(<type>path</>)</literal></entry>
+        <entry><literal><function>isclosed(<type>path</>)</function></literal></entry>
         <entry><type>boolean</type></entry>
         <entry>a closed path?</entry>
         <entry><literal>isclosed(path '((0,0),(1,1),(2,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>isopen</function>(<type>path</>)</literal></entry>
+        <entry><literal><function>isopen(<type>path</>)</function></literal></entry>
         <entry><type>boolean</type></entry>
         <entry>an open path?</entry>
         <entry><literal>isopen(path '[(0,0),(1,1),(2,0)]')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>length</function>(<replaceable>object</>)</literal></entry>
+        <entry><literal><function>length(<replaceable>object</>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>length</entry>
         <entry><literal>length(path '((-1,0),(1,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>npoints</function>(<type>path</>)</literal></entry>
+        <entry><literal><function>npoints(<type>path</>)</function></literal></entry>
         <entry><type>int</type></entry>
         <entry>number of points</entry>
         <entry><literal>npoints(path '[(0,0),(1,1),(2,0)]')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>npoints</function>(<type>polygon</>)</literal></entry>
+        <entry><literal><function>npoints(<type>polygon</>)</function></literal></entry>
         <entry><type>int</type></entry>
         <entry>number of points</entry>
         <entry><literal>npoints(polygon '((1,1),(0,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>pclose</function>(<type>path</>)</literal></entry>
+        <entry><literal><function>pclose(<type>path</>)</function></literal></entry>
         <entry><type>path</type></entry>
         <entry>convert path to closed</entry>
         <entry><literal>pclose(path '[(0,0),(1,1),(2,0)]')</literal></entry>
@@ -7281,26 +7398,26 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
 <![IGNORE[
 <!-- Not defined by this name. Implements the intersection operator '#' -->
        <row>
-        <entry><literal><function>point</function>(<type>lseg</>, <type>lseg</>)</literal></entry>
+        <entry><literal><function>point(<type>lseg</>, <type>lseg</>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>intersection</entry>
         <entry><literal>point(lseg '((-1,0),(1,0))',lseg '((-2,-2),(2,2))')</literal></entry>
        </row>
 ]]>
        <row>
-        <entry><literal><function>popen</function>(<type>path</>)</literal></entry>
+        <entry><literal><function>popen(<type>path</>)</function></literal></entry>
         <entry><type>path</type></entry>
         <entry>convert path to open</entry>
         <entry><literal>popen(path '((0,0),(1,1),(2,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>radius</function>(<type>circle</type>)</literal></entry>
+        <entry><literal><function>radius(<type>circle</type>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>radius of circle</entry>
         <entry><literal>radius(circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>width</function>(<type>box</>)</literal></entry>
+        <entry><literal><function>width(<type>box</>)</function></literal></entry>
         <entry><type>double precision</type></entry>
         <entry>horizontal size of box</entry>
         <entry><literal>width(box '((0,0),(1,1))')</literal></entry>
@@ -7322,55 +7439,55 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>box</function>(<type>circle</type>)</literal></entry>
+        <entry><literal><function>box(<type>circle</type>)</function></literal></entry>
         <entry><type>box</type></entry>
         <entry>circle to box</entry>
         <entry><literal>box(circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>box</function>(<type>point</type>, <type>point</type>)</literal></entry>
+        <entry><literal><function>box(<type>point</type>, <type>point</type>)</function></literal></entry>
         <entry><type>box</type></entry>
         <entry>points to box</entry>
         <entry><literal>box(point '(0,0)', point '(1,1)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>box</function>(<type>polygon</type>)</literal></entry>
+        <entry><literal><function>box(<type>polygon</type>)</function></literal></entry>
         <entry><type>box</type></entry>
         <entry>polygon to box</entry>
         <entry><literal>box(polygon '((0,0),(1,1),(2,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>circle</function>(<type>box</type>)</literal></entry>
+        <entry><literal><function>circle(<type>box</type>)</function></literal></entry>
         <entry><type>circle</type></entry>
         <entry>box to circle</entry>
         <entry><literal>circle(box '((0,0),(1,1))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>circle</function>(<type>point</type>, <type>double precision</type>)</literal></entry>
+        <entry><literal><function>circle(<type>point</type>, <type>double precision</type>)</function></literal></entry>
         <entry><type>circle</type></entry>
         <entry>center and radius to circle</entry>
         <entry><literal>circle(point '(0,0)', 2.0)</literal></entry>
        </row>
        <row>
-        <entry><literal><function>circle</function>(<type>polygon</type>)</literal></entry>
+        <entry><literal><function>circle(<type>polygon</type>)</function></literal></entry>
         <entry><type>circle</type></entry>
         <entry>polygon to circle</entry>
         <entry><literal>circle(polygon '((0,0),(1,1),(2,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>lseg</function>(<type>box</type>)</literal></entry>
+        <entry><literal><function>lseg(<type>box</type>)</function></literal></entry>
         <entry><type>lseg</type></entry>
         <entry>box diagonal to line segment</entry>
         <entry><literal>lseg(box '((-1,0),(1,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>lseg</function>(<type>point</type>, <type>point</type>)</literal></entry>
+        <entry><literal><function>lseg(<type>point</type>, <type>point</type>)</function></literal></entry>
         <entry><type>lseg</type></entry>
         <entry>points to line segment</entry>
         <entry><literal>lseg(point '(-1,0)', point '(1,0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>path</function>(<type>polygon</type>)</literal></entry>
+        <entry><literal><function>path(<type>polygon</type>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>polygon to path</entry>
         <entry><literal>path(polygon '((0,0),(1,1),(2,0))')</literal></entry>
@@ -7383,49 +7500,49 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
         <entry><literal>point(23.4, -44.5)</literal></entry>
        </row>
        <row>
-        <entry><literal><function>point</function>(<type>box</type>)</literal></entry>
+        <entry><literal><function>point(<type>box</type>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>center of box</entry>
         <entry><literal>point(box '((-1,0),(1,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>point</function>(<type>circle</type>)</literal></entry>
+        <entry><literal><function>point(<type>circle</type>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>center of circle</entry>
         <entry><literal>point(circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>point</function>(<type>lseg</type>)</literal></entry>
+        <entry><literal><function>point(<type>lseg</type>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>center of line segment</entry>
         <entry><literal>point(lseg '((-1,0),(1,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>point</function>(<type>polygon</type>)</literal></entry>
+        <entry><literal><function>point(<type>polygon</type>)</function></literal></entry>
         <entry><type>point</type></entry>
         <entry>center of polygon</entry>
         <entry><literal>point(polygon '((0,0),(1,1),(2,0))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>polygon</function>(<type>box</type>)</literal></entry>
+        <entry><literal><function>polygon(<type>box</type>)</function></literal></entry>
         <entry><type>polygon</type></entry>
         <entry>box to 4-point polygon</entry>
         <entry><literal>polygon(box '((0,0),(1,1))')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>polygon</function>(<type>circle</type>)</literal></entry>
+        <entry><literal><function>polygon(<type>circle</type>)</function></literal></entry>
         <entry><type>polygon</type></entry>
         <entry>circle to 12-point polygon</entry>
         <entry><literal>polygon(circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>polygon</function>(<replaceable class="parameter">npts</replaceable>, <type>circle</type>)</literal></entry>
+        <entry><literal><function>polygon(<replaceable class="parameter">npts</replaceable>, <type>circle</type>)</function></literal></entry>
         <entry><type>polygon</type></entry>
         <entry>circle to <replaceable class="parameter">npts</replaceable>-point polygon</entry>
         <entry><literal>polygon(12, circle '((0,0),2.0)')</literal></entry>
        </row>
        <row>
-        <entry><literal><function>polygon</function>(<type>path</type>)</literal></entry>
+        <entry><literal><function>polygon(<type>path</type>)</function></literal></entry>
         <entry><type>polygon</type></entry>
         <entry>path to polygon</entry>
         <entry><literal>polygon(path '((0,0),(1,1),(2,0))')</literal></entry>
@@ -7595,28 +7712,28 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>abbrev</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>abbrev(<type>inet</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>abbreviated display format as text</entry>
         <entry><literal>abbrev(inet '10.1.0.0/16')</literal></entry>
         <entry><literal>10.1.0.0/16</literal></entry>
        </row>
        <row>
-        <entry><literal><function>abbrev</function>(<type>cidr</type>)</literal></entry>
+        <entry><literal><function>abbrev(<type>cidr</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>abbreviated display format as text</entry>
         <entry><literal>abbrev(cidr '10.1.0.0/16')</literal></entry>
         <entry><literal>10.1/16</literal></entry>
        </row>
        <row>
-        <entry><literal><function>broadcast</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>broadcast(<type>inet</type>)</function></literal></entry>
         <entry><type>inet</type></entry>
         <entry>broadcast address for network</entry>
         <entry><literal>broadcast('192.168.1.5/24')</literal></entry>
         <entry><literal>192.168.1.255/24</literal></entry>
        </row>
        <row>
-        <entry><literal><function>family</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>family(<type>inet</type>)</function></literal></entry>
         <entry><type>int</type></entry>
         <entry>extract family of address; <literal>4</literal> for IPv4,
          <literal>6</literal> for IPv6</entry>
@@ -7624,56 +7741,56 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
         <entry><literal>6</literal></entry>
        </row>
        <row>
-        <entry><literal><function>host</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>host(<type>inet</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>extract IP address as text</entry>
         <entry><literal>host('192.168.1.5/24')</literal></entry>
         <entry><literal>192.168.1.5</literal></entry>
        </row>
        <row>
-        <entry><literal><function>hostmask</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>hostmask(<type>inet</type>)</function></literal></entry>
         <entry><type>inet</type></entry>
         <entry>construct host mask for network</entry>
         <entry><literal>hostmask('192.168.23.20/30')</literal></entry>
         <entry><literal>0.0.0.3</literal></entry>
        </row>
        <row>
-        <entry><literal><function>masklen</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>masklen(<type>inet</type>)</function></literal></entry>
         <entry><type>int</type></entry>
         <entry>extract netmask length</entry>
         <entry><literal>masklen('192.168.1.5/24')</literal></entry>
         <entry><literal>24</literal></entry>
        </row>
        <row>
-        <entry><literal><function>netmask</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>netmask(<type>inet</type>)</function></literal></entry>
         <entry><type>inet</type></entry>
         <entry>construct netmask for network</entry>
         <entry><literal>netmask('192.168.1.5/24')</literal></entry>
         <entry><literal>255.255.255.0</literal></entry>
        </row>
        <row>
-        <entry><literal><function>network</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>network(<type>inet</type>)</function></literal></entry>
         <entry><type>cidr</type></entry>
         <entry>extract network part of address</entry>
         <entry><literal>network('192.168.1.5/24')</literal></entry>
         <entry><literal>192.168.1.0/24</literal></entry>
        </row>
        <row>
-        <entry><literal><function>set_masklen</function>(<type>inet</type>, <type>int</type>)</literal></entry>
+        <entry><literal><function>set_masklen(<type>inet</type>, <type>int</type>)</function></literal></entry>
         <entry><type>inet</type></entry>
         <entry>set netmask length for <type>inet</type> value</entry>
         <entry><literal>set_masklen('192.168.1.5/24', 16)</literal></entry>
         <entry><literal>192.168.1.5/16</literal></entry>
        </row>
        <row>
-        <entry><literal><function>set_masklen</function>(<type>cidr</type>, <type>int</type>)</literal></entry>
+        <entry><literal><function>set_masklen(<type>cidr</type>, <type>int</type>)</function></literal></entry>
         <entry><type>cidr</type></entry>
         <entry>set netmask length for <type>cidr</type> value</entry>
         <entry><literal>set_masklen('192.168.1.0/24'::cidr, 16)</literal></entry>
         <entry><literal>192.168.0.0/16</literal></entry>
        </row>
        <row>
-        <entry><literal><function>text</function>(<type>inet</type>)</literal></entry>
+        <entry><literal><function>text(<type>inet</type>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>extract IP address and netmask length as text</entry>
         <entry><literal>text(inet '192.168.1.5')</literal></entry>
@@ -7702,7 +7819,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
   <para>
    <xref linkend="macaddr-functions-table"> shows the functions
    available for use with the <type>macaddr</type> type.  The function
-   <literal><function>trunc</function>(<type>macaddr</type>)</literal> returns a MAC
+   <literal><function>trunc(<type>macaddr</type>)</function></literal> returns a MAC
    address with the last 3 bytes set to zero.  This can be used to
    associate the remaining prefix with a manufacturer.
   </para>
@@ -7721,7 +7838,7 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>trunc</function>(<type>macaddr</type>)</literal></entry>
+        <entry><literal><function>trunc(<type>macaddr</type>)</function></literal></entry>
         <entry><type>macaddr</type></entry>
         <entry>set last 3 bytes to zero</entry>
         <entry><literal>trunc(macaddr '12:34:56:78:90:ab')</literal></entry>
@@ -7856,116 +7973,115 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>to_tsvector</function>(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">document</> <type>text</type>)</literal></entry>
+        <entry><literal><function>to_tsvector(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">document</> <type>text</type>)</function></literal></entry>
         <entry><type>tsvector</type></entry>
         <entry>reduce document text to <type>tsvector</></entry>
         <entry><literal>to_tsvector('english', 'The Fat Rats')</literal></entry>
         <entry><literal>'fat':2 'rat':3</literal></entry>
        </row>
        <row>
-        <entry><literal><function>length</function>(<type>tsvector</>)</literal></entry>
+        <entry><literal><function>length(<type>tsvector</>)</function></literal></entry>
         <entry><type>integer</type></entry>
         <entry>number of lexemes in <type>tsvector</></entry>
         <entry><literal>length('fat:2,4 cat:3 rat:5A'::tsvector)</literal></entry>
         <entry><literal>3</literal></entry>
        </row>
        <row>
-        <entry><literal><function>setweight</function>(<type>tsvector</>, <type>"char"</>)</literal></entry>
+        <entry><literal><function>setweight(<type>tsvector</>, <type>"char"</>)</function></literal></entry>
         <entry><type>tsvector</type></entry>
         <entry>assign weight to each element of <type>tsvector</></entry>
         <entry><literal>setweight('fat:2,4 cat:3 rat:5B'::tsvector, 'A')</literal></entry>
         <entry><literal>'cat':3A 'fat':2A,4A 'rat':5A</literal></entry>
        </row>
        <row>
-        <entry><literal><function>strip</function>(<type>tsvector</>)</literal></entry>
+        <entry><literal><function>strip(<type>tsvector</>)</function></literal></entry>
         <entry><type>tsvector</type></entry>
         <entry>remove positions and weights from <type>tsvector</></entry>
         <entry><literal>strip('fat:2,4 cat:3 rat:5A'::tsvector)</literal></entry>
         <entry><literal>'cat' 'fat' 'rat'</literal></entry>
        </row>
        <row>
-        <entry><literal><function>to_tsquery</function>(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">query</> <type>text</type>)</literal></entry>
+        <entry><literal><function>to_tsquery(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">query</> <type>text</type>)</function></literal></entry>
         <entry><type>tsquery</type></entry>
         <entry>normalize words and convert to <type>tsquery</></entry>
         <entry><literal>to_tsquery('english', 'The &amp; Fat &amp; Rats')</literal></entry>
         <entry><literal>'fat' &amp; 'rat'</literal></entry>
        </row>
        <row>
-        <entry><literal><function>plainto_tsquery</function>(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">query</> <type>text</type>)</literal></entry>
+        <entry><literal><function>plainto_tsquery(<optional> <replaceable class="PARAMETER">config</> <type>regconfig</> , </optional> <replaceable class="PARAMETER">query</> <type>text</type>)</function></literal></entry>
         <entry><type>tsquery</type></entry>
         <entry>produce <type>tsquery</> ignoring punctuation</entry>
         <entry><literal>plainto_tsquery('english', 'The Fat Rats')</literal></entry>
         <entry><literal>'fat' &amp; 'rat'</literal></entry>
        </row>
        <row>
-        <entry><literal><function>numnode</function>(<type>tsquery</>)</literal></entry>
+        <entry><literal><function>numnode(<type>tsquery</>)</function></literal></entry>
         <entry><type>integer</type></entry>
         <entry>number of lexemes plus operators in <type>tsquery</></entry>
         <entry><literal> numnode('(fat &amp; rat) | cat'::tsquery)</literal></entry>
         <entry><literal>5</literal></entry>
        </row>
        <row>
-        <entry><literal><function>querytree</function>(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>)</literal></entry>
+        <entry><literal><function>querytree(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>get indexable part of a <type>tsquery</></entry>
         <entry><literal>querytree('foo &amp; ! bar'::tsquery)</literal></entry>
         <entry><literal>'foo'</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_rank</function>(<optional> <replaceable class="PARAMETER">weights</replaceable> <type>float4[]</>, </optional> <replaceable class="PARAMETER">vector</replaceable> <type>tsvector</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">normalization</replaceable> <type>integer</> </optional>)</literal></entry>
+        <entry><literal><function>ts_rank(<optional> <replaceable class="PARAMETER">weights</replaceable> <type>float4[]</>, </optional> <replaceable class="PARAMETER">vector</replaceable> <type>tsvector</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">normalization</replaceable> <type>integer</> </optional>)</function></literal></entry>
         <entry><type>float4</type></entry>
         <entry>rank document for query</entry>
         <entry><literal>ts_rank(textsearch, query)</literal></entry>
         <entry><literal>0.818</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_rank_cd</function>(<optional> <replaceable class="PARAMETER">weights</replaceable> <type>float4[]</>, </optional> <replaceable class="PARAMETER">vector</replaceable> <type>tsvector</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">normalization</replaceable> <type>integer</> </optional>)</literal></entry>
+        <entry><literal><function>ts_rank_cd(<optional> <replaceable class="PARAMETER">weights</replaceable> <type>float4[]</>, </optional> <replaceable class="PARAMETER">vector</replaceable> <type>tsvector</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">normalization</replaceable> <type>integer</> </optional>)</function></literal></entry>
         <entry><type>float4</type></entry>
         <entry>rank document for query using cover density</entry>
         <entry><literal>ts_rank_cd('{0.1, 0.2, 0.4, 1.0}', textsearch, query)</literal></entry>
         <entry><literal>2.01317</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_headline</function>(<optional> <replaceable class="PARAMETER">config</replaceable> <type>regconfig</>, </optional> <replaceable class="PARAMETER">document</replaceable> <type>text</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">options</replaceable> <type>text</> </optional>)</literal></entry>
+        <entry><literal><function>ts_headline(<optional> <replaceable class="PARAMETER">config</replaceable> <type>regconfig</>, </optional> <replaceable class="PARAMETER">document</replaceable> <type>text</>, <replaceable class="PARAMETER">query</replaceable> <type>tsquery</> <optional>, <replaceable class="PARAMETER">options</replaceable> <type>text</> </optional>)</function></literal></entry>
         <entry><type>text</type></entry>
         <entry>display a query match</entry>
         <entry><literal>ts_headline('x y z', 'z'::tsquery)</literal></entry>
         <entry><literal>x y &lt;b&gt;z&lt;/b&gt;</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_rewrite</function>(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">target</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">substitute</replaceable> <type>tsquery</>)</literal></entry>
+        <entry><literal><function>ts_rewrite(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">target</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">substitute</replaceable> <type>tsquery</>)</function></literal></entry>
         <entry><type>tsquery</type></entry>
         <entry>replace target with substitute within query</entry>
         <entry><literal>ts_rewrite('a &amp; b'::tsquery, 'a'::tsquery, 'foo|bar'::tsquery)</literal></entry>
         <entry><literal>'b' &amp; ( 'foo' | 'bar' )</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_rewrite</function>(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">select</replaceable> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_rewrite(<replaceable class="PARAMETER">query</replaceable> <type>tsquery</>, <replaceable class="PARAMETER">select</replaceable> <type>text</>)</function></literal></entry>
         <entry><type>tsquery</type></entry>
         <entry>replace using targets and substitutes from a <command>SELECT</> command</entry>
         <entry><literal>SELECT ts_rewrite('a &amp; b'::tsquery, 'SELECT t,s FROM aliases')</literal></entry>
         <entry><literal>'b' &amp; ( 'foo' | 'bar' )</literal></entry>
        </row>
        <row>
-        <entry><literal><function>get_current_ts_config</function>()</literal></entry>
+        <entry><literal><function>get_current_ts_config()</function></literal></entry>
         <entry><type>regconfig</type></entry>
         <entry>get default text search configuration</entry>
         <entry><literal>get_current_ts_config()</literal></entry>
         <entry><literal>english</literal></entry>
        </row>
        <row>
-        <entry><literal><function>tsvector_update_trigger</function>()</literal></entry>
+        <entry><literal><function>tsvector_update_trigger()</function></literal></entry>
         <entry><type>trigger</type></entry>
         <entry>trigger function for automatic <type>tsvector</> column update</entry>
         <entry><literal>CREATE TRIGGER ... tsvector_update_trigger(tsvcol, 'pg_catalog.swedish', title, body)</literal></entry>
         <entry><literal></literal></entry>
        </row>
        <row>
-        <entry><literal><function>tsvector_update_trigger_column</function>()</literal></entry>
+        <entry><literal><function>tsvector_update_trigger_column()</function></literal></entry>
         <entry><type>trigger</type></entry>
         <entry>trigger function for automatic <type>tsvector</> column update</entry>
         <entry><literal>CREATE TRIGGER ... tsvector_update_trigger_column(tsvcol, configcol, title, body)</literal></entry>
-        <entry><literal></literal></entry>
         <entry><literal></literal></entry>
        </row>
       </tbody>
@@ -8003,49 +8119,49 @@ CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple
       </thead>
       <tbody>
        <row>
-        <entry><literal><function>ts_debug</function>(<optional> <replaceable class="PARAMETER">config</replaceable> <type>regconfig</>, </optional> <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>, OUT <replaceable class="PARAMETER">token</> <type>text</>, OUT <replaceable class="PARAMETER">dictionaries</> <type>regdictionary[]</>, OUT <replaceable class="PARAMETER">dictionary</> <type>regdictionary</>, OUT <replaceable class="PARAMETER">lexemes</> <type>text[]</>)</literal></entry>
+        <entry><literal><function>ts_debug(<optional> <replaceable class="PARAMETER">config</replaceable> <type>regconfig</>, </optional> <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>, OUT <replaceable class="PARAMETER">token</> <type>text</>, OUT <replaceable class="PARAMETER">dictionaries</> <type>regdictionary[]</>, OUT <replaceable class="PARAMETER">dictionary</> <type>regdictionary</>, OUT <replaceable class="PARAMETER">lexemes</> <type>text[]</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>test a configuration</entry>
         <entry><literal>ts_debug('english', 'The Brightest supernovaes')</literal></entry>
         <entry><literal>(asciiword,"Word, all ASCII",The,{english_stem},english_stem,{}) ...</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_lexize</function>(<replaceable class="PARAMETER">dict</replaceable> <type>regdictionary</>, <replaceable class="PARAMETER">token</replaceable> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_lexize(<replaceable class="PARAMETER">dict</replaceable> <type>regdictionary</>, <replaceable class="PARAMETER">token</replaceable> <type>text</>)</function></literal></entry>
         <entry><type>text[]</type></entry>
         <entry>test a dictionary</entry>
         <entry><literal>ts_lexize('english_stem', 'stars')</literal></entry>
         <entry><literal>{star}</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_parse</function>(<replaceable class="PARAMETER">parser_name</replaceable> <type>text</>, <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">token</> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_parse(<replaceable class="PARAMETER">parser_name</replaceable> <type>text</>, <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">token</> <type>text</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>test a parser</entry>
         <entry><literal>ts_parse('default', 'foo - bar')</literal></entry>
         <entry><literal>(1,foo) ...</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_parse</function>(<replaceable class="PARAMETER">parser_oid</replaceable> <type>oid</>, <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">token</> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_parse(<replaceable class="PARAMETER">parser_oid</replaceable> <type>oid</>, <replaceable class="PARAMETER">document</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">token</> <type>text</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>test a parser</entry>
         <entry><literal>ts_parse(3722, 'foo - bar')</literal></entry>
         <entry><literal>(1,foo) ...</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_token_type</function>(<replaceable class="PARAMETER">parser_name</> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_token_type(<replaceable class="PARAMETER">parser_name</> <type>text</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>get token types defined by parser</entry>
         <entry><literal>ts_token_type('default')</literal></entry>
         <entry><literal>(1,asciiword,"Word, all ASCII") ...</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_token_type</function>(<replaceable class="PARAMETER">parser_oid</> <type>oid</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>)</literal></entry>
+        <entry><literal><function>ts_token_type(<replaceable class="PARAMETER">parser_oid</> <type>oid</>, OUT <replaceable class="PARAMETER">tokid</> <type>integer</>, OUT <replaceable class="PARAMETER">alias</> <type>text</>, OUT <replaceable class="PARAMETER">description</> <type>text</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>get token types defined by parser</entry>
         <entry><literal>ts_token_type(3722)</literal></entry>
         <entry><literal>(1,asciiword,"Word, all ASCII") ...</literal></entry>
        </row>
        <row>
-        <entry><literal><function>ts_stat</function>(<replaceable class="PARAMETER">sqlquery</replaceable> <type>text</>, <optional> <replaceable class="PARAMETER">weights</replaceable> <type>text</>, </optional> OUT <replaceable class="PARAMETER">word</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">ndoc</replaceable> <type>integer</>, OUT <replaceable class="PARAMETER">nentry</replaceable> <type>integer</>)</literal></entry>
+        <entry><literal><function>ts_stat(<replaceable class="PARAMETER">sqlquery</replaceable> <type>text</>, <optional> <replaceable class="PARAMETER">weights</replaceable> <type>text</>, </optional> OUT <replaceable class="PARAMETER">word</replaceable> <type>text</>, OUT <replaceable class="PARAMETER">ndoc</replaceable> <type>integer</>, OUT <replaceable class="PARAMETER">nentry</replaceable> <type>integer</>)</function></literal></entry>
         <entry><type>setof record</type></entry>
         <entry>get statistics of a <type>tsvector</> column</entry>
         <entry><literal>ts_stat('SELECT vector from apod')</literal></entry>
@@ -8120,9 +8236,9 @@ SELECT xmlcomment('hello');
      <primary>xmlconcat</primary>
     </indexterm>
 
- <synopsis>
- <function>xmlconcat</function>(<replaceable>xml</replaceable><optional>, ...</optional>)
- </synopsis>
+<synopsis>
+<function>xmlconcat</function>(<replaceable>xml</replaceable><optional>, ...</optional>)
+</synopsis>
  
     <para>
      The function <function>xmlconcat</function> concatenates a list
@@ -8178,8 +8294,8 @@ SELECT xmlconcat('<?xml version="1.1"?><foo/>', '<?xml version="1.1" standalone=
    </indexterm>
  
 <synopsis>
- <function>xmlelement</function>(name <replaceable>name</replaceable> <optional>, xmlattributes(<replaceable>value</replaceable> <optional>AS <replaceable>attname</replaceable></optional> <optional>, ... </optional>)</optional> <optional><replaceable>, content, ...</replaceable></optional>)
- </synopsis>
+<function>xmlelement</function>(name <replaceable>name</replaceable> <optional>, xmlattributes(<replaceable>value</replaceable> <optional>AS <replaceable>attname</replaceable></optional> <optional>, ... </optional>)</optional> <optional><replaceable>, content, ...</replaceable></optional>)
+</synopsis>
  
     <para>
      The <function>xmlelement</function> expression produces an XML
@@ -8275,9 +8391,9 @@ SELECT xmlelement(name foo, xmlattributes('xyz' as bar),
     <primary>xmlforest</primary>
    </indexterm>
  
- <synopsis>
- <function>xmlforest</function>(<replaceable>content</replaceable> <optional>AS <replaceable>name</replaceable></optional> <optional>, ...</optional>)
- </synopsis>
+<synopsis>
+<function>xmlforest</function>(<replaceable>content</replaceable> <optional>AS <replaceable>name</replaceable></optional> <optional>, ...</optional>)
+</synopsis>
  
     <para>
      The <function>xmlforest</function> expression produces an XML
@@ -8332,9 +8448,9 @@ WHERE table_schema = 'pg_catalog';
     <primary>xmlpi</primary>
    </indexterm>
  
- <synopsis>
- <function>xmlpi</function>(name <replaceable>target</replaceable> <optional>, <replaceable>content</replaceable></optional>)
- </synopsis>
+<synopsis>
+<function>xmlpi</function>(name <replaceable>target</replaceable> <optional>, <replaceable>content</replaceable></optional>)
+</synopsis>
  
     <para>
      The <function>xmlpi</function> expression creates an XML
@@ -8361,9 +8477,9 @@ SELECT xmlpi(name php, 'echo "hello world";');
     <primary>xmlroot</primary>
    </indexterm>
  
- <synopsis>
- <function>xmlroot</function>(<replaceable>xml</replaceable>, version <replaceable>text</replaceable> | no value <optional>, standalone yes|no|no value</optional>)
- </synopsis>
+<synopsis>
+<function>xmlroot</function>(<replaceable>xml</replaceable>, version <replaceable>text</replaceable> | no value <optional>, standalone yes|no|no value</optional>)
+</synopsis>
  
     <para>
      The <function>xmlroot</function> expression alters the properties
@@ -8401,7 +8517,8 @@ SELECT xmlroot(xmlparse(document '<?xml version="1.1"?><content>abc</content>'),
      The function <function>xmlagg</function> is, unlike the other
      functions described here, an aggregate function.  It concatenates the
      input values to the aggregate function call,
-     like <function>xmlconcat</function> does.
+     much like <function>xmlconcat</function> does, except that concatenation
+     occurs across rows rather than across expressions in a single row.
      See <xref linkend="functions-aggregate"> for additional information
      about aggregate functions.
     </para>
@@ -8420,8 +8537,22 @@ SELECT xmlagg(x) FROM test;
     </para>
 
     <para>
-     To determine the order of the concatenation, something like the
-     following approach can be used:
+     To determine the order of the concatenation, an <literal>ORDER BY</>
+     clause may be added to the aggregate call as described in
+     <xref linkend="syntax-aggregates">. For example:
+
+<screen><![CDATA[
+SELECT xmlagg(x ORDER BY y DESC) FROM test;
+        xmlagg
+----------------------
+ <bar/><foo>abc</foo>
+]]></screen>
+    </para>
+
+    <para>
+     The following non-standard approach used to be recommended
+     in previous versions, and may still be useful in specific
+     cases:
 
 <screen><![CDATA[
 SELECT xmlagg(x) FROM (SELECT * FROM test ORDER BY y DESC) AS tab;
@@ -8429,9 +8560,6 @@ SELECT xmlagg(x) FROM (SELECT * FROM test ORDER BY y DESC) AS tab;
 ----------------------
  <bar/><foo>abc</foo>
 ]]></screen>
-
-     Again, see <xref linkend="functions-aggregate"> for additional
-     information.
     </para>
    </sect3>
 
@@ -8490,8 +8618,11 @@ SELECT xmlagg(x) FROM (SELECT * FROM test ORDER BY y DESC) AS tab;
     mappings.  This array should be a two-dimensional array with the
     length of the second axis being equal to 2 (i.e., it should be an
     array of arrays, each of which consists of exactly 2 elements).
-    The first element of each array entry is the namespace name, the
-    second the namespace URI.
+    The first element of each array entry is the namespace name (alias), the
+    second the namespace URI. It is not required that aliases provided in
+    this array are the same that those being used in the XML document itself (in
+    other words, both in the XML document and in the <function>xpath</function>
+    function context, aliases are <emphasis>local</>).
    </para>
 
    <para>
@@ -8501,6 +8632,19 @@ SELECT xpath('/my:a/text()', '<my:a xmlns:my="http://example.com">test</my:a>',
              ARRAY[ARRAY['my', 'http://example.com']]);
 
  xpath  
+--------
+ {test}
+(1 row)
+]]></screen>
+   </para>
+
+   <para>
+    How to deal with default (anonymous) namespaces:
+<screen><![CDATA[
+SELECT xpath('//mydefns:b/text()', '<a xmlns="http://example.com"><b>test</b></a>',
+             ARRAY[ARRAY['mydefns', 'http://example.com']]);
+
+ xpath
 --------
  {test}
 (1 row)
@@ -8784,7 +8928,7 @@ table2-mapping
    functions for operating on <firstterm>sequence objects</firstterm>.
    Sequence objects (also called sequence generators or just
    sequences) are special single-row tables created with <xref
-   linkend="sql-createsequence" endterm="sql-createsequence-title">.
+   linkend="sql-createsequence">.
    A sequence object is usually used to generate unique identifiers
    for rows of a table.  The sequence functions, listed in <xref
    linkend="functions-sequence-table">, provide simple, multiuser-safe
@@ -8801,29 +8945,29 @@ table2-mapping
 
      <tbody>
       <row>
-        <entry><literal><function>currval</function>(<type>regclass</type>)</literal></entry>
+        <entry><literal><function>currval(<type>regclass</type>)</function></literal></entry>
         <entry><type>bigint</type></entry>
         <entry>Return value most recently obtained with
         <function>nextval</function> for specified sequence</entry>
       </row>
       <row>
-        <entry><literal><function>lastval</function>()</literal></entry>
+        <entry><literal><function>lastval()</function></literal></entry>
         <entry><type>bigint</type></entry>
         <entry>Return value most recently obtained with
         <function>nextval</function> for any sequence</entry>
       </row>
       <row>
-        <entry><literal><function>nextval</function>(<type>regclass</type>)</literal></entry>
+        <entry><literal><function>nextval(<type>regclass</type>)</function></literal></entry>
         <entry><type>bigint</type></entry>
         <entry>Advance sequence and return new value</entry>
       </row>
       <row>
-        <entry><literal><function>setval</function>(<type>regclass</type>, <type>bigint</type>)</literal></entry>
+        <entry><literal><function>setval(<type>regclass</type>, <type>bigint</type>)</function></literal></entry>
         <entry><type>bigint</type></entry>
         <entry>Set sequence's current value</entry>
       </row>
       <row>
-        <entry><literal><function>setval</function>(<type>regclass</type>, <type>bigint</type>, <type>boolean</type>)</literal></entry>
+        <entry><literal><function>setval(<type>regclass</type>, <type>bigint</type>, <type>boolean</type>)</function></literal></entry>
         <entry><type>bigint</type></entry>
         <entry>Set sequence's current value and <literal>is_called</literal> flag</entry>
       </row>
@@ -8839,7 +8983,7 @@ table2-mapping
    converter will do the work for you.  Just write the sequence name enclosed
    in single quotes so that it looks like a literal constant.  For
    compatibility with the handling of ordinary
-   <acronym>SQL</acronym> names, the string will be converted to lowercase
+   <acronym>SQL</acronym> names, the string will be converted to lower case
    unless it contains double quotes around the sequence name.  Thus:
 <programlisting>
 nextval('foo')      <lineannotation>operates on sequence <literal>foo</literal></>
@@ -8977,7 +9121,7 @@ SELECT setval('foo', 42, false);    <lineannotation>Next <function>nextval</> wi
    If a sequence object has been created with default parameters,
    successive <function>nextval</function> calls will return successive values
    beginning with 1.  Other behaviors can be obtained by using
-   special parameters in the <xref linkend="sql-createsequence" endterm="sql-createsequence-title"> command;
+   special parameters in the <xref linkend="sql-createsequence"> command;
    see its command reference page for more information.
   </para>
 
@@ -9193,8 +9337,9 @@ SELECT NULLIF(value, '(none)') ...
 </programlisting>
   </para>
   <para>
-   If <replaceable>value1</replaceable> is <literal>(none)</>, return a null,
-   otherwise return <replaceable>value1</replaceable>.
+   In this example, if <literal>value</literal> is <literal>(none)</>,
+   null is returned, otherwise the value of <literal>value</literal>
+   is returned.
   </para>
 
   </sect2>
@@ -9351,7 +9496,7 @@ SELECT NULLIF(value, '(none)') ...
 
   <para>
    Array comparisons compare the array contents element-by-element,
-   using the default B-Tree comparison function for the element data type.
+   using the default B-tree comparison function for the element data type.
    In multidimensional arrays the elements are visited in row-major order
    (last subscript varies most rapidly).
    If the contents of two arrays are equal but the dimensionality is
@@ -9594,7 +9739,7 @@ SELECT NULLIF(value, '(none)') ...
     <thead>
      <row>
       <entry>Function</entry>
-      <entry>Argument Type</entry>
+      <entry>Argument Type(s)</entry>
       <entry>Return Type</entry>
       <entry>Description</entry>
      </row>
@@ -9614,7 +9759,7 @@ SELECT NULLIF(value, '(none)') ...
       <entry>
        array of the argument type
       </entry>
-      <entry>input values concatenated into an array</entry>
+      <entry>input values, including nulls, concatenated into an array</entry>
      </row>
 
      <row>
@@ -9759,6 +9904,25 @@ SELECT NULLIF(value, '(none)') ...
      </row>
 
      <row>
+      <entry>
+       <indexterm>
+        <primary>string_agg</primary>
+       </indexterm>
+       <function>
+         string_agg(<replaceable class="parameter">expression</replaceable>,
+                    <replaceable class="parameter">delimiter</replaceable>)
+       </function>
+      </entry>
+      <entry>
+       <type>text</type>, <type>text</type>
+      </entry>
+      <entry>
+       <type>text</type>
+      </entry>
+      <entry>input values concatenated into a string, separated by delimiter</entry>
+     </row>
+
+     <row>
       <entry><function>sum(<replaceable class="parameter">expression</replaceable>)</function></entry>
       <entry>
        <type>smallint</type>, <type>int</type>,
@@ -9823,8 +9987,8 @@ SELECT NULLIF(value, '(none)') ...
 SELECT b1 = ANY((SELECT b2 FROM t2 ...)) FROM t1 ...;
 </programlisting>
       Here <function>ANY</function> can be considered either as introducing
-      a subquery, or as being an aggregate function, if the sub-select
-      returns one row with a boolean value.
+      a subquery, or as being an aggregate function, if the subquery
+      returns one row with a Boolean value.
       Thus the standard name cannot be given to these aggregates.
     </para>
   </note>
@@ -9844,23 +10008,23 @@ SELECT count(*) FROM sometable;
   </note>
 
   <para>
-   The aggregate functions <function>array_agg</function>
+   The aggregate functions <function>array_agg</function>,
+   <function>string_agg</function>,
    and <function>xmlagg</function>, as well as similar user-defined
    aggregate functions, produce meaningfully different result values
-   depending on the order of the input values.  In the current
-   implementation, the order of the input is in principle unspecified.
-   Supplying the input values from a sorted subquery
-   will usually work, however.  For example:
+   depending on the order of the input values.  This ordering is
+   unspecified by default, but can be controlled by writing an
+   <literal>ORDER BY</> clause within the aggregate call, as shown in
+   <xref linkend="syntax-aggregates">.
+   Alternatively, supplying the input values from a sorted subquery
+   will usually work.  For example:
 
 <screen><![CDATA[
 SELECT xmlagg(x) FROM (SELECT x FROM test ORDER BY y DESC) AS tab;
 ]]></screen>
 
    But this syntax is not allowed in the SQL standard, and is
-   not portable to other database systems.  A future version of
-   <productname>PostgreSQL</> might provide an additional feature to control
-   the order in a better-defined way (<literal>xmlagg(expr ORDER BY expr, expr,
-   ...)</literal>).
+   not portable to other database systems.
   </para>
 
   <para>
@@ -10458,21 +10622,23 @@ SELECT xmlagg(x) FROM (SELECT x FROM test ORDER BY y DESC) AS tab;
    <function>nth_value</> consider only the rows within the <quote>window
    frame</>, which by default contains the rows from the start of the
    partition through the last peer of the current row.  This is
-   likely to give unhelpful results for <function>nth_value</> and
-   particularly <function>last_value</>.  You can redefine the frame as
-   being the whole partition by adding <literal>ROWS BETWEEN UNBOUNDED
-   PRECEDING AND UNBOUNDED FOLLOWING</> to the <literal>OVER</> clause.
-   See <xref linkend="syntax-window-functions"> for more information.
+   likely to give unhelpful results for <function>last_value</> and
+   sometimes also <function>nth_value</>.  You can redefine the frame by
+   adding a suitable frame specification (<literal>RANGE</> or
+   <literal>ROWS</>) to the <literal>OVER</> clause.
+   See <xref linkend="syntax-window-functions"> for more information
+   about frame specifications.
   </para>
 
   <para>
    When an aggregate function is used as a window function, it aggregates
-   over the rows within the current row's window frame.  To obtain
-   aggregation over the whole partition, omit <literal>ORDER BY</> or use
-   <literal>ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING</>.
+   over the rows within the current row's window frame.
    An aggregate used with <literal>ORDER BY</> and the default window frame
    definition produces a <quote>running sum</> type of behavior, which may or
-   may not be what's wanted.
+   may not be what's wanted.  To obtain
+   aggregation over the whole partition, omit <literal>ORDER BY</> or use
+   <literal>ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING</>.
+   Other frame specifications can be used to obtain other effects.
   </para>
 
   <note>
@@ -11057,8 +11223,8 @@ AND
    <literal>&gt;</> or
    <literal>&gt;=</>,
    or has semantics similar to one of these.  (To be specific, an operator
-   can be a row comparison operator if it is a member of a B-Tree operator
-   class, or is the negator of the <literal>=</> member of a B-Tree operator
+   can be a row comparison operator if it is a member of a B-tree operator
+   class, or is the negator of the <literal>=</> member of a B-tree operator
    class.)
   </para>
 
@@ -11169,7 +11335,7 @@ AND
 
     <tbody>
      <row>
-      <entry><literal><function>generate_series</function>(<parameter>start</parameter>, <parameter>stop</parameter>)</literal></entry>
+      <entry><literal><function>generate_series(<parameter>start</parameter>, <parameter>stop</parameter>)</function></literal></entry>
       <entry><type>int</type> or <type>bigint</type></entry>
       <entry><type>setof int</type> or <type>setof bigint</type> (same as argument type)</entry>
       <entry>
@@ -11179,7 +11345,7 @@ AND
      </row>
 
      <row>
-      <entry><literal><function>generate_series</function>(<parameter>start</parameter>, <parameter>stop</parameter>, <parameter>step</parameter>)</literal></entry>
+      <entry><literal><function>generate_series(<parameter>start</parameter>, <parameter>stop</parameter>, <parameter>step</parameter>)</function></literal></entry>
       <entry><type>int</type> or <type>bigint</type></entry>
       <entry><type>setof int</type> or <type>setof bigint</type> (same as argument type)</entry>
       <entry>
@@ -11189,7 +11355,7 @@ AND
      </row>
 
      <row>
-      <entry><literal><function>generate_series</function>(<parameter>start</parameter>, <parameter>stop</parameter>, <parameter>step</parameter> <type>interval</>)</literal></entry>
+      <entry><literal><function>generate_series(<parameter>start</parameter>, <parameter>stop</parameter>, <parameter>step</parameter> <type>interval</>)</function></literal></entry>
       <entry><type>timestamp</type> or <type>timestamp with time zone</type></entry>
       <entry><type>setof timestamp</type> or <type>setof timestamp with time zone</type> (same as argument type)</entry>
       <entry>
@@ -11270,7 +11436,7 @@ SELECT * FROM generate_series('2008-03-01 00:00'::timestamp,
 
     <tbody>
      <row>
-      <entry><literal><function>generate_subscripts</function>(<parameter>array anyarray</parameter>, <parameter>dim int</parameter>)</literal></entry>
+      <entry><literal><function>generate_subscripts(<parameter>array anyarray</parameter>, <parameter>dim int</parameter>)</function></literal></entry>
       <entry><type>setof int</type></entry>
       <entry>
        Generate a series comprising the given array's subscripts.
@@ -11278,7 +11444,7 @@ SELECT * FROM generate_series('2008-03-01 00:00'::timestamp,
      </row>
 
      <row>
-      <entry><literal><function>generate_subscripts</function>(<parameter>array anyarray</parameter>, <parameter>dim int</parameter>, <parameter>reverse boolean</parameter>)</literal></entry>
+      <entry><literal><function>generate_subscripts(<parameter>array anyarray</parameter>, <parameter>dim int</parameter>, <parameter>reverse boolean</parameter>)</function></literal></entry>
       <entry><type>setof int</type></entry>
       <entry>
        Generate a series comprising the given array's subscripts. When
@@ -11304,7 +11470,7 @@ SELECT * FROM generate_series('2008-03-01 00:00'::timestamp,
    elements).  Some examples follow:
 <programlisting>
 -- basic usage
-select generate_subscripts('{NULL,1,NULL,2}'::int[], 1) as s;
+SELECT generate_subscripts('{NULL,1,NULL,2}'::int[], 1) AS s;
  s 
 ---
  1
@@ -11315,32 +11481,33 @@ select generate_subscripts('{NULL,1,NULL,2}'::int[], 1) as s;
 
 -- presenting an array, the subscript and the subscripted
 -- value requires a subquery
-select * from arrays;
+SELECT * FROM arrays;
          a          
 --------------------
  {-1,-2}
- {100,200}
+ {100,200,300}
 (2 rows)
 
-select a as array, s as subscript, a[s] as value
-from (select generate_subscripts(a, 1) as s, a from arrays) foo;
-   array   | subscript | value 
------------+-----------+-------
- {-1,-2}   |         1 |    -1
- {-1,-2}   |         2 |    -2
- {100,200} |         1 |   100
- {100,200} |         2 |   200
-(4 rows)
+SELECT a AS array, s AS subscript, a[s] AS value
+FROM (SELECT generate_subscripts(a, 1) AS s, a FROM arrays) foo;
+     array     | subscript | value
+---------------+-----------+-------
+ {-1,-2}       |         1 |    -1
+ {-1,-2}       |         2 |    -2
+ {100,200,300} |         1 |   100
+ {100,200,300} |         2 |   200
+ {100,200,300} |         3 |   300
+(5 rows)
 
 -- unnest a 2D array
-create or replace function unnest2(anyarray)
-returns setof anyelement as $$
+CREATE OR REPLACE FUNCTION unnest2(anyarray)
+RETURNS SETOF anyelement AS $$
 select $1[i][j] 
    from generate_subscripts($1,1) g1(i),
         generate_subscripts($1,2) g2(j);
-$$ language sql immutable;
+$$ LANGUAGE sql IMMUTABLE;
 CREATE FUNCTION
-postgres=# select * from unnest2(array[[1,2],[3,4]]);
+postgres=# SELECT * FROM unnest2(ARRAY[[1,2],[3,4]]);
  unnest2 
 ---------
        1
@@ -11383,7 +11550,7 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
       </row>
 
       <row>
-       <entry><literal><function>current_database</function>()</literal></entry>
+       <entry><literal><function>current_database()</function></literal></entry>
        <entry><type>name</type></entry>
        <entry>name of current database</entry>
       </row>
@@ -11395,9 +11562,9 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
       </row>
 
       <row>
-       <entry><literal><function>current_schemas</function>(<type>boolean</type>)</literal></entry>
+       <entry><literal><function>current_schemas(<type>boolean</type>)</function></literal></entry>
        <entry><type>name[]</type></entry>
-       <entry>names of schemas in search path optionally including implicit schemas</entry>
+       <entry>names of schemas in search path, optionally including implicit schemas</entry>
       </row>
 
       <row>
@@ -11407,15 +11574,15 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
       </row>
 
       <row>
-       <entry><literal><function>current_query</function></literal></entry>
+       <entry><literal><function>current_query()</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>text of the currently executing query, as submitted
        by the client (might contain more than one statement)</entry>
-      </row>  
+      </row>
 
       <row>
        <!-- See also the entry for this in monitoring.sgml -->
-       <entry><literal><function>pg_backend_pid</function>()</literal></entry>
+       <entry><literal><function>pg_backend_pid()</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>
         Process ID of the server process attached to the current session
@@ -11423,49 +11590,55 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
       </row>
 
       <row>
-       <entry><literal><function>inet_client_addr</function>()</literal></entry>
+       <entry><literal><function>pg_listening_channels()</function></literal></entry>
+       <entry><type>setof text</type></entry>
+       <entry>channel names that the session is currently listening on</entry>
+      </row>
+
+      <row>
+       <entry><literal><function>inet_client_addr()</function></literal></entry>
        <entry><type>inet</type></entry>
        <entry>address of the remote connection</entry>
       </row>
 
       <row>
-       <entry><literal><function>inet_client_port</function>()</literal></entry>
+       <entry><literal><function>inet_client_port()</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>port of the remote connection</entry>
       </row>
 
       <row>
-       <entry><literal><function>inet_server_addr</function>()</literal></entry>
+       <entry><literal><function>inet_server_addr()</function></literal></entry>
        <entry><type>inet</type></entry>
        <entry>address of the local connection</entry>
       </row>
 
       <row>
-       <entry><literal><function>inet_server_port</function>()</literal></entry>
+       <entry><literal><function>inet_server_port()</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>port of the local connection</entry>
       </row>
 
       <row>
-       <entry><literal><function>pg_my_temp_schema</function>()</literal></entry>
+       <entry><literal><function>pg_my_temp_schema()</function></literal></entry>
        <entry><type>oid</type></entry>
        <entry>OID of session's temporary schema, or 0 if none</entry>
       </row>
 
       <row>
-       <entry><literal><function>pg_is_other_temp_schema</function>(<type>oid</type>)</literal></entry>
+       <entry><literal><function>pg_is_other_temp_schema(<type>oid</type>)</function></literal></entry>
        <entry><type>boolean</type></entry>
        <entry>is schema another session's temporary schema?</entry>
       </row>
 
       <row>
-       <entry><literal><function>pg_postmaster_start_time</function>()</literal></entry>
+       <entry><literal><function>pg_postmaster_start_time()</function></literal></entry>
        <entry><type>timestamp with time zone</type></entry>
        <entry>server start time</entry>
       </row>
 
       <row>
-       <entry><literal><function>pg_conf_load_time</function>()</literal></entry>
+       <entry><literal><function>pg_conf_load_time()</function></literal></entry>
        <entry><type>timestamp with time zone</type></entry>
        <entry>configuration load time</entry>
       </row>
@@ -11483,13 +11656,24 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
       </row>
 
       <row>
-       <entry><literal><function>version</function>()</literal></entry>
+       <entry><literal><function>version()</function></literal></entry>
        <entry><type>text</type></entry>
        <entry><productname>PostgreSQL</> version information</entry>
       </row>
      </tbody>
     </tgroup>
    </table>
+
+   <note>
+    <para>
+     <function>current_catalog</function>, <function>current_schema</function>,
+     <function>current_user</function>, <function>session_user</function>,
+     and <function>user</function> have special syntactic status
+     in <acronym>SQL</acronym>: they must be called without trailing
+     parentheses.  (In PostgreSQL, parentheses can optionally be used with
+     <function>current_schema</function>, but not with the others.)
+    </para>
+   </note>
 
    <indexterm>
     <primary>user</primary>
@@ -11525,27 +11709,16 @@ postgres=# select * from unnest2(array[[1,2],[3,4]]);
    <para>
     The <function>session_user</function> is normally the user who initiated
     the current database connection; but superusers can change this setting
-    with <xref linkend="sql-set-session-authorization" endterm="sql-set-session-authorization-title">.
+    with <xref linkend="sql-set-session-authorization">.
     The <function>current_user</function> is the user identifier
     that is applicable for permission checking. Normally it is equal
     to the session user, but it can be changed with
-    <xref linkend="sql-set-role" endterm="sql-set-role-title">.
+    <xref linkend="sql-set-role">.
     It also changes during the execution of
     functions with the attribute <literal>SECURITY DEFINER</literal>.
     In Unix parlance, the session user is the <quote>real user</quote> and
     the current user is the <quote>effective user</quote>.
    </para>
-
-   <note>
-    <para>
-     <function>current_catalog</function>, <function>current_schema</function>,
-     <function>current_user</function>, <function>session_user</function>,
-     and <function>user</function> have special syntactic status
-     in <acronym>SQL</acronym>: they must be called without trailing
-     parentheses (optional in PostgreSQL in the case
-     of <function>current_schema</function>).
-    </para>
-   </note>
 
    <para>
     <function>current_schema</function> returns the name of the schema that is
@@ -11566,6 +11739,16 @@ SET search_path TO <replaceable>schema</> <optional>, <replaceable>schema</>, ..
 </programlisting>
     </para>
    </note>
+
+   <indexterm>
+    <primary>pg_listening_channels</primary>
+   </indexterm>
+
+   <para>
+    <function>pg_listening_channels</function> returns a set of names of
+    channels that the current session is listening to.  See <xref
+    linkend="sql-listen"> for more information.
+   </para>
 
    <indexterm>
     <primary>inet_client_addr</primary>
@@ -11788,6 +11971,21 @@ SET search_path TO <replaceable>schema</> <optional>, <replaceable>schema</>, ..
        <entry>does current user have privilege for foreign server</entry>
       </row>
       <row>
+       <entry><literal><function>has_sequence_privilege</function>(<parameter>user</parameter>,
+                                  <parameter>sequence</parameter>,
+                                  <parameter>privilege</parameter>)</literal>
+       </entry>
+       <entry><type>boolean</type></entry>
+       <entry>does user have privilege for sequence</entry>
+      </row>
+      <row>
+       <entry><literal><function>has_sequence_privilege</function>(<parameter>sequence</parameter>,
+                                  <parameter>privilege</parameter>)</literal>
+       </entry>
+       <entry><type>boolean</type></entry>
+       <entry>does current user have privilege for sequence</entry>
+      </row>
+      <row>
        <entry><literal><function>has_table_privilege</function>(<parameter>user</parameter>,
                                   <parameter>table</parameter>,
                                   <parameter>privilege</parameter>)</literal>
@@ -11861,6 +12059,9 @@ SET search_path TO <replaceable>schema</> <optional>, <replaceable>schema</>, ..
     <primary>has_server_privilege</primary>
    </indexterm>
    <indexterm>
+    <primary>has_sequence_privilege</primary>
+   </indexterm>
+   <indexterm>
     <primary>has_table_privilege</primary>
    </indexterm>
    <indexterm>
@@ -11897,6 +12098,16 @@ SET search_path TO <replaceable>schema</> <optional>, <replaceable>schema</>, ..
 SELECT has_table_privilege('myschema.mytable', 'select');
 SELECT has_table_privilege('joe', 'mytable', 'INSERT, SELECT WITH GRANT OPTION');
 </programlisting>
+   </para>
+
+   <para>
+    <function>has_sequence_privilege</function> checks whether a user
+    can access a sequence in a particular way.  The possibilities for its
+    arguments are analogous to <function>has_table_privilege</function>.
+    The desired access privilege type must evaluate to one of
+    <literal>USAGE</literal>,
+    <literal>SELECT</literal>, or
+    <literal>UPDATE</literal>.
    </para>
 
    <para>
@@ -12044,61 +12255,61 @@ SELECT relname FROM pg_class WHERE pg_table_is_visible(oid);
 
      <tbody>
       <row>
-       <entry><literal><function>pg_conversion_is_visible</function>(<parameter>conversion_oid</parameter>)</literal>
+       <entry><literal><function>pg_conversion_is_visible(<parameter>conversion_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is conversion visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_function_is_visible</function>(<parameter>function_oid</parameter>)</literal>
+       <entry><literal><function>pg_function_is_visible(<parameter>function_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is function visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_operator_is_visible</function>(<parameter>operator_oid</parameter>)</literal>
+       <entry><literal><function>pg_operator_is_visible(<parameter>operator_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is operator visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_opclass_is_visible</function>(<parameter>opclass_oid</parameter>)</literal>
+       <entry><literal><function>pg_opclass_is_visible(<parameter>opclass_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is operator class visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_table_is_visible</function>(<parameter>table_oid</parameter>)</literal>
+       <entry><literal><function>pg_table_is_visible(<parameter>table_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is table visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_ts_config_is_visible</function>(<parameter>config_oid</parameter>)</literal>
+       <entry><literal><function>pg_ts_config_is_visible(<parameter>config_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is text search configuration visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_ts_dict_is_visible</function>(<parameter>dict_oid</parameter>)</literal>
+       <entry><literal><function>pg_ts_dict_is_visible(<parameter>dict_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is text search dictionary visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_ts_parser_is_visible</function>(<parameter>parser_oid</parameter>)</literal>
+       <entry><literal><function>pg_ts_parser_is_visible(<parameter>parser_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is text search parser visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_ts_template_is_visible</function>(<parameter>template_oid</parameter>)</literal>
+       <entry><literal><function>pg_ts_template_is_visible(<parameter>template_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is text search template visible in search path</entry>
       </row>
       <row>
-       <entry><literal><function>pg_type_is_visible</function>(<parameter>type_oid</parameter>)</literal>
+       <entry><literal><function>pg_type_is_visible(<parameter>type_oid</parameter>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>is type (or domain) visible in search path</entry>
@@ -12240,81 +12451,81 @@ SELECT pg_type_is_visible('myschema.widget'::regtype);
 
      <tbody>
       <row>
-       <entry><literal><function>format_type</function>(<parameter>type_oid</parameter>, <parameter>typemod</>)</literal></entry>
+       <entry><literal><function>format_type(<parameter>type_oid</parameter>, <parameter>typemod</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get SQL name of a data type</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_keywords</function>()</literal></entry>
+       <entry><literal><function>pg_get_keywords()</function></literal></entry>
        <entry><type>setof record</type></entry>
        <entry>get list of SQL keywords and their categories</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_constraintdef</function>(<parameter>constraint_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_constraintdef(<parameter>constraint_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get definition of a constraint</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_constraintdef</function>(<parameter>constraint_oid</parameter>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_constraintdef(<parameter>constraint_oid</parameter>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get definition of a constraint</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_expr</function>(<parameter>expr_text</parameter>, <parameter>relation_oid</>)</literal></entry>
+       <entry><literal><function>pg_get_expr(<parameter>expr_text</parameter>, <parameter>relation_oid</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>decompile internal form of an expression, assuming that any Vars
        in it refer to the relation indicated by the second parameter</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_expr</function>(<parameter>expr_text</parameter>, <parameter>relation_oid</>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_expr(<parameter>expr_text</parameter>, <parameter>relation_oid</>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>decompile internal form of an expression, assuming that any Vars
        in it refer to the relation indicated by the second parameter</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_functiondef</function>(<parameter>func_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_functiondef(<parameter>func_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get definition of a function</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_function_arguments</function>(<parameter>func_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_function_arguments(<parameter>func_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get argument list of function's definition (with default values)</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_function_identity_arguments</function>(<parameter>func_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_function_identity_arguments(<parameter>func_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get argument list to identify a function (without default values)</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_function_result</function>(<parameter>func_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_function_result(<parameter>func_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get <literal>RETURNS</> clause for function</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_indexdef</function>(<parameter>index_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_indexdef(<parameter>index_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get <command>CREATE INDEX</> command for index</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_indexdef</function>(<parameter>index_oid</parameter>, <parameter>column_no</>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_indexdef(<parameter>index_oid</parameter>, <parameter>column_no</>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get <command>CREATE INDEX</> command for index,
        or definition of just one index column when
        <parameter>column_no</> is not zero</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_ruledef</function>(<parameter>rule_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_ruledef(<parameter>rule_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get <command>CREATE RULE</> command for rule</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_ruledef</function>(<parameter>rule_oid</parameter>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_ruledef(<parameter>rule_oid</parameter>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get <command>CREATE RULE</> command for rule</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_serial_sequence</function>(<parameter>table_name</parameter>, <parameter>column_name</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_serial_sequence(<parameter>table_name</parameter>, <parameter>column_name</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get name of the sequence that a <type>serial</type> or <type>bigserial</type> column
        uses</entry>
@@ -12325,37 +12536,42 @@ SELECT pg_type_is_visible('myschema.widget'::regtype);
        <entry>get <command>CREATE [ CONSTRAINT ] TRIGGER</> command for trigger</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_userbyid</function>(<parameter>role_oid</parameter>)</literal></entry>
+       <entry><function>pg_get_triggerdef</function>(<parameter>trigger_oid</parameter>, <parameter>pretty_bool</>)</entry>
+       <entry><type>text</type></entry>
+       <entry>get <command>CREATE [ CONSTRAINT ] TRIGGER</> command for trigger</entry>
+      </row>
+      <row>
+       <entry><literal><function>pg_get_userbyid(<parameter>role_oid</parameter>)</function></literal></entry>
        <entry><type>name</type></entry>
        <entry>get role name with given OID</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_viewdef</function>(<parameter>view_name</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_viewdef(<parameter>view_name</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get underlying <command>SELECT</command> command for view (<emphasis>deprecated</emphasis>)</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_viewdef</function>(<parameter>view_name</parameter>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_viewdef(<parameter>view_name</parameter>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get underlying <command>SELECT</command> command for view (<emphasis>deprecated</emphasis>)</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_viewdef</function>(<parameter>view_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_get_viewdef(<parameter>view_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get underlying <command>SELECT</command> command for view</entry>
       </row>
       <row>
-       <entry><literal><function>pg_get_viewdef</function>(<parameter>view_oid</parameter>, <parameter>pretty_bool</>)</literal></entry>
+       <entry><literal><function>pg_get_viewdef(<parameter>view_oid</parameter>, <parameter>pretty_bool</>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get underlying <command>SELECT</command> command for view</entry>
       </row>
       <row>
-       <entry><literal><function>pg_tablespace_databases</function>(<parameter>tablespace_oid</parameter>)</literal></entry>
+       <entry><literal><function>pg_tablespace_databases(<parameter>tablespace_oid</parameter>)</function></literal></entry>
        <entry><type>setof oid</type></entry>
        <entry>get the set of database OIDs that have objects in the tablespace</entry>
       </row>
       <row>
-       <entry><literal><function>pg_typeof</function>(<parameter>any</parameter>)</literal></entry>
+       <entry><literal><function>pg_typeof(<parameter>any</parameter>)</function></literal></entry>
        <entry><type>regtype</type></entry>
        <entry>get the data type of any value</entry>
       </row>
@@ -12420,7 +12636,7 @@ SELECT pg_type_is_visible('myschema.widget'::regtype);
    with the column.  The first input parameter is a table name with
    optional schema, and the second parameter is a column name.  Because
    the first parameter is potentially a schema and table, it is not treated
-   as a double-quoted identifier, meaning it is lowercased by default,
+   as a double-quoted identifier, meaning it is lower cased by default,
    while the second parameter, being just a column name, is treated as
    double-quoted and has its case preserved.  The function returns a value
    suitably formatted for passing to sequence functions (see <xref
@@ -12489,8 +12705,8 @@ SELECT typlen FROM pg_type WHERE oid = pg_typeof(33);
 
    <para>
     The functions shown in <xref linkend="functions-info-comment-table">
-    extract comments previously stored with the <xref linkend="sql-comment"
-    endterm="sql-comment-title"> command.  A null value is returned if no
+    extract comments previously stored with the <xref linkend="sql-comment">
+    command.  A null value is returned if no
     comment could be found for the specified parameters.
    </para>
 
@@ -12503,22 +12719,22 @@ SELECT typlen FROM pg_type WHERE oid = pg_typeof(33);
 
      <tbody>
       <row>
-       <entry><literal><function>col_description</function>(<parameter>table_oid</parameter>, <parameter>column_number</parameter>)</literal></entry>
+       <entry><literal><function>col_description(<parameter>table_oid</parameter>, <parameter>column_number</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get comment for a table column</entry>
       </row>
       <row>
-       <entry><literal><function>obj_description</function>(<parameter>object_oid</parameter>, <parameter>catalog_name</parameter>)</literal></entry>
+       <entry><literal><function>obj_description(<parameter>object_oid</parameter>, <parameter>catalog_name</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get comment for a database object</entry>
       </row>
       <row>
-       <entry><literal><function>obj_description</function>(<parameter>object_oid</parameter>)</literal></entry>
+       <entry><literal><function>obj_description(<parameter>object_oid</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get comment for a database object (<emphasis>deprecated</emphasis>)</entry>
       </row>
       <row>
-       <entry><literal><function>shobj_description</function>(<parameter>object_oid</parameter>, <parameter>catalog_name</parameter>)</literal></entry>
+       <entry><literal><function>shobj_description(<parameter>object_oid</parameter>, <parameter>catalog_name</parameter>)</function></literal></entry>
        <entry><type>text</type></entry>
        <entry>get comment for a shared database object</entry>
       </row>
@@ -12593,32 +12809,32 @@ SELECT typlen FROM pg_type WHERE oid = pg_typeof(33);
 
      <tbody>
       <row>
-       <entry><literal><function>txid_current</function>()</literal></entry>
+       <entry><literal><function>txid_current()</function></literal></entry>
        <entry><type>bigint</type></entry>
        <entry>get current transaction ID</entry>
       </row>
       <row>
-       <entry><literal><function>txid_current_snapshot</function>()</literal></entry>
+       <entry><literal><function>txid_current_snapshot()</function></literal></entry>
        <entry><type>txid_snapshot</type></entry>
        <entry>get current snapshot</entry>
       </row>
       <row>
-       <entry><literal><function>txid_snapshot_xmin</function>(<parameter>txid_snapshot</parameter>)</literal></entry>
+       <entry><literal><function>txid_snapshot_xmin(<parameter>txid_snapshot</parameter>)</function></literal></entry>
        <entry><type>bigint</type></entry>
        <entry>get xmin of snapshot</entry>
       </row>
       <row>
-       <entry><literal><function>txid_snapshot_xmax</function>(<parameter>txid_snapshot</parameter>)</literal></entry>
+       <entry><literal><function>txid_snapshot_xmax(<parameter>txid_snapshot</parameter>)</function></literal></entry>
        <entry><type>bigint</type></entry>
        <entry>get xmax of snapshot</entry>
       </row>
       <row>
-       <entry><literal><function>txid_snapshot_xip</function>(<parameter>txid_snapshot</parameter>)</literal></entry>
+       <entry><literal><function>txid_snapshot_xip(<parameter>txid_snapshot</parameter>)</function></literal></entry>
        <entry><type>setof bigint</type></entry>
        <entry>get in-progress transaction IDs in snapshot</entry>
       </row>
       <row>
-       <entry><literal><function>txid_visible_in_snapshot</function>(<parameter>bigint</parameter>, <parameter>txid_snapshot</parameter>)</literal></entry>
+       <entry><literal><function>txid_visible_in_snapshot(<parameter>bigint</parameter>, <parameter>txid_snapshot</parameter>)</function></literal></entry>
        <entry><type>boolean</type></entry>
        <entry>is transaction ID visible in snapshot? (do not use with subtransaction ids)</entry>
       </row>
@@ -12710,7 +12926,7 @@ SELECT typlen FROM pg_type WHERE oid = pg_typeof(33);
      <tbody>
       <row>
        <entry>
-        <literal><function>current_setting</function>(<parameter>setting_name</parameter>)</literal>
+        <literal><function>current_setting(<parameter>setting_name</parameter>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>get current value of setting</entry>
@@ -12812,28 +13028,28 @@ SELECT set_config('log_statement_stats', 'off', false);
      <tbody>
       <row>
        <entry>
-        <literal><function>pg_cancel_backend</function>(<parameter>pid</parameter> <type>int</>)</literal>
+        <literal><function>pg_cancel_backend(<parameter>pid</parameter> <type>int</>)</function></literal>
         </entry>
        <entry><type>boolean</type></entry>
        <entry>Cancel a backend's current query</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_terminate_backend</function>(<parameter>pid</parameter> <type>int</>)</literal>
+        <literal><function>pg_terminate_backend(<parameter>pid</parameter> <type>int</>)</function></literal>
         </entry>
        <entry><type>boolean</type></entry>
        <entry>Terminate a backend</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_reload_conf</function>()</literal>
+        <literal><function>pg_reload_conf()</function></literal>
         </entry>
        <entry><type>boolean</type></entry>
        <entry>Cause server processes to reload their configuration files</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_rotate_logfile</function>()</literal>
+        <literal><function>pg_rotate_logfile()</function></literal>
         </entry>
        <entry><type>boolean</type></entry>
        <entry>Rotate server's log file</entry>
@@ -12900,6 +13116,7 @@ SELECT set_config('log_statement_stats', 'off', false);
    <para>
     The functions shown in <xref
     linkend="functions-admin-backup-table"> assist in making on-line backups.
+    These functions cannot be executed during recovery.
     Use of the first three functions is restricted to superusers.
    </para>
 
@@ -12914,49 +13131,49 @@ SELECT set_config('log_statement_stats', 'off', false);
      <tbody>
       <row>
        <entry>
-        <literal><function>pg_start_backup</function>(<parameter>label</> <type>text</> <optional>, <parameter>fast</> <type>boolean</> </optional>)</literal>
+        <literal><function>pg_start_backup(<parameter>label</> <type>text</> <optional>, <parameter>fast</> <type>boolean</> </optional>)</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Prepare for performing on-line backup</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_stop_backup</function>()</literal>
+        <literal><function>pg_stop_backup()</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Finish performing on-line backup</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_switch_xlog</function>()</literal>
+        <literal><function>pg_switch_xlog()</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Force switch to a new transaction log file</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_current_xlog_location</function>()</literal>
+        <literal><function>pg_current_xlog_location()</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Get current transaction log write location</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_current_xlog_insert_location</function>()</literal>
+        <literal><function>pg_current_xlog_insert_location()</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Get current transaction log insert location</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_xlogfile_name_offset</function>(<parameter>location</> <type>text</>)</literal>
+        <literal><function>pg_xlogfile_name_offset(<parameter>location</> <type>text</>)</function></literal>
         </entry>
        <entry><type>text</>, <type>integer</></entry>
        <entry>Convert transaction log location string to file name and decimal byte offset within file</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_xlogfile_name</function>(<parameter>location</> <type>text</>)</literal>
+        <literal><function>pg_xlogfile_name(<parameter>location</> <type>text</>)</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Convert transaction log location string to file name</entry>
@@ -12981,7 +13198,7 @@ postgres=# select pg_start_backup('label_goes_here');
  0/D4445B8
 (1 row)
 </programlisting>
-    There is an optional boolean second parameter.  If <literal>true</>,
+    There is an optional second parameter of type <type>boolean</type>.  If <literal>true</>,
     it specifies executing <function>pg_start_backup</> as quickly as
     possible.  This forces an immediate checkpoint which will cause a
     spike in I/O operations, slowing any concurrently executing queries.
@@ -13048,6 +13265,73 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
     <xref linkend="continuous-archiving">.
    </para>
 
+   <indexterm>
+    <primary>pg_is_in_recovery</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_last_xlog_receive_location</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_last_xlog_replay_location</primary>
+   </indexterm>
+
+   <para>
+    The functions shown in <xref
+    linkend="functions-recovery-info-table"> provide information
+    about the current status of the standby.
+    These functions may be executed during both recovery and in normal running.
+   </para>
+
+   <table id="functions-recovery-info-table">
+    <title>Recovery Information Functions</title>
+    <tgroup cols="3">
+     <thead>
+      <row><entry>Name</entry> <entry>Return Type</entry> <entry>Description</entry>
+      </row>
+     </thead>
+
+     <tbody>
+      <row>
+       <entry>
+        <literal><function>pg_is_in_recovery()</function></literal>
+        </entry>
+       <entry><type>bool</type></entry>
+       <entry>True if recovery is still in progress.
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_last_xlog_receive_location()</function></literal>
+        </entry>
+       <entry><type>text</type></entry>
+       <entry>Get last transaction log location received and synced to disk by
+        streaming replication. While streaming replication is in progress
+        this will increase monotonically. But when streaming replication is
+        restarted this will back off to the replication starting position,
+        typically the beginning of the WAL file containing the current
+        replay location.  If recovery has completed this will remain static at
+        the value of the last WAL record received and synced to disk during
+        recovery. If streaming replication is disabled, or if it has not yet
+        started, the function returns NULL.
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_last_xlog_replay_location()</function></literal>
+        </entry>
+       <entry><type>text</type></entry>
+       <entry>Get last transaction log location replayed during recovery.
+        If recovery is still in progress this will increase monotonically.
+        If recovery has completed then this value will remain static at
+        the value of the last WAL record applied during that recovery.
+        When the server has been started normally without recovery
+        the function returns NULL.
+       </entry>
+      </row>
+     </tbody>
+    </tgroup>
+   </table>
+
    <para>
     The functions shown in <xref linkend="functions-admin-dbsize"> calculate
     the disk space usage of database objects.
@@ -13057,19 +13341,25 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
     <primary>pg_column_size</primary>
    </indexterm>
    <indexterm>
+    <primary>pg_total_relation_size</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_table_size</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_indexes_size</primary>
+   </indexterm>
+   <indexterm>
     <primary>pg_database_size</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_tablespace_size</primary>
    </indexterm>
    <indexterm>
     <primary>pg_relation_size</primary>
    </indexterm>
    <indexterm>
     <primary>pg_size_pretty</primary>
-   </indexterm>
-   <indexterm>
-    <primary>pg_tablespace_size</primary>
-   </indexterm>
-   <indexterm>
-    <primary>pg_total_relation_size</primary>
    </indexterm>
 
    <table id="functions-admin-dbsize">
@@ -13082,27 +13372,72 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
 
      <tbody>
       <row>
-       <entry><literal><function>pg_column_size</function>(<type>any</type>)</literal></entry>
+       <entry><literal><function>pg_column_size(<type>any</type>)</function></literal></entry>
        <entry><type>int</type></entry>
        <entry>Number of bytes used to store a particular value (possibly compressed)</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_database_size</function>(<type>oid</type>)</literal>
+        <literal><function>pg_total_relation_size(<type>regclass</type>)</function></literal>
+        </entry>
+       <entry><type>bigint</type></entry>
+       <entry>
+        Total disk space used by the table with the specified OID or name,
+        including all indexes and <acronym>TOAST</> data
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_table_size(<type>regclass</type>)</function></literal>
+        </entry>
+       <entry><type>bigint</type></entry>
+       <entry>
+        Disk space used by the table with the specified OID or name,
+        excluding indexes (but including TOAST, free space map, and visibility
+        map)
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_indexes_size(<type>regclass</type>)</function></literal>
+        </entry>
+       <entry><type>bigint</type></entry>
+       <entry>
+        Total disk space used by indexes attached to the table with the
+        specified OID or name
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_database_size(<type>oid</type>)</function></literal>
         </entry>
        <entry><type>bigint</type></entry>
        <entry>Disk space used by the database with the specified OID</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_database_size</function>(<type>name</type>)</literal>
+        <literal><function>pg_database_size(<type>name</type>)</function></literal>
         </entry>
        <entry><type>bigint</type></entry>
        <entry>Disk space used by the database with the specified name</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_relation_size</function>(<parameter>relation</parameter> <type>regclass</type>, <parameter>fork</parameter> <type>text</type>)</literal>
+        <literal><function>pg_tablespace_size(<type>oid</type>)</function></literal>
+        </entry>
+       <entry><type>bigint</type></entry>
+       <entry>Disk space used by the tablespace with the specified OID</entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_tablespace_size(<type>name</type>)</function></literal>
+        </entry>
+       <entry><type>bigint</type></entry>
+       <entry>Disk space used by the tablespace with the specified name</entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_relation_size(<parameter>relation</parameter> <type>regclass</type>, <parameter>fork</parameter> <type>text</type>)</function></literal>
         </entry>
        <entry><type>bigint</type></entry>
        <entry>
@@ -13113,7 +13448,7 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
       </row>
       <row>
        <entry>
-        <literal><function>pg_relation_size</function>(<parameter>relation</parameter> <type>regclass</type>)</literal>
+        <literal><function>pg_relation_size(<parameter>relation</parameter> <type>regclass</type>)</function></literal>
         </entry>
        <entry><type>bigint</type></entry>
        <entry>
@@ -13122,34 +13457,10 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
       </row>
       <row>
        <entry>
-        <literal><function>pg_size_pretty</function>(<type>bigint</type>)</literal>
+        <literal><function>pg_size_pretty(<type>bigint</type>)</function></literal>
         </entry>
        <entry><type>text</type></entry>
        <entry>Converts a size in bytes into a human-readable format with size units</entry>
-      </row>
-      <row>
-       <entry>
-        <literal><function>pg_tablespace_size</function>(<type>oid</type>)</literal>
-        </entry>
-       <entry><type>bigint</type></entry>
-       <entry>Disk space used by the tablespace with the specified OID</entry>
-      </row>
-      <row>
-       <entry>
-        <literal><function>pg_tablespace_size</function>(<type>name</type>)</literal>
-        </entry>
-       <entry><type>bigint</type></entry>
-       <entry>Disk space used by the tablespace with the specified name</entry>
-      </row>
-      <row>
-       <entry>
-        <literal><function>pg_total_relation_size</function>(<type>regclass</type>)</literal>
-        </entry>
-       <entry><type>bigint</type></entry>
-       <entry>
-        Total disk space used by the table with the specified OID or name,
-        including indexes and <acronym>TOAST</> data
-       </entry>
       </row>
      </tbody>
     </tgroup>
@@ -13161,6 +13472,26 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
    </para>
 
    <para>
+    <function>pg_total_relation_size</> accepts the OID or name of a
+    table or toast table, and returns the total on-disk space used for
+    that table, including all associated indexes.  This function is
+    equivalent to <function>pg_table_size</function>
+    <literal>+</> <function>pg_indexes_size</function>.
+   </para>
+
+   <para>
+    <function>pg_table_size</> accepts the OID or name of a table and
+    returns the disk space needed for that table, exclusive of indexes.
+    (TOAST space, free space map, and visibility map are included.)
+   </para>
+
+   <para>
+    <function>pg_indexes_size</> accepts the OID or name of a table and
+    returns the total disk space used by all the indexes attached to that
+    table.
+   </para>
+
+   <para>
     <function>pg_database_size</function> and <function>pg_tablespace_size</>
     accept the OID or name of a database or tablespace, and return the total
     disk space used therein.
@@ -13168,14 +13499,17 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
 
    <para>
     <function>pg_relation_size</> accepts the OID or name of a table, index or
-    toast table, and returns the size in bytes. Specifying
+    toast table, and returns the on-disk size in bytes. Specifying
     <literal>'main'</literal> or leaving out the second argument returns the
     size of the main data fork of the relation. Specifying
     <literal>'fsm'</literal> returns the size of the
     Free Space Map (see <xref linkend="storage-fsm">) associated with the
     relation. Specifying <literal>'vm'</literal> returns the size of the
     Visibility Map (see <xref linkend="storage-vm">) associated with the
-    relation.
+    relation.  Note that this function shows the size of only one fork;
+    for most purposes it is more convenient to use the higher-level
+    functions <function>pg_total_relation_size</> or
+    <function>pg_table_size</>.
    </para>
 
    <para>
@@ -13185,9 +13519,65 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
    </para>
 
    <para>
-    <function>pg_total_relation_size</> accepts the OID or name of a
-    table or toast table, and returns the size in bytes of the data
-    and all associated indexes and toast tables.
+    The functions shown in <xref linkend="functions-admin-dblocation"> assist
+    in identifying the specific disk files associated with database objects.
+   </para>
+
+   <indexterm>
+    <primary>pg_relation_filenode</primary>
+   </indexterm>
+   <indexterm>
+    <primary>pg_relation_filepath</primary>
+   </indexterm>
+
+   <table id="functions-admin-dblocation">
+    <title>Database Object Location Functions</title>
+    <tgroup cols="3">
+     <thead>
+      <row><entry>Name</entry> <entry>Return Type</entry> <entry>Description</entry>
+      </row>
+     </thead>
+
+     <tbody>
+      <row>
+       <entry>
+        <literal><function>pg_relation_filenode(<parameter>relation</parameter> <type>regclass</type>)</function></literal>
+        </entry>
+       <entry><type>oid</type></entry>
+       <entry>
+        Filenode number of the relation with the specified OID or name
+       </entry>
+      </row>
+      <row>
+       <entry>
+        <literal><function>pg_relation_filepath(<parameter>relation</parameter> <type>regclass</type>)</function></literal>
+        </entry>
+       <entry><type>text</type></entry>
+       <entry>
+        File path name of the relation with the specified OID or name
+       </entry>
+      </row>
+     </tbody>
+    </tgroup>
+   </table>
+
+   <para>
+    <function>pg_relation_filenode</> accepts the OID or name of a table,
+    index, sequence, or toast table, and returns the <quote>filenode</> number
+    currently assigned to it.  The filenode is the base component of the file
+    name(s) used for the relation (see <xref linkend="storage-file-layout">
+    for more information).  For most tables the result is the same as
+    <structname>pg_class</>.<structfield>relfilenode</>, but for certain
+    system catalogs <structfield>relfilenode</> is zero and this function must
+    be used to get the correct value.  The function returns NULL if passed
+    a relation that does not have storage, such as a view.
+   </para>
+
+   <para>
+    <function>pg_relation_filepath</> is similar to
+    <function>pg_relation_filenode</>, but it returns the entire file path name
+    (relative to the database cluster's data directory <varname>PGDATA</>) of
+    the relation.
    </para>
 
    <para>
@@ -13211,21 +13601,21 @@ postgres=# SELECT * FROM pg_xlogfile_name_offset(pg_stop_backup());
      <tbody>
       <row>
        <entry>
-        <literal><function>pg_ls_dir</function>(<parameter>dirname</> <type>text</>)</literal>
+        <literal><function>pg_ls_dir(<parameter>dirname</> <type>text</>)</function></literal>
        </entry>
        <entry><type>setof text</type></entry>
        <entry>List the contents of a directory</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_read_file</function>(<parameter>filename</> <type>text</>, <parameter>offset</> <type>bigint</>, <parameter>length</> <type>bigint</>)</literal>
+        <literal><function>pg_read_file(<parameter>filename</> <type>text</>, <parameter>offset</> <type>bigint</>, <parameter>length</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>text</type></entry>
        <entry>Return the contents of a text file</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_stat_file</function>(<parameter>filename</> <type>text</>)</literal>
+        <literal><function>pg_stat_file(<parameter>filename</> <type>text</>)</function></literal>
        </entry>
        <entry><type>record</type></entry>
        <entry>Return information about a file</entry>
@@ -13285,14 +13675,14 @@ SELECT (pg_stat_file('filename')).modification;
      <tbody>
       <row>
        <entry>
-        <literal><function>pg_advisory_lock</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_advisory_lock(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>void</type></entry>
        <entry>Obtain exclusive advisory lock</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_advisory_lock</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_advisory_lock(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>void</type></entry>
        <entry>Obtain exclusive advisory lock</entry>
@@ -13300,14 +13690,14 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_advisory_lock_shared</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_advisory_lock_shared(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>void</type></entry>
        <entry>Obtain shared advisory lock</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_advisory_lock_shared</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_advisory_lock_shared(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>void</type></entry>
        <entry>Obtain shared advisory lock</entry>
@@ -13315,14 +13705,14 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_try_advisory_lock</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_try_advisory_lock(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Obtain exclusive advisory lock if available</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_try_advisory_lock</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_try_advisory_lock(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Obtain exclusive advisory lock if available</entry>
@@ -13330,14 +13720,14 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_try_advisory_lock_shared</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_try_advisory_lock_shared(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Obtain shared advisory lock if available</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_try_advisory_lock_shared</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_try_advisory_lock_shared(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Obtain shared advisory lock if available</entry>
@@ -13345,14 +13735,14 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_advisory_unlock</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_advisory_unlock(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Release an exclusive advisory lock</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_advisory_unlock</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_advisory_unlock(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Release an exclusive advisory lock</entry>
@@ -13360,14 +13750,14 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_advisory_unlock_shared</function>(<parameter>key</> <type>bigint</>)</literal>
+        <literal><function>pg_advisory_unlock_shared(<parameter>key</> <type>bigint</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Release a shared advisory lock</entry>
       </row>
       <row>
        <entry>
-        <literal><function>pg_advisory_unlock_shared</function>(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</literal>
+        <literal><function>pg_advisory_unlock_shared(<parameter>key1</> <type>int</>, <parameter>key2</> <type>int</>)</function></literal>
        </entry>
        <entry><type>boolean</type></entry>
        <entry>Release a shared advisory lock</entry>
@@ -13375,7 +13765,7 @@ SELECT (pg_stat_file('filename')).modification;
 
       <row>
        <entry>
-        <literal><function>pg_advisory_unlock_all</function>()</literal>
+        <literal><function>pg_advisory_unlock_all()</function></literal>
        </entry>
        <entry><type>void</type></entry>
        <entry>Release all advisory locks held by the current session</entry>
@@ -13473,8 +13863,8 @@ SELECT (pg_stat_file('filename')).modification;
       function, <function>suppress_redundant_updates_trigger</>, 
       which will prevent any update
       that does not actually change the data in the row from taking place, in
-      contrast to the normal behaviour which always performs the update
-      regardless of whether or not the data has changed. (This normal behaviour
+      contrast to the normal behavior which always performs the update
+      regardless of whether or not the data has changed. (This normal behavior
       makes updates run faster, since no checking is required, and is also
       useful in certain cases.)
     </para>

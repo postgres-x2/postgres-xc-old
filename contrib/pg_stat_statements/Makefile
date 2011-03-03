@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/pg_stat_statements/Makefile
 
 MODULE_big = pg_stat_statements
 DATA_built = pg_stat_statements.sql

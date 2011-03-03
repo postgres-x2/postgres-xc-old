@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/ecpgerrno.h */
 
 #ifndef _ECPG_ERRNO_H
 #define _ECPG_ERRNO_H

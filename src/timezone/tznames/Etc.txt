@@ -4,7 +4,7 @@
 #   a template for timezones you could need.  See the `Date/Time Support'
 #   appendix in the PostgreSQL documentation for more information.
 #
-# $PostgreSQL$
+# src/timezone/tznames/Etc.txt
 #
 
 GMT         0    # Greenwich Mean Time

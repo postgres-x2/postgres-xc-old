@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/citext/Makefile
 
 MODULES = citext
 DATA_built = citext.sql

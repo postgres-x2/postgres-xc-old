@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/bin/pgevent/pgmsgevent.h
 
 /*	*/
 /*	 Values are 32 bit values layed out as follows: */

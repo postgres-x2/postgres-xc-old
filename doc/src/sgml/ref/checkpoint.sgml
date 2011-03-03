@@ -1,8 +1,8 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/ref/checkpoint.sgml
 
 <refentry id="sql-checkpoint">
  <refmeta>
-  <refentrytitle id="sql-checkpoint-title">CHECKPOINT</refentrytitle>
+  <refentrytitle>CHECKPOINT</refentrytitle>
   <manvolnum>7</manvolnum>
   <refmiscinfo>SQL - Language Statements</refmiscinfo>
  </refmeta>
@@ -40,6 +40,11 @@ CHECKPOINT
    all data files have been updated to reflect the information in the
    log.  All data files will be flushed to disk.  Refer to
    <xref linkend="wal"> for more information about the WAL system.
+  </para>
+
+  <para>
+   If executed during recovery, the <command>CHECKPOINT</command> command
+   will force a restartpoint rather than writing a new checkpoint.
   </para>
 
   <para>

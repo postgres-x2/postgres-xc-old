@@ -4,7 +4,7 @@
 #    Makefile for tcop
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/tcop/Makefile
 #
 #-------------------------------------------------------------------------
 

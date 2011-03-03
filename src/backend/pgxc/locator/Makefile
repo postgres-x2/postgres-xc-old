@@ -7,7 +7,7 @@
 # Copyright(C) 2010 Nippon Telegraph and Telephone Corporation
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/pgxc/locator/Makefile
 #
 #-------------------------------------------------------------------------
 

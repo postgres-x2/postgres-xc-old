@@ -1,5 +1,5 @@
 @echo off
-REM $PostgreSQL$
+REM src/tools/msvc/install.bat
 
 if NOT "%1"=="" GOTO RUN_INSTALL
 

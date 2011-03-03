@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/uuid-ossp/uninstall_uuid-ossp.sql
 
 -- Adjust this setting to control where the objects get dropped.
 SET search_path = public;

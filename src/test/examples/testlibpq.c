@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/test/examples/testlibpq.c
  *
  *
  * testlibpq.c

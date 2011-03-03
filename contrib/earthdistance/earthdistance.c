@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/earthdistance/earthdistance.c
 
 #include "postgres.h"
 

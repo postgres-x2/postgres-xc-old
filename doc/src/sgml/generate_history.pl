@@ -9,7 +9,7 @@
 # in a standalone build of the release notes.  To make sure this is done
 # everywhere, we have to fold in the sub-files of the release notes.
 #
-# $PostgreSQL$
+# doc/src/sgml/generate_history.pl
 
 use strict;
 

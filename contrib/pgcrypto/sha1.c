@@ -1,4 +1,4 @@
-/*	   $KAME$    */
+/*	   $KAME: sha1.c,v 1.3 2000/02/22 14:01:18 itojun Exp $    */
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,11 +28,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $PostgreSQL$
+ * contrib/pgcrypto/sha1.c
  */
 /*
  * FIPS pub 180-1: Secure Hash Algorithm (SHA-1)
- * based on: http://csrc.nist.gov/fips/fip180-1.txt
+ * based on: http://www.itl.nist.gov/fipspubs/fip180-1.htm
  * implemented by Jun-ichiro itojun Itoh <itojun@itojun.org>
  */
 

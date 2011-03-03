@@ -4,7 +4,7 @@
 #    Makefile for utils/hash
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/hash/Makefile
 #
 #-------------------------------------------------------------------------
 

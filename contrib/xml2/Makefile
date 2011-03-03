@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/xml2/Makefile
 
 MODULE_big = pgxml
 

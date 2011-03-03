@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/chkpass/uninstall_chkpass.sql
 
 -- Adjust this setting to control where the objects get dropped.
 SET search_path = public;

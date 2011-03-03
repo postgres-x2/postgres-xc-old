@@ -3,12 +3,12 @@
  * allpaths.c
  *	  Routines to find possible search paths for processing a query
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/optimizer/path/allpaths.c
  *
  *-------------------------------------------------------------------------
  */
@@ -17,7 +17,6 @@
 
 #include <math.h>
 
-#include "catalog/pg_namespace.h"
 #include "nodes/nodeFuncs.h"
 #ifdef OPTIMIZER_DEBUG
 #include "nodes/print.h"
@@ -35,10 +34,10 @@
 #include "parser/parse_clause.h"
 #include "parser/parsetree.h"
 #ifdef PGXC
+#include "catalog/pg_namespace.h"
 #include "pgxc/pgxc.h"
 #endif
 #include "rewrite/rewriteManip.h"
-#include "utils/lsyscache.h"
 
 
 /* These parameters are set by GUC */
@@ -368,11 +367,11 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		 * can disregard this child.
 		 *
 		 * As of 8.4, the child rel's targetlist might contain non-Var
-		 * expressions, which means that substitution into the quals
-		 * could produce opportunities for const-simplification, and perhaps
-		 * even pseudoconstant quals.  To deal with this, we strip the
-		 * RestrictInfo nodes, do the substitution, do const-simplification,
-		 * and then reconstitute the RestrictInfo layer.
+		 * expressions, which means that substitution into the quals could
+		 * produce opportunities for const-simplification, and perhaps even
+		 * pseudoconstant quals.  To deal with this, we strip the RestrictInfo
+		 * nodes, do the substitution, do const-simplification, and then
+		 * reconstitute the RestrictInfo layer.
 		 */
 		childquals = get_all_actual_clauses(rel->baserestrictinfo);
 		childquals = (List *) adjust_appendrel_attrs((Node *) childquals,
@@ -446,7 +445,7 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		childpath = childrel->cheapest_total_path;
 		if (IsA(childpath, AppendPath))
 			subpaths = list_concat(subpaths,
-								   ((AppendPath *) childpath)->subpaths);
+							list_copy(((AppendPath *) childpath)->subpaths));
 		else
 			subpaths = lappend(subpaths, childpath);
 
@@ -653,6 +652,7 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 									false, tuple_fraction,
 									&subroot);
 	rel->subrtable = subroot->parse->rtable;
+	rel->subrowmark = subroot->rowMarks;
 
 	/* Copy number of output rows from subplan */
 	rel->tuples = rel->subplan->plan_rows;
@@ -918,9 +918,14 @@ make_rel_from_joinlist(PlannerInfo *root, List *joinlist)
 RelOptInfo *
 standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 {
-	List	  **joinitems;
 	int			lev;
 	RelOptInfo *rel;
+
+	/*
+	 * This function cannot be invoked recursively within any one planning
+	 * problem, so join_rel_level[] can't be in use already.
+	 */
+	Assert(root->join_rel_level == NULL);
 
 	/*
 	 * We employ a simple "dynamic programming" algorithm: we first find all
@@ -929,30 +934,31 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 	 * joins, and so on until we have considered all ways to join all the
 	 * items into one rel.
 	 *
-	 * joinitems[j] is a list of all the j-item rels.  Initially we set
-	 * joinitems[1] to represent all the single-jointree-item relations.
+	 * root->join_rel_level[j] is a list of all the j-item rels.  Initially we
+	 * set root->join_rel_level[1] to represent all the single-jointree-item
+	 * relations.
 	 */
-	joinitems = (List **) palloc0((levels_needed + 1) * sizeof(List *));
+	root->join_rel_level = (List **) palloc0((levels_needed + 1) * sizeof(List *));
 
-	joinitems[1] = initial_rels;
+	root->join_rel_level[1] = initial_rels;
 
 	for (lev = 2; lev <= levels_needed; lev++)
 	{
-		ListCell   *x;
+		ListCell   *lc;
 
 		/*
 		 * Determine all possible pairs of relations to be joined at this
 		 * level, and build paths for making each one from every available
 		 * pair of lower-level relations.
 		 */
-		joinitems[lev] = join_search_one_level(root, lev, joinitems);
+		join_search_one_level(root, lev);
 
 		/*
 		 * Do cleanup work on each just-processed rel.
 		 */
-		foreach(x, joinitems[lev])
+		foreach(lc, root->join_rel_level[lev])
 		{
-			rel = (RelOptInfo *) lfirst(x);
+			rel = (RelOptInfo *) lfirst(lc);
 
 			/* Find and save the cheapest paths for this rel */
 			set_cheapest(rel);
@@ -966,11 +972,13 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
 	/*
 	 * We should have a single rel at the final level.
 	 */
-	if (joinitems[levels_needed] == NIL)
+	if (root->join_rel_level[levels_needed] == NIL)
 		elog(ERROR, "failed to build any %d-way joins", levels_needed);
-	Assert(list_length(joinitems[levels_needed]) == 1);
+	Assert(list_length(root->join_rel_level[levels_needed]) == 1);
 
-	rel = (RelOptInfo *) linitial(joinitems[levels_needed]);
+	rel = (RelOptInfo *) linitial(root->join_rel_level[levels_needed]);
+
+	root->join_rel_level = NULL;
 
 	return rel;
 }
@@ -992,10 +1000,10 @@ standard_join_search(PlannerInfo *root, int levels_needed, List *initial_rels)
  * since that could change the set of rows returned.
  *
  * 2. If the subquery contains any window functions, we can't push quals
- * into it, because that would change the results.
+ * into it, because that could change the results.
  *
  * 3. If the subquery contains EXCEPT or EXCEPT ALL set ops we cannot push
- * quals into it, because that would change the results.
+ * quals into it, because that could change the results.
  *
  * 4. For subqueries using UNION/UNION ALL/INTERSECT/INTERSECT ALL, we can
  * push quals into each component query, but the quals can only reference
@@ -1459,14 +1467,12 @@ print_path(PlannerInfo *root, Path *path, int indent)
 		{
 			MergePath  *mp = (MergePath *) path;
 
-			if (mp->outersortkeys || mp->innersortkeys)
-			{
-				for (i = 0; i < indent; i++)
-					printf("\t");
-				printf("  sortouter=%d sortinner=%d\n",
-					   ((mp->outersortkeys) ? 1 : 0),
-					   ((mp->innersortkeys) ? 1 : 0));
-			}
+			for (i = 0; i < indent; i++)
+				printf("\t");
+			printf("  sortouter=%d sortinner=%d materializeinner=%d\n",
+				   ((mp->outersortkeys) ? 1 : 0),
+				   ((mp->innersortkeys) ? 1 : 0),
+				   ((mp->materialize_inner) ? 1 : 0));
 		}
 
 		print_path(root, jp->outerjoinpath, indent + 1);

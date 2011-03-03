@@ -5,13 +5,13 @@
  *	  along with the relation's initial contents.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/catalog/pg_am.h
  *
  * NOTES
- *		the genbki.sh script reads this file and generates .bki
+ *		the genbki.pl script reads this file and generates .bki
  *		information from the DATA() statements.
  *
  *		XXX do NOT break up DATA() statements into multiple lines!
@@ -46,7 +46,7 @@ CATALOG(pg_am,2601)
 	bool		amcanmulticol;	/* does AM support multi-column indexes? */
 	bool		amoptionalkey;	/* can query omit key for the first column? */
 	bool		amindexnulls;	/* does AM support NULL index entries? */
-	bool		amsearchnulls;	/* can AM search for NULL index entries? */
+	bool		amsearchnulls;	/* can AM search for NULL/NOT NULL entries? */
 	bool		amstorage;		/* can storage type differ from column type? */
 	bool		amclusterable;	/* does AM support cluster command? */
 	Oid			amkeytype;		/* type of data in index, or InvalidOid */

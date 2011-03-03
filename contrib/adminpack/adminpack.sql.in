@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/adminpack/adminpack.sql.in
 
 /* ***********************************************
  * Administrative functions for PostgreSQL

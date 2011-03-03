@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/backend/access/hash/README
 
 Hash Indexing
 =============

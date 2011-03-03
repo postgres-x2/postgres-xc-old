@@ -34,7 +34,7 @@
  *
  *
  * IDENTIFICATION
- *		$PostgreSQL$
+ *		src/bin/pg_dump/pg_restore.c
  *
  *-------------------------------------------------------------------------
  */
@@ -154,7 +154,7 @@ main(int argc, char **argv)
 				opts->dropSchema = 1;
 				break;
 			case 'C':
-				opts->create = 1;
+				opts->createDB = 1;
 				break;
 			case 'd':
 				opts->dbname = strdup(optarg);
@@ -295,10 +295,21 @@ main(int argc, char **argv)
 		}
 	}
 
+	/* Get file name from command line */
 	if (optind < argc)
-		inputFileSpec = argv[optind];
+		inputFileSpec = argv[optind++];
 	else
 		inputFileSpec = NULL;
+
+	/* Complain if any arguments remain */
+	if (optind < argc)
+	{
+		fprintf(stderr, _("%s: too many command-line arguments (first is \"%s\")\n"),
+				progname, argv[optind]);
+		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
+				progname);
+		exit(1);
+	}
 
 	/* Should get at most one of -d and -f, else user is confused */
 	if (opts->dbname)

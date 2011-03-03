@@ -2,7 +2,7 @@
 #
 # pgstattuple Makefile
 #
-# $PostgreSQL$
+# contrib/pgstattuple/Makefile
 #
 #-------------------------------------------------------------------------
 

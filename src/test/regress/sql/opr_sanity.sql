@@ -218,6 +218,38 @@ FROM pg_proc as p1
 WHERE p1.prorettype = 'internal'::regtype AND NOT
     'internal'::regtype = ANY (p1.proargtypes);
 
+-- Check for length inconsistencies between the various argument-info arrays.
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proallargtypes IS NOT NULL AND
+    array_length(proallargtypes,1) < array_length(proargtypes,1);
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proargmodes IS NOT NULL AND
+    array_length(proargmodes,1) < array_length(proargtypes,1);
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proargnames IS NOT NULL AND
+    array_length(proargnames,1) < array_length(proargtypes,1);
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proallargtypes IS NOT NULL AND proargmodes IS NOT NULL AND
+    array_length(proallargtypes,1) <> array_length(proargmodes,1);
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proallargtypes IS NOT NULL AND proargnames IS NOT NULL AND
+    array_length(proallargtypes,1) <> array_length(proargnames,1);
+
+SELECT p1.oid, p1.proname
+FROM pg_proc as p1
+WHERE proargmodes IS NOT NULL AND proargnames IS NOT NULL AND
+    array_length(proargmodes,1) <> array_length(proargnames,1);
+
 
 -- **************** pg_cast ****************
 
@@ -588,6 +620,26 @@ WHERE a.aggfnoid = p.oid AND a.aggsortop = o.oid AND
     amopopr = o.oid AND
     amopmethod = (SELECT oid FROM pg_am WHERE amname = 'btree')
 ORDER BY 1, 2;
+
+-- Check that there are not aggregates with the same name and different
+-- numbers of arguments.  While not technically wrong, we have a project policy
+-- to avoid this because it opens the door for confusion in connection with
+-- ORDER BY: novices frequently put the ORDER BY in the wrong place.
+-- See the fate of the single-argument form of string_agg() for history.
+-- The only aggregates that should show up here are count(x) and count(*).
+
+SELECT p1.oid::regprocedure, p2.oid::regprocedure
+FROM pg_proc AS p1, pg_proc AS p2
+WHERE p1.oid < p2.oid AND p1.proname = p2.proname AND
+    p1.proisagg AND p2.proisagg AND
+    array_dims(p1.proargtypes) != array_dims(p2.proargtypes)
+ORDER BY 1;
+
+-- For the same reason, aggregates with default arguments are no good.
+
+SELECT oid, proname
+FROM pg_proc AS p
+WHERE proisagg AND proargdefaults IS NOT NULL;
 
 -- **************** pg_opfamily ****************
 

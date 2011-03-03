@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/port/strtoul.c
  *
  *
  * Copyright (c) 1990, 1993

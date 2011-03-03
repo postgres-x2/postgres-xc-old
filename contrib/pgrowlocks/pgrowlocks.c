@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/pgrowlocks/pgrowlocks.c
  *
  * Copyright (c) 2005-2006	Tatsuo Ishii
  *

@@ -2,7 +2,7 @@
 **
 **		halt.c
 **
-** $PostgreSQL$
+** src/tools/entab/halt.c
 **
 **		This is used to print out error messages and exit
 */

@@ -4,10 +4,10 @@
  *	  header file for postgres vacuum cleaner and statistics analyzer
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/commands/vacuum.h
  *
  *-------------------------------------------------------------------------
  */
@@ -62,9 +62,17 @@ typedef struct VacAttrStats
 	/*
 	 * These fields are set up by the main ANALYZE code before invoking the
 	 * type-specific typanalyze function.
+	 *
+	 * Note: do not assume that the data being analyzed has the same datatype
+	 * shown in attr, ie do not trust attr->atttypid, attlen, etc.  This is
+	 * because some index opclasses store a different type than the underlying
+	 * column/expression.  Instead use attrtypid, attrtypmod, and attrtype for
+	 * information about the datatype being fed to the typanalyze function.
 	 */
 	Form_pg_attribute attr;		/* copy of pg_attribute row for column */
-	Form_pg_type attrtype;		/* copy of pg_type row for column */
+	Oid			attrtypid;		/* type of data being analyzed */
+	int32		attrtypmod;		/* typmod of data being analyzed */
+	Form_pg_type attrtype;		/* copy of pg_type row for attrtypid */
 	MemoryContext anl_context;	/* where to save long-lived data */
 
 	/*
@@ -95,10 +103,9 @@ typedef struct VacAttrStats
 
 	/*
 	 * These fields describe the stavalues[n] element types. They will be
-	 * initialized to be the same as the column's that's underlying the slot,
-	 * but a custom typanalyze function might want to store an array of
-	 * something other than the analyzed column's elements. It should then
-	 * overwrite these fields.
+	 * initialized to match attrtypid, but a custom typanalyze function might
+	 * want to store an array of something other than the analyzed column's
+	 * elements. It should then overwrite these fields.
 	 */
 	Oid			statypid[STATISTIC_NUM_SLOTS];
 	int2		statyplen[STATISTIC_NUM_SLOTS];
@@ -142,11 +149,10 @@ extern void vacuum_set_xid_limits(int freeze_min_age, int freeze_table_age,
 					  TransactionId *freezeLimit,
 					  TransactionId *freezeTableLimit);
 extern void vac_update_datfrozenxid(void);
-extern bool vac_is_partial_index(Relation indrel);
 extern void vacuum_delay_point(void);
 
 /* in commands/vacuumlazy.c */
-extern bool lazy_vacuum_rel(Relation onerel, VacuumStmt *vacstmt,
+extern void lazy_vacuum_rel(Relation onerel, VacuumStmt *vacstmt,
 				BufferAccessStrategy bstrategy, bool *scanned_all);
 
 /* in commands/analyze.c */

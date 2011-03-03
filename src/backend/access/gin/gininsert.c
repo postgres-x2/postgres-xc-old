@@ -4,11 +4,11 @@
  *	  insert routines for the postgres inverted index access method.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *			$PostgreSQL$
+ *			src/backend/access/gin/gininsert.c
  *-------------------------------------------------------------------------
  */
 
@@ -176,6 +176,7 @@ ginEntryInsert(Relation index, GinState *ginstate,
 			gdi = prepareScanPostingTree(index, rootPostingTree, FALSE);
 			gdi->btree.isBuild = isBuild;
 			insertItemPointer(gdi, items, nitem);
+			pfree(gdi);
 
 			return;
 		}
@@ -247,15 +248,14 @@ ginBuildCallback(Relation index, HeapTuple htup, Datum *values,
 															&htup->t_self);
 
 	/* If we've maxed out our available memory, dump everything to the index */
-	/* Also dump if the tree seems to be getting too unbalanced */
-	if (buildstate->accum.allocatedMemory >= maintenance_work_mem * 1024L ||
-		buildstate->accum.maxdepth > GIN_MAX_TREE_DEPTH)
+	if (buildstate->accum.allocatedMemory >= maintenance_work_mem * 1024L)
 	{
 		ItemPointerData *list;
 		Datum		entry;
 		uint32		nlist;
 		OffsetNumber attnum;
 
+		ginBeginBAScan(&buildstate->accum);
 		while ((list = ginGetEntry(&buildstate->accum, &attnum, &entry, &nlist)) != NULL)
 		{
 			/* there could be many entries, so be willing to abort here */
@@ -362,6 +362,7 @@ ginbuild(PG_FUNCTION_ARGS)
 
 	/* dump remaining entries to the index */
 	oldCtx = MemoryContextSwitchTo(buildstate.tmpCtx);
+	ginBeginBAScan(&buildstate.accum);
 	while ((list = ginGetEntry(&buildstate.accum, &attnum, &entry, &nlist)) != NULL)
 	{
 		/* there could be many entries, so be willing to abort here */
@@ -415,12 +416,11 @@ gininsert(PG_FUNCTION_ARGS)
 
 #ifdef NOT_USED
 	Relation	heapRel = (Relation) PG_GETARG_POINTER(4);
-	bool		checkUnique = PG_GETARG_BOOL(5);
+	IndexUniqueCheck checkUnique = (IndexUniqueCheck) PG_GETARG_INT32(5);
 #endif
 	GinState	ginstate;
 	MemoryContext oldCtx;
 	MemoryContext insertCtx;
-	uint32		res = 0;
 	int			i;
 
 	insertCtx = AllocSetContextCreate(CurrentMemoryContext,
@@ -440,7 +440,7 @@ gininsert(PG_FUNCTION_ARGS)
 		memset(&collector, 0, sizeof(GinTupleCollector));
 		for (i = 0; i < ginstate.origTupdesc->natts; i++)
 			if (!isnull[i])
-				res += ginHeapTupleFastCollect(index, &ginstate, &collector,
+				ginHeapTupleFastCollect(index, &ginstate, &collector,
 								 (OffsetNumber) (i + 1), values[i], ht_ctid);
 
 		ginHeapTupleFastInsert(index, &ginstate, &collector);
@@ -449,7 +449,7 @@ gininsert(PG_FUNCTION_ARGS)
 	{
 		for (i = 0; i < ginstate.origTupdesc->natts; i++)
 			if (!isnull[i])
-				res += ginHeapTupleInsert(index, &ginstate,
+				ginHeapTupleInsert(index, &ginstate,
 								 (OffsetNumber) (i + 1), values[i], ht_ctid);
 
 	}
@@ -457,5 +457,5 @@ gininsert(PG_FUNCTION_ARGS)
 	MemoryContextSwitchTo(oldCtx);
 	MemoryContextDelete(insertCtx);
 
-	PG_RETURN_BOOL(res > 0);
+	PG_RETURN_BOOL(false);
 }

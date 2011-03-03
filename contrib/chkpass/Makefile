@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/chkpass/Makefile
 
 MODULE_big = chkpass
 OBJS = chkpass.o

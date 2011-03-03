@@ -1,7 +1,7 @@
 /*
  *	PostgreSQL definitions for managed Large Objects.
  *
- *	$PostgreSQL$
+ *	contrib/lo/lo.c
  *
  */
 

@@ -2,22 +2,27 @@
 #
 # Makefile for the postgres backend
 #
-# Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+# Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 #
-# $PostgreSQL$
+# src/backend/Makefile
 #
 #-------------------------------------------------------------------------
 
 PGFILEDESC = "PostgreSQL Server"
+# This is a daemon process, which is why it is not labeled as an executable
+#PGAPPICON=win32
+
 subdir = src/backend
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
+# PGXC BEGIN
 SUBDIRS = access bootstrap catalog parser commands executor foreign lib libpq \
-	pgxc main nodes optimizer port postmaster regex rewrite \
+	pgxc main nodes optimizer port postmaster regex replication rewrite \
 	storage tcop tsearch utils $(top_builddir)/src/timezone $(top_builddir)/src/interfaces/libpq
 
+# PGXC END
 include $(srcdir)/common.mk
 
 # As of 1/2010:
@@ -32,6 +37,7 @@ LOCALOBJS += utils/probes.o
 endif
 endif
 
+# PGXC BEGIN
 OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
 	$(top_builddir)/src/interfaces/libpq/fe-connect.o \
 	$(top_builddir)/src/interfaces/libpq/fe-secure.o \
@@ -45,6 +51,7 @@ OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
 	$(top_builddir)/src/gtm/client/libgtmclient.a \
 	$(top_builddir)/src/gtm/common/libgtm.a \
 	$(top_builddir)/src/gtm/libpq/libpqcomm.a	
+# PGXC END
 
 # We put libpgport into OBJS, so remove it from LIBS; also add libldap
 LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE)
@@ -52,19 +59,22 @@ LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE)
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lz -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
 
+# PGXC BEGIN
 # LIBS := $(LIBS) -lpqcomm
 # LDFLAGS += -L$(top_builddir)/src/gtm/libpg
+# PGXC END
 ##########################################################################
 
-all: submake-libpgport postgres $(POSTGRES_IMP)
+all: submake-libpgport submake-schemapg postgres $(POSTGRES_IMP)
 
 ifneq ($(PORTNAME), cygwin)
 ifneq ($(PORTNAME), win32)
 ifneq ($(PORTNAME), aix)
 
 postgres: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -L$(top_builddir)/src/gtm/libpg $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o $@
-
+# PGXC BEGIN
+	$(CC) $(CFLAGS) $(LDFLAGS) -L$(top_builddir)/src/gtm/libpg $(LDFLAGS_EX) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o $@
+# PGXC END
 endif
 endif
 endif
@@ -73,9 +83,9 @@ ifeq ($(PORTNAME), cygwin)
 
 postgres: $(OBJS) postgres.def libpostgres.a
 	$(DLLTOOL) --dllname $@$(X) --output-exp $@.exp --def postgres.def
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
 	$(DLLTOOL) --dllname $@$(X) --base-file $@.base --output-exp $@.exp --def postgres.def
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--stack,$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -Wl,--stack,$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
 	rm -f $@.exp $@.base
 
 postgres.def: $(OBJS)
@@ -91,9 +101,9 @@ LIBS += -lsecur32
 
 postgres: $(OBJS) postgres.def libpostgres.a $(WIN32RES)
 	$(DLLTOOL) --dllname $@$(X) --output-exp $@.exp --def postgres.def
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
 	$(DLLTOOL) --dllname $@$(X) --base-file $@.base --output-exp $@.exp --def postgres.def
-	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--stack=$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -Wl,--stack=$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
 	rm -f $@.exp $@.base
 
 postgres.def: $(OBJS)
@@ -107,7 +117,7 @@ endif # win32
 ifeq ($(PORTNAME), aix)
 
 postgres: $(POSTGRES_IMP)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(call expand_subsys,$(OBJS)) -Wl,-bE:$(top_builddir)/src/backend/$(POSTGRES_IMP) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) $(call expand_subsys,$(OBJS)) -Wl,-bE:$(top_builddir)/src/backend/$(POSTGRES_IMP) $(LIBS) -o $@
 
 $(POSTGRES_IMP): $(OBJS)
 	$(LD) $(LDREL) $(LDOUT) SUBSYS.o $(call expand_subsys,$^)
@@ -125,23 +135,31 @@ endif
 endif # aix
 
 # Update the commonly used headers before building the subdirectories
-$(SUBDIRS:%=%-recursive): $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/probes.h
+$(SUBDIRS:%=%-recursive): $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/catalog/schemapg.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/probes.h
+
+# run this unconditionally to avoid needing to know its dependencies here:
+submake-schemapg:
+	$(MAKE) -C catalog schemapg.h
+
+.PHONY: submake-schemapg
+
+catalog/schemapg.h: submake-schemapg
 
 
 # The postgres.o target is needed by the rule in Makefile.global that
 # creates the exports file when MAKE_EXPORTS = true.
 postgres.o: $(OBJS)
-	$(CC) $(LDREL) $(LDFLAGS) $(call expand_subsys,$^) $(LIBS) -o $@
+	$(CC) $(LDREL) $(LDFLAGS) $(LDFLAGS_EX) $(call expand_subsys,$^) $(LIBS) -o $@
 
 
 # The following targets are specified in make commands that appear in
 # the make files in our subdirectories. Note that it's important we
 # match the dependencies shown in the subdirectory makefiles!
 
-$(srcdir)/parser/gram.h: parser/gram.y
+parser/gram.h: parser/gram.y
 	$(MAKE) -C parser gram.h
 
-utils/fmgroids.h: utils/Gen_fmgrtab.sh $(top_srcdir)/src/include/catalog/pg_proc.h
+utils/fmgroids.h: utils/Gen_fmgrtab.pl catalog/Catalog.pm $(top_srcdir)/src/include/catalog/pg_proc.h
 	$(MAKE) -C utils fmgroids.h
 
 utils/probes.h: utils/probes.d
@@ -150,15 +168,28 @@ utils/probes.h: utils/probes.d
 # Make symlinks for these headers in the include directory. That way
 # we can cut down on the -I options. Also, a symlink is automatically
 # up to date when we update the base file.
+#
+# The point of the prereqdir incantation in some of the rules below is to
+# force the symlink to use an absolute path rather than a relative path.
+# For headers which are generated by make distprep, the actual header within
+# src/backend will be in the source tree, while the symlink in src/include
+# will be in the build tree, so a simple ../.. reference won't work.
+# For headers generated during regular builds, we prefer a relative symlink.
 
-$(top_builddir)/src/include/parser/gram.h: $(srcdir)/parser/gram.h
+$(top_builddir)/src/include/parser/gram.h: parser/gram.h
+	prereqdir=`cd $(dir $<) >/dev/null && pwd` && \
+	  cd $(dir $@) && rm -f $(notdir $@) && \
+	  $(LN_S) "$$prereqdir/$(notdir $<)" .
+
+$(top_builddir)/src/include/catalog/schemapg.h: catalog/schemapg.h
 	prereqdir=`cd $(dir $<) >/dev/null && pwd` && \
 	  cd $(dir $@) && rm -f $(notdir $@) && \
 	  $(LN_S) "$$prereqdir/$(notdir $<)" .
 
 $(top_builddir)/src/include/utils/fmgroids.h: utils/fmgroids.h
-	cd $(dir $@) && rm -f $(notdir $@) && \
-	    $(LN_S) ../../../$(subdir)/utils/fmgroids.h .
+	prereqdir=`cd $(dir $<) >/dev/null && pwd` && \
+	  cd $(dir $@) && rm -f $(notdir $@) && \
+	  $(LN_S) "$$prereqdir/$(notdir $<)" .
 
 $(top_builddir)/src/include/utils/probes.h: utils/probes.h
 	cd $(dir $@) && rm -f $(notdir $@) && \
@@ -174,6 +205,8 @@ utils/probes.o: utils/probes.d $(SUBDIROBJS)
 distprep:
 	$(MAKE) -C parser	gram.c gram.h scan.c
 	$(MAKE) -C bootstrap	bootparse.c bootscanner.c
+	$(MAKE) -C catalog	schemapg.h postgres.bki postgres.description postgres.shdescription
+	$(MAKE) -C utils	fmgrtab.c fmgroids.h 
 	$(MAKE) -C utils/misc	guc-file.c
 
 
@@ -195,7 +228,9 @@ endif
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_hba.conf.sample '$(DESTDIR)$(datadir)/pg_hba.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/utils/misc/postgresql.conf.sample '$(DESTDIR)$(datadir)/postgresql.conf.sample'
+# PGXC BEGIN
 	$(INSTALL_DATA) $(srcdir)/utils/misc/pgxc.conf.sample '$(DESTDIR)$(datadir)/pgxc.conf.sample'
+# PGXC END
 	$(INSTALL_DATA) $(srcdir)/access/transam/recovery.conf.sample '$(DESTDIR)$(datadir)/recovery.conf.sample'
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
@@ -213,19 +248,19 @@ endif
 .PHONY: install-bin
 
 installdirs:
-	$(mkinstalldirs) '$(DESTDIR)$(bindir)' '$(DESTDIR)$(datadir)'
+	$(MKDIR_P) '$(DESTDIR)$(bindir)' '$(DESTDIR)$(datadir)'
 ifeq ($(PORTNAME), cygwin)
 ifeq ($(MAKE_DLL), true)
-	$(mkinstalldirs) '$(DESTDIR)$(libdir)'
+	$(MKDIR_P) '$(DESTDIR)$(libdir)'
 endif
 endif
 ifeq ($(PORTNAME), win32)
 ifeq ($(MAKE_DLL), true)
-	$(mkinstalldirs) '$(DESTDIR)$(libdir)'
+	$(MKDIR_P) '$(DESTDIR)$(libdir)'
 endif
 endif
 ifeq ($(MAKE_EXPORTS), true)
-	$(mkinstalldirs) '$(DESTDIR)$(pkglibdir)'
+	$(MKDIR_P) '$(DESTDIR)$(pkglibdir)'
 endif
 
 
@@ -248,19 +283,22 @@ endif
 endif
 	$(MAKE) -C catalog uninstall-data
 	$(MAKE) -C tsearch uninstall-data
+# PGXC BEGIN
 	rm -f '$(DESTDIR)$(datadir)/pg_hba.conf.sample' \
 	      '$(DESTDIR)$(datadir)/pgxc.conf.sample' \
 	      '$(DESTDIR)$(datadir)/pg_ident.conf.sample' \
-	      '$(DESTDIR)$(datadir)/postgresql.conf.sample' \
+              '$(DESTDIR)$(datadir)/postgresql.conf.sample' \
 	      '$(DESTDIR)$(datadir)/recovery.conf.sample'
-
+# PGXC END
 
 ##########################################################################
 
 clean:
 	rm -f $(LOCALOBJS) postgres$(X) $(POSTGRES_IMP) \
-		$(top_srcdir)/src/include/parser/gram.h \
-		$(top_builddir)/src/include/utils/fmgroids.h
+		$(top_builddir)/src/include/parser/gram.h \
+		$(top_builddir)/src/include/catalog/schemapg.h \
+		$(top_builddir)/src/include/utils/fmgroids.h \
+		$(top_builddir)/src/include/utils/probes.h
 ifeq ($(PORTNAME), cygwin)
 	rm -f postgres.dll postgres.def libpostgres.a
 endif
@@ -272,12 +310,18 @@ distclean: clean
 	rm -f port/tas.s port/dynloader.c port/pg_sema.c port/pg_shmem.c
 
 maintainer-clean: distclean
-	rm -f $(srcdir)/bootstrap/bootparse.c \
-	      $(srcdir)/bootstrap/bootscanner.c \
-	      $(srcdir)/parser/gram.c \
-	      $(srcdir)/parser/scan.c \
-	      $(srcdir)/parser/gram.h \
-	      $(srcdir)/utils/misc/guc-file.c
+	rm -f bootstrap/bootparse.c \
+	      bootstrap/bootscanner.c \
+	      parser/gram.c \
+	      parser/scan.c \
+	      parser/gram.h \
+	      catalog/schemapg.h \
+	      catalog/postgres.bki \
+	      catalog/postgres.description \
+	      catalog/postgres.shdescription \
+	      utils/fmgroids.h \
+	      utils/fmgrtab.c \
+	      utils/misc/guc-file.c
 
 
 ##########################################################################
@@ -288,4 +332,4 @@ maintainer-clean: distclean
 # are up to date.  It saves the time of doing all the submakes.
 .PHONY: quick
 quick: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o postgres
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o postgres

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/backend/utils/mb/wstrcmp.c
  *
  *-
  * Copyright (c) 1990, 1993

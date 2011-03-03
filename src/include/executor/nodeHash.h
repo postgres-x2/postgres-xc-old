@@ -4,10 +4,10 @@
  *	  prototypes for nodeHash.c
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/executor/nodeHash.h
  *
  *-------------------------------------------------------------------------
  */
@@ -16,7 +16,6 @@
 
 #include "nodes/execnodes.h"
 
-extern int	ExecCountSlotsHash(Hash *node);
 extern HashState *ExecInitHash(Hash *node, EState *estate, int eflags);
 extern TupleTableSlot *ExecHash(HashState *node);
 extern Node *MultiExecHash(HashState *node);

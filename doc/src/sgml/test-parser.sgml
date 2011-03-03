@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/test-parser.sgml
 
 <sect1 id="test-parser">
  <title>test_parser</title>

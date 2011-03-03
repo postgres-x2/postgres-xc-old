@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------
 #
-# $PostgreSQL$
+# src/backend/utils/mb/conversion_procs/cyrillic_and_mic/Makefile
 #
 #-------------------------------------------------------------------------
 subdir = src/backend/utils/mb/conversion_procs/cyrillic_and_mic

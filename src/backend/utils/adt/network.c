@@ -1,7 +1,7 @@
 /*
  *	PostgreSQL type definitions for the INET and CIDR types.
  *
- *	$PostgreSQL$
+ *	src/backend/utils/adt/network.c
  *
  *	Jon Postel RIP 16 Oct 1998
  */

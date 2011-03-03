@@ -8,11 +8,11 @@
  * doesn't actually run the executor for them.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/utils/mmgr/portalmem.c
  *
  *-------------------------------------------------------------------------
  */
@@ -330,9 +330,9 @@ PortalReleaseCachedPlan(Portal portal)
 		portal->cplan = NULL;
 
 		/*
-		 * We must also clear portal->stmts which is now a dangling
-		 * reference to the cached plan's plan list.  This protects any
-		 * code that might try to examine the Portal later.
+		 * We must also clear portal->stmts which is now a dangling reference
+		 * to the cached plan's plan list.  This protects any code that might
+		 * try to examine the Portal later.
 		 */
 		portal->stmts = NIL;
 	}
@@ -377,6 +377,31 @@ PortalCreateHoldStore(Portal portal)
 }
 
 /*
+ * PinPortal
+ *		Protect a portal from dropping.
+ *
+ * A pinned portal is still unpinned and dropped at transaction or
+ * subtransaction abort.
+ */
+void
+PinPortal(Portal portal)
+{
+	if (portal->portalPinned)
+		elog(ERROR, "portal already pinned");
+
+	portal->portalPinned = true;
+}
+
+void
+UnpinPortal(Portal portal)
+{
+	if (!portal->portalPinned)
+		elog(ERROR, "portal not pinned");
+
+	portal->portalPinned = false;
+}
+
+/*
  * PortalDrop
  *		Destroy the portal.
  */
@@ -385,9 +410,16 @@ PortalDrop(Portal portal, bool isTopCommit)
 {
 	AssertArg(PortalIsValid(portal));
 
-	/* Not sure if this case can validly happen or not... */
-	if (portal->status == PORTAL_ACTIVE)
-		elog(ERROR, "cannot drop active portal");
+	/*
+	 * Don't allow dropping a pinned portal, it's still needed by whoever
+	 * pinned it. Not sure if the PORTAL_ACTIVE case can validly happen or
+	 * not...
+	 */
+	if (portal->portalPinned ||
+		portal->status == PORTAL_ACTIVE)
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_CURSOR_STATE),
+				 errmsg("cannot drop active portal \"%s\"", portal->name)));
 
 	/*
 	 * Remove portal from hash table.  Because we do this first, we will not
@@ -631,6 +663,13 @@ AtCommit_Portals(void)
 		}
 
 		/*
+		 * There should be no pinned portals anymore. Complain if someone
+		 * leaked one.
+		 */
+		if (portal->portalPinned)
+			elog(ERROR, "cannot commit while a portal is pinned");
+
+		/*
 		 * Do nothing to cursors held over from a previous transaction
 		 * (including holdable ones just frozen by CommitHoldablePortals).
 		 */
@@ -738,7 +777,15 @@ AtCleanup_Portals(void)
 			continue;
 		}
 
-		/* Else zap it. */
+		/*
+		 * If a portal is still pinned, forcibly unpin it. PortalDrop will not
+		 * let us drop the portal otherwise. Whoever pinned the portal was
+		 * interrupted by the abort too and won't try to use it anymore.
+		 */
+		if (portal->portalPinned)
+			portal->portalPinned = false;
+
+		/* Zap it. */
 		PortalDrop(portal, false);
 	}
 }
@@ -822,16 +869,16 @@ AtSubAbort_Portals(SubTransactionId mySubid,
 
 		/*
 		 * Any resources belonging to the portal will be released in the
-		 * upcoming transaction-wide cleanup; they will be gone before we
-		 * run PortalDrop.
+		 * upcoming transaction-wide cleanup; they will be gone before we run
+		 * PortalDrop.
 		 */
 		portal->resowner = NULL;
 
 		/*
-		 * Although we can't delete the portal data structure proper, we
-		 * can release any memory in subsidiary contexts, such as executor
-		 * state.  The cleanup hook was the last thing that might have
-		 * needed data there.
+		 * Although we can't delete the portal data structure proper, we can
+		 * release any memory in subsidiary contexts, such as executor state.
+		 * The cleanup hook was the last thing that might have needed data
+		 * there.
 		 */
 		MemoryContextDeleteChildren(PortalGetHeapMemory(portal));
 	}
@@ -857,6 +904,14 @@ AtSubCleanup_Portals(SubTransactionId mySubid)
 
 		if (portal->createSubid != mySubid)
 			continue;
+
+		/*
+		 * If a portal is still pinned, forcibly unpin it. PortalDrop will not
+		 * let us drop the portal otherwise. Whoever pinned the portal was
+		 * interrupted by the abort too and won't try to use it anymore.
+		 */
+		if (portal->portalPinned)
+			portal->portalPinned = false;
 
 		/* Zap it. */
 		PortalDrop(portal, false);

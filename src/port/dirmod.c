@@ -3,14 +3,14 @@
  * dirmod.c
  *	  directory handling functions
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *	This includes replacement versions of functions that work on
  *	Win32 (NT4 and newer).
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/port/dirmod.c
  *
  *-------------------------------------------------------------------------
  */
@@ -135,8 +135,8 @@ pgrename(const char *from, const char *to)
 		_dosmaperr(err);
 
 		/*
-		 * Modern NT-based Windows versions return ERROR_SHARING_VIOLATION
-		 * if another process has the file open without FILE_SHARE_DELETE.
+		 * Modern NT-based Windows versions return ERROR_SHARING_VIOLATION if
+		 * another process has the file open without FILE_SHARE_DELETE.
 		 * ERROR_LOCK_VIOLATION has also been seen with some anti-virus
 		 * software. This used to check for just ERROR_ACCESS_DENIED, so
 		 * presumably you can get that too with some OS versions. We don't
@@ -211,7 +211,7 @@ typedef struct
 	WORD		PrintNameOffset;
 	WORD		PrintNameLength;
 	WCHAR		PathBuffer[1];
-} REPARSE_JUNCTION_DATA_BUFFER;
+}	REPARSE_JUNCTION_DATA_BUFFER;
 
 #define REPARSE_JUNCTION_DATA_BUFFER_HEADER_SIZE   \
 		FIELD_OFFSET(REPARSE_JUNCTION_DATA_BUFFER, SubstituteNameOffset)
@@ -220,7 +220,7 @@ typedef struct
 /*
  *	pgsymlink - uses Win32 junction points
  *
- *	For reference:	http://www.codeproject.com/w2k/junctionpoints.asp
+ *	For reference:	http://www.codeproject.com/KB/winsdk/junctionpoints.aspx
  */
 int
 pgsymlink(const char *oldpath, const char *newpath)

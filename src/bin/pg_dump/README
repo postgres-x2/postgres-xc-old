@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/bin/pg_dump/README
 
 Notes on pg_dump
 ================

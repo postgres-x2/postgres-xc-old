@@ -4,11 +4,11 @@
  *	  routines for signaling the postmaster from its child processes
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/storage/ipc/pmsignal.c
  *
  *-------------------------------------------------------------------------
  */
@@ -19,6 +19,7 @@
 
 #include "miscadmin.h"
 #include "postmaster/postmaster.h"
+#include "replication/walsender.h"
 #include "storage/pmsignal.h"
 #include "storage/shmem.h"
 
@@ -45,11 +46,15 @@
  * process is actively using shared memory.  The slots are assigned to
  * child processes at random, and postmaster.c is responsible for tracking
  * which one goes with which PID.
+ *
+ * Actually there is a fourth state, WALSENDER.  This is just like ACTIVE,
+ * but carries the extra information that the child is a WAL sender.
  */
 
 #define PM_CHILD_UNUSED		0	/* these values must fit in sig_atomic_t */
 #define PM_CHILD_ASSIGNED	1
 #define PM_CHILD_ACTIVE		2
+#define PM_CHILD_WALSENDER	3
 
 /* "typedef struct PMSignalData PMSignalData" appears in pmsignal.h */
 struct PMSignalData
@@ -193,6 +198,22 @@ ReleasePostmasterChildSlot(int slot)
 }
 
 /*
+ * IsPostmasterChildWalSender - check if given slot is in use by a
+ * walsender process.
+ */
+bool
+IsPostmasterChildWalSender(int slot)
+{
+	Assert(slot > 0 && slot <= PMSignalState->num_child_flags);
+	slot--;
+
+	if (PMSignalState->PMChildFlags[slot] == PM_CHILD_WALSENDER)
+		return true;
+	else
+		return false;
+}
+
+/*
  * MarkPostmasterChildActive - mark a postmaster child as about to begin
  * actively using shared memory.  This is called in the child process.
  */
@@ -204,7 +225,8 @@ MarkPostmasterChildActive(void)
 	Assert(slot > 0 && slot <= PMSignalState->num_child_flags);
 	slot--;
 	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ASSIGNED);
-	PMSignalState->PMChildFlags[slot] = PM_CHILD_ACTIVE;
+	PMSignalState->PMChildFlags[slot] =
+		(am_walsender ? PM_CHILD_WALSENDER : PM_CHILD_ACTIVE);
 }
 
 /*
@@ -218,7 +240,8 @@ MarkPostmasterChildInactive(void)
 
 	Assert(slot > 0 && slot <= PMSignalState->num_child_flags);
 	slot--;
-	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ACTIVE);
+	Assert(PMSignalState->PMChildFlags[slot] == PM_CHILD_ACTIVE ||
+		   PMSignalState->PMChildFlags[slot] == PM_CHILD_WALSENDER);
 	PMSignalState->PMChildFlags[slot] = PM_CHILD_ASSIGNED;
 }
 

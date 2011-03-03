@@ -2,9 +2,9 @@
  *
  * PostgreSQL locale utilities
  *
- * $PostgreSQL$
+ * src/include/utils/pg_locale.h
  *
- * Copyright (c) 2002-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2002-2010, PostgreSQL Global Development Group
  *
  *-----------------------------------------------------------------------
  */

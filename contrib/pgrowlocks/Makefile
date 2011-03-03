@@ -2,7 +2,7 @@
 #
 # pgrowlocks Makefile
 #
-# $PostgreSQL$
+# contrib/pgrowlocks/Makefile
 #
 #-------------------------------------------------------------------------
 

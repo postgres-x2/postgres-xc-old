@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/backend/utils/mb/Unicode/euc_jp_to_utf8.map */
 
 static pg_local_to_utf LUmapEUC_JP[] = {
   {0x8ea1, 0xefbda1},

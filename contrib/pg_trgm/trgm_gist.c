@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/pg_trgm/trgm_gist.c
  */
 #include "trgm.h"
 

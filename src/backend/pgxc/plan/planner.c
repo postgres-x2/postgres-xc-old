@@ -4,7 +4,7 @@
  *
  *	  Functions for generating a PGXC style plan.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  *
@@ -709,7 +709,6 @@ examine_conditions_walker(Node *expr_node, XCWalkerContext *context)
 		/* Find referenced portal and figure out what was the last fetch node */
 		Portal		portal;
 		QueryDesc  *queryDesc;
-		PlanState  *state;
 		CurrentOfExpr *cexpr = (CurrentOfExpr *) expr_node;
 		char	   *cursor_name = cexpr->cursor_name;
 		char	   *node_cursor;
@@ -738,11 +737,10 @@ examine_conditions_walker(Node *expr_node, XCWalkerContext *context)
 					 errmsg("cursor \"%s\" is not positioned on a row",
 							cursor_name)));
 
-		state = ExecGetActivePlanTree(queryDesc);
-		if (IsA(state, RemoteQueryState))
+		if (IsA(queryDesc->planstate, RemoteQueryState))
 		{
-			RemoteQueryState *node = (RemoteQueryState *) state;
-			RemoteQuery *step = (RemoteQuery *) state->plan;
+			RemoteQueryState *node = (RemoteQueryState *) queryDesc->planstate;
+			RemoteQuery *step = (RemoteQuery *) queryDesc->planstate->plan;
 
 			/*
 			 *   1. step query: SELECT * FROM <table> WHERE ctid = <cur_ctid>,

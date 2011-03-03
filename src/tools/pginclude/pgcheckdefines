@@ -17,7 +17,7 @@
 # them.  We try to process all .c files, even those not intended for the
 # current platform, so there will be some phony failures.
 #
-# $PostgreSQL$
+# src/tools/pginclude/pgcheckdefines
 #
 
 use Cwd;

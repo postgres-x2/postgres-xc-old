@@ -92,11 +92,11 @@
  * heap's TOAST table will go through the normal bufmgr.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994-5, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/heap/rewriteheap.c
  *
  *-------------------------------------------------------------------------
  */
@@ -636,7 +636,7 @@ raw_heap_insert(RewriteState state, HeapTuple tup)
 	}
 
 	/* And now we can insert the tuple into the page */
-	newoff = PageAddItem(page, (Item) heaptup->t_data, len,
+	newoff = PageAddItem(page, (Item) heaptup->t_data, heaptup->t_len,
 						 InvalidOffsetNumber, false, true);
 	if (newoff == InvalidOffsetNumber)
 		elog(ERROR, "failed to add tuple");

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/pageinspect/btreefuncs.c
  *
  *
  * btreefuncs.c

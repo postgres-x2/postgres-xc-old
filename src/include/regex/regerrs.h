@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/regex/regerrs.h
  */
 
 {

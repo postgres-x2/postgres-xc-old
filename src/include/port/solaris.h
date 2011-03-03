@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/include/port/solaris.h
 
 /*
  * Sort this out for all operating systems some time.  The __xxx

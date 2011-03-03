@@ -4,12 +4,12 @@
  *	  lexical token lookup for key words in PostgreSQL
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/bin/pg_dump/keywords.c
  *
  *-------------------------------------------------------------------------
  */
@@ -27,5 +27,4 @@ const ScanKeyword ScanKeywords[] = {
 #include "parser/kwlist.h"
 };
 
-/* End of ScanKeywords, for use in kwlookup.c */
-const ScanKeyword *LastScanKeyword = endof(ScanKeywords);
+const int	NumScanKeywords = lengthof(ScanKeywords);

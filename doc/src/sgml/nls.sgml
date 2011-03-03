@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/nls.sgml
 
 <chapter id="nls">
  <chapterinfo>
@@ -46,7 +46,7 @@
     <filename>msgmerge</filename>, respectively, in a GNU-compatible
     implementation.  Later, we will try to arrange it so that if you
     use a packaged source distribution, you won't need
-    <filename>xgettext</filename>.  (If working from CVS, you will still need
+    <filename>xgettext</filename>.  (If working from Git, you will still need
     it.)  <application>GNU Gettext 0.10.36</application> or later is currently recommended.
    </para>
 
@@ -153,14 +153,14 @@ msgstr "another translated"
     someone has already done some translation work.  The files are
     named <filename><replaceable>language</replaceable>.po</filename>,
     where <replaceable>language</replaceable> is the
-    <ulink url="http://lcweb.loc.gov/standards/iso639-2/englangn.html">
+    <ulink url="http://www.loc.gov/standards/iso639-2/php/English_list.php">
     ISO 639-1 two-letter language code (in lower case)</ulink>, e.g.,
     <filename>fr.po</filename> for French.  If there is really a need
     for more than one translation effort per language then the files
     can also be named
     <filename><replaceable>language</replaceable>_<replaceable>region</replaceable>.po</filename>
     where <replaceable>region</replaceable> is the
-    <ulink url="http://www.din.de/gremien/nas/nabd/iso3166ma/codlstp1/en_listp1.html">
+    <ulink url="http://www.iso.org/iso/english_country_names_and_code_elements">
     ISO 3166-1 two-letter country code (in upper case)</ulink>,
     e.g.,
     <filename>pt_BR.po</filename> for Portuguese in Brazil.  If you

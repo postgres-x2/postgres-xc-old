@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/pgtypes_error.h */
 
 #define PGTYPES_NUM_OVERFLOW		301
 #define PGTYPES_NUM_BAD_NUMERIC		302

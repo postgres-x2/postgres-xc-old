@@ -7,9 +7,9 @@
  * with some sort of sed hackery, but no time for that now.  It's likely
  * that an exact mapping will not be what's wanted anyhow ...
  *
- * Copyright (c) 2003-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2003-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/pl/plpgsql/src/plerrcodes.h
  *
  *-------------------------------------------------------------------------
  */
@@ -304,6 +304,10 @@
 },
 
 {
+	"exclusion_violation", ERRCODE_EXCLUSION_VIOLATION
+},
+
+{
 	"invalid_cursor_state", ERRCODE_INVALID_CURSOR_STATE
 },
 
@@ -361,6 +365,10 @@
 
 {
 	"invalid_authorization_specification", ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION
+},
+
+{
+	"invalid_password", ERRCODE_INVALID_PASSWORD
 },
 
 {

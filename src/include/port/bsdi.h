@@ -1,3 +1,3 @@
 /*
- * $PostgreSQL$
+ * src/include/port/bsdi.h
  */

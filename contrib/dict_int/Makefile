@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/dict_int/Makefile
 
 MODULE_big = dict_int
 OBJS = dict_int.o

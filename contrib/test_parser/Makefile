@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/test_parser/Makefile
 
 MODULE_big = test_parser
 OBJS = test_parser.o

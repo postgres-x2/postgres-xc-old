@@ -3,18 +3,18 @@
  * strlcpy.c
  *	  strncpy done right
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/port/strlcpy.c
  *
  * This file was taken from OpenBSD and is used on platforms that don't
  * provide strlcpy().  The OpenBSD copyright terms follow.
  *-------------------------------------------------------------------------
  */
 
-/*	$OpenBSD$	*/
+/*	$OpenBSD: strlcpy.c,v 1.11 2006/05/05 15:27:38 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>

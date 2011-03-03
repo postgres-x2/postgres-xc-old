@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/sslinfo/Makefile
 
 MODULE_big = sslinfo
 OBJS = sslinfo.o

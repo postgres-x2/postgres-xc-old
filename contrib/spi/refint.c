@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/spi/refint.c
  *
  *
  * refint.c --	set of functions to define referential integrity

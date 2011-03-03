@@ -2,7 +2,7 @@
  *	Definitions for pg_backup_db.c
  *
  *	IDENTIFICATION
- *		$PostgreSQL$
+ *		src/bin/pg_dump/pg_backup_db.h
  */
 
 #ifndef PG_BACKUP_DB_H

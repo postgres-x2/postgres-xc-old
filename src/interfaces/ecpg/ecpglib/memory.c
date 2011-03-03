@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/ecpglib/memory.c */
 
 #define POSTGRES_ECPG_INTERNAL
 #include "postgres_fe.h"

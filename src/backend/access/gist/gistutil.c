@@ -4,11 +4,11 @@
  *	  utilities routines for the postgres GiST index access method.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *			$PostgreSQL$
+ *			src/backend/access/gist/gistutil.c
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
@@ -676,4 +676,25 @@ gistoptions(PG_FUNCTION_ARGS)
 	if (result)
 		PG_RETURN_BYTEA_P(result);
 	PG_RETURN_NULL();
+}
+
+/*
+ * Temporary GiST indexes are not WAL-logged, but we need LSNs to detect
+ * concurrent page splits anyway. GetXLogRecPtrForTemp() provides a fake
+ * sequence of LSNs for that purpose. Each call generates an LSN that is
+ * greater than any previous value returned by this function in the same
+ * session.
+ */
+XLogRecPtr
+GetXLogRecPtrForTemp(void)
+{
+	static XLogRecPtr counter = {0, 1};
+
+	counter.xrecoff++;
+	if (counter.xrecoff == 0)
+	{
+		counter.xlogid++;
+		counter.xrecoff++;
+	}
+	return counter;
 }

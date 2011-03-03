@@ -10,10 +10,10 @@
  *	  Over time, this has also become the preferred place for widely known
  *	  resource-limitation stuff, such as work_mem and check_stack_depth().
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/miscadmin.h
  *
  * NOTES
  *	  some of the information in this file should be moved to other files.
@@ -236,6 +236,13 @@ extern bool VacuumCostActive;
 /* in tcop/postgres.c */
 extern void check_stack_depth(void);
 
+/* in tcop/utility.c */
+extern void PreventCommandIfReadOnly(const char *cmdname);
+extern void PreventCommandDuringRecovery(const char *cmdname);
+
+/* in utils/misc/guc.c */
+extern int	trace_recovery_messages;
+extern int	trace_recovery(int trace_level);
 
 /*****************************************************************************
  *	  pdir.h --																 *
@@ -330,8 +337,9 @@ extern ProcessingMode Mode;
  *****************************************************************************/
 
 /* in utils/init/postinit.c */
-extern bool InitPostgres(const char *in_dbname, Oid dboid, const char *username,
-			 char **out_dbname);
+extern void pg_split_opts(char **argv, int *argcp, char *optstr);
+extern void InitPostgres(const char *in_dbname, Oid dboid, const char *username,
+			 char *out_dbname);
 extern void BaseInit(void);
 
 /* in utils/init/miscinit.c */
@@ -340,10 +348,6 @@ extern PGDLLIMPORT bool process_shared_preload_libraries_in_progress;
 extern char *shared_preload_libraries_string;
 extern char *local_preload_libraries_string;
 
-extern void SetReindexProcessing(Oid heapOid, Oid indexOid);
-extern void ResetReindexProcessing(void);
-extern bool ReindexIsProcessingHeap(Oid heapOid);
-extern bool ReindexIsProcessingIndex(Oid indexOid);
 extern void CreateDataDirLockFile(bool amPostmaster);
 extern void CreateSocketLockFile(const char *socketfile, bool amPostmaster);
 extern void TouchSocketLockFile(void);

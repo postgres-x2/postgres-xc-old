@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/tutorial/funcs.c
 
 /******************************************************************************
   These are user-defined functions that can be bound to a Postgres backend

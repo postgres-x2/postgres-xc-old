@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/tsearch2/Makefile
 
 MODULES = tsearch2
 DATA_built = tsearch2.sql

@@ -6,11 +6,11 @@
  * These routines represent a fairly thin layer on top of SysV shared
  * memory functionality.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/port/sysv_shmem.c
  *
  *-------------------------------------------------------------------------
  */
@@ -93,7 +93,55 @@ InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
 			return NULL;
 
 		/*
-		 * Else complain and abort
+		 * Some BSD-derived kernels are known to return EINVAL, not EEXIST, if
+		 * there is an existing segment but it's smaller than "size" (this is
+		 * a result of poorly-thought-out ordering of error tests). To
+		 * distinguish between collision and invalid size in such cases, we
+		 * make a second try with size = 0.  These kernels do not test size
+		 * against SHMMIN in the preexisting-segment case, so we will not get
+		 * EINVAL a second time if there is such a segment.
+		 */
+		if (errno == EINVAL)
+		{
+			int			save_errno = errno;
+
+			shmid = shmget(memKey, 0, IPC_CREAT | IPC_EXCL | IPCProtection);
+
+			if (shmid < 0)
+			{
+				/* As above, fail quietly if we verify a collision */
+				if (errno == EEXIST || errno == EACCES
+#ifdef EIDRM
+					|| errno == EIDRM
+#endif
+					)
+					return NULL;
+				/* Otherwise, fall through to report the original error */
+			}
+			else
+			{
+				/*
+				 * On most platforms we cannot get here because SHMMIN is
+				 * greater than zero.  However, if we do succeed in creating a
+				 * zero-size segment, free it and then fall through to report
+				 * the original error.
+				 */
+				if (shmctl(shmid, IPC_RMID, NULL) < 0)
+					elog(LOG, "shmctl(%d, %d, 0) failed: %m",
+						 (int) shmid, IPC_RMID);
+			}
+
+			errno = save_errno;
+		}
+
+		/*
+		 * Else complain and abort.
+		 *
+		 * Note: at this point EINVAL should mean that either SHMMIN or SHMMAX
+		 * is violated.  SHMALL violation might be reported as either ENOMEM
+		 * (BSDen) or ENOSPC (Linux); the Single Unix Spec fails to say which
+		 * it should be.  SHMMNI violation is ENOSPC, per spec.  Just plain
+		 * not-enough-RAM is ENOMEM.
 		 */
 		ereport(FATAL,
 				(errmsg("could not create shared memory segment: %m"),
@@ -115,7 +163,9 @@ InternalIpcMemoryCreate(IpcMemoryKey memKey, Size size)
 						 (unsigned long) size, NBuffers, MaxBackends) : 0,
 				 (errno == ENOMEM) ?
 				 errhint("This error usually means that PostgreSQL's request for a shared "
-				   "memory segment exceeded available memory or swap space. "
+				   "memory segment exceeded available memory or swap space, "
+						 "or exceeded your kernel's SHMALL parameter.  You can either "
+						 "reduce the request size or reconfigure the kernel with larger SHMALL.  "
 				  "To reduce the request size (currently %lu bytes), reduce "
 			   "PostgreSQL's shared_buffers parameter (currently %d) and/or "
 						 "its max_connections parameter (currently %d).\n"

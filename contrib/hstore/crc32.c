@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/hstore/crc32.c
  *
  * Both POSIX and CRC32 checksums */
 

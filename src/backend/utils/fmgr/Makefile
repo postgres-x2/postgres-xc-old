@@ -4,7 +4,7 @@
 #    Makefile for utils/fmgr
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/fmgr/Makefile
 #
 #-------------------------------------------------------------------------
 

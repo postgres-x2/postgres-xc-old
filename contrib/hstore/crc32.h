@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/hstore/crc32.h
  */
 #ifndef _CRC32_H
 #define _CRC32_H

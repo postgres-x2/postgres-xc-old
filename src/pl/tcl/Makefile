@@ -2,7 +2,7 @@
 #
 # Makefile for the pltcl shared object
 #
-# $PostgreSQL$
+# src/pl/tcl/Makefile
 #
 #-------------------------------------------------------------------------
 

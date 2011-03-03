@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/test/regress/regress.c
  */
 
 #include "postgres.h"

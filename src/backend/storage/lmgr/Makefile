@@ -4,7 +4,7 @@
 #    Makefile for storage/lmgr
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/storage/lmgr/Makefile
 #
 #-------------------------------------------------------------------------
 

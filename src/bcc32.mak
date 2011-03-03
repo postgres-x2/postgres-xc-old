@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/bcc32.mak
 
 # Makefile for Borland C++ 5.5 (or compat)
 # Top-file makefile for building Win32 libpq with Borland C++.

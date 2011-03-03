@@ -4,12 +4,12 @@
  *		Functions for finding and validating executable files
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/port/exec.c
  *
  *-------------------------------------------------------------------------
  */
@@ -20,24 +20,10 @@
 #include "postgres_fe.h"
 #endif
 
-#include <grp.h>
-#include <pwd.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-#ifndef S_IRUSR					/* XXX [TRH] should be in a header */
-#define S_IRUSR		 S_IREAD
-#define S_IWUSR		 S_IWRITE
-#define S_IXUSR		 S_IEXEC
-#define S_IRGRP		 ((S_IRUSR)>>3)
-#define S_IWGRP		 ((S_IWUSR)>>3)
-#define S_IXGRP		 ((S_IXUSR)>>3)
-#define S_IROTH		 ((S_IRUSR)>>6)
-#define S_IWOTH		 ((S_IWUSR)>>6)
-#define S_IXOTH		 ((S_IXUSR)>>6)
-#endif
 
 #ifndef FRONTEND
 /* We use only 3-parameter elog calls in this file, for simplicity */
@@ -56,7 +42,7 @@ static int	resolve_symlinks(char *path);
 static char *pipe_read_line(char *cmd, char *line, int maxsize);
 
 #ifdef WIN32
-static BOOL GetUserSid(PSID *ppSidUser, HANDLE hToken);
+static BOOL GetTokenUser(HANDLE hToken, PTOKEN_USER *ppTokenUser);
 #endif
 
 /*
@@ -70,20 +56,12 @@ static int
 validate_exec(const char *path)
 {
 	struct stat buf;
-
-#ifndef WIN32
-	uid_t		euid;
-	struct group *gp;
-	struct passwd *pwp;
-	int			i;
-	int			in_grp = 0;
-#else
-	char		path_exe[MAXPGPATH + sizeof(".exe") - 1];
-#endif
 	int			is_r;
 	int			is_x;
 
 #ifdef WIN32
+	char		path_exe[MAXPGPATH + sizeof(".exe") - 1];
+
 	/* Win32 requires a .exe suffix for stat() */
 	if (strlen(path) >= strlen(".exe") &&
 		pg_strcasecmp(path + strlen(path) - strlen(".exe"), ".exe") != 0)
@@ -107,61 +85,17 @@ validate_exec(const char *path)
 		return -1;
 
 	/*
-	 * Ensure that we are using an authorized executable.
-	 */
-
-	/*
 	 * Ensure that the file is both executable and readable (required for
 	 * dynamic loading).
 	 */
-#ifdef WIN32
+#ifndef WIN32
+	is_r = (access(path, R_OK) == 0);
+	is_x = (access(path, X_OK) == 0);
+#else
 	is_r = buf.st_mode & S_IRUSR;
 	is_x = buf.st_mode & S_IXUSR;
-	return is_x ? (is_r ? 0 : -2) : -1;
-#else
-	euid = geteuid();
-
-	/* If owned by us, just check owner bits */
-	if (euid == buf.st_uid)
-	{
-		is_r = buf.st_mode & S_IRUSR;
-		is_x = buf.st_mode & S_IXUSR;
-		return is_x ? (is_r ? 0 : -2) : -1;
-	}
-
-	/* OK, check group bits */
-
-	pwp = getpwuid(euid);		/* not thread-safe */
-	if (pwp)
-	{
-		if (pwp->pw_gid == buf.st_gid)	/* my primary group? */
-			++in_grp;
-		else if (pwp->pw_name &&
-				 (gp = getgrgid(buf.st_gid)) != NULL && /* not thread-safe */
-				 gp->gr_mem != NULL)
-		{						/* try list of member groups */
-			for (i = 0; gp->gr_mem[i]; ++i)
-			{
-				if (!strcmp(gp->gr_mem[i], pwp->pw_name))
-				{
-					++in_grp;
-					break;
-				}
-			}
-		}
-		if (in_grp)
-		{
-			is_r = buf.st_mode & S_IRGRP;
-			is_x = buf.st_mode & S_IXGRP;
-			return is_x ? (is_r ? 0 : -2) : -1;
-		}
-	}
-
-	/* Check "other" bits */
-	is_r = buf.st_mode & S_IROTH;
-	is_x = buf.st_mode & S_IXOTH;
-	return is_x ? (is_r ? 0 : -2) : -1;
 #endif
+	return is_x ? (is_r ? 0 : -2) : -1;
 }
 
 
@@ -178,10 +112,6 @@ validate_exec(const char *path)
  * path because we will later change working directory.  Finally, we want
  * a true path not a symlink location, so that we can locate other files
  * that are part of our installation relative to the executable.
- *
- * This function is not thread-safe because it calls validate_exec(),
- * which calls getgrgid().	This function should be used only in
- * non-threaded binaries, not in library routines.
  */
 int
 find_my_exec(const char *argv0, char *retpath)
@@ -695,7 +625,7 @@ AddUserToTokenDacl(HANDLE hToken)
 	DWORD		dwSize = 0;
 	DWORD		dwTokenInfoLength = 0;
 	PACL		pacl = NULL;
-	PSID		psidUser = NULL;
+	PTOKEN_USER pTokenUser = NULL;
 	TOKEN_DEFAULT_DACL tddNew;
 	TOKEN_DEFAULT_DACL *ptdd = NULL;
 	TOKEN_INFORMATION_CLASS tic = TokenDefaultDacl;
@@ -735,15 +665,19 @@ AddUserToTokenDacl(HANDLE hToken)
 		goto cleanup;
 	}
 
-	/* Get the SID for the current user. We need to add this to the ACL. */
-	if (!GetUserSid(&psidUser, hToken))
+	/*
+	 * Get the user token for the current user, which provides us with the SID
+	 * that is needed for creating the ACL.
+	 */
+	if (!GetTokenUser(hToken, &pTokenUser))
 	{
-		log_error("could not get user SID: %lu", GetLastError());
+		log_error("could not get user token: %lu", GetLastError());
 		goto cleanup;
 	}
 
 	/* Figure out the size of the new ACL */
-	dwNewAclSize = asi.AclBytesInUse + sizeof(ACCESS_ALLOWED_ACE) + GetLengthSid(psidUser) -sizeof(DWORD);
+	dwNewAclSize = asi.AclBytesInUse + sizeof(ACCESS_ALLOWED_ACE) +
+		GetLengthSid(pTokenUser->User.Sid) -sizeof(DWORD);
 
 	/* Allocate the ACL buffer & initialize it */
 	pacl = (PACL) LocalAlloc(LPTR, dwNewAclSize);
@@ -776,7 +710,7 @@ AddUserToTokenDacl(HANDLE hToken)
 	}
 
 	/* Add the new ACE for the current user */
-	if (!AddAccessAllowedAceEx(pacl, ACL_REVISION, OBJECT_INHERIT_ACE, GENERIC_ALL, psidUser))
+	if (!AddAccessAllowedAceEx(pacl, ACL_REVISION, OBJECT_INHERIT_ACE, GENERIC_ALL, pTokenUser->User.Sid))
 	{
 		log_error("could not add access allowed ACE: %lu", GetLastError());
 		goto cleanup;
@@ -794,8 +728,8 @@ AddUserToTokenDacl(HANDLE hToken)
 	ret = TRUE;
 
 cleanup:
-	if (psidUser)
-		FreeSid(psidUser);
+	if (pTokenUser)
+		LocalFree((HLOCAL) pTokenUser);
 
 	if (pacl)
 		LocalFree((HLOCAL) pacl);
@@ -807,28 +741,31 @@ cleanup:
 }
 
 /*
- * GetUserSid*PSID *ppSidUser, HANDLE hToken)
+ * GetTokenUser(HANDLE hToken, PTOKEN_USER *ppTokenUser)
  *
- * Get the SID for the current user
+ * Get the users token information from a process token.
+ *
+ * The caller of this function is responsible for calling LocalFree() on the
+ * returned TOKEN_USER memory.
  */
 static BOOL
-GetUserSid(PSID *ppSidUser, HANDLE hToken)
+GetTokenUser(HANDLE hToken, PTOKEN_USER *ppTokenUser)
 {
 	DWORD		dwLength;
-	PTOKEN_USER pTokenUser = NULL;
 
+	*ppTokenUser = NULL;
 
 	if (!GetTokenInformation(hToken,
 							 TokenUser,
-							 pTokenUser,
+							 NULL,
 							 0,
 							 &dwLength))
 	{
 		if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
 		{
-			pTokenUser = (PTOKEN_USER) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwLength);
+			*ppTokenUser = (PTOKEN_USER) LocalAlloc(LPTR, dwLength);
 
-			if (pTokenUser == NULL)
+			if (*ppTokenUser == NULL)
 			{
 				log_error("could not allocate %lu bytes of memory", dwLength);
 				return FALSE;
@@ -843,18 +780,18 @@ GetUserSid(PSID *ppSidUser, HANDLE hToken)
 
 	if (!GetTokenInformation(hToken,
 							 TokenUser,
-							 pTokenUser,
+							 *ppTokenUser,
 							 dwLength,
 							 &dwLength))
 	{
-		HeapFree(GetProcessHeap(), 0, pTokenUser);
-		pTokenUser = NULL;
+		LocalFree(*ppTokenUser);
+		*ppTokenUser = NULL;
 
 		log_error("could not get token information: %lu", GetLastError());
 		return FALSE;
 	}
 
-	*ppSidUser = pTokenUser->User.Sid;
+	/* Memory in *ppTokenUser is LocalFree():d by the caller */
 	return TRUE;
 }
 

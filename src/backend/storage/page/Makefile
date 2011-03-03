@@ -4,7 +4,7 @@
 #    Makefile for storage/page
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/storage/page/Makefile
 #
 #-------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/make_mkid
 
 mkid `find \`pwd\`/ \( -name _deadcode -a -prune \) -o \
 	-type f -name '*.[chyl]' -print|sed 's;//;/;g'`

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/pgtypeslib/interval.c */
 
 #include "postgres_fe.h"
 #include <time.h>
@@ -606,7 +606,7 @@ DecodeInterval(char **field, int *ftype, int nf,		/* int range, */
 						break;
 
 					case RESERV:
-						tmask = (DTK_DATE_M || DTK_TIME_M);
+						tmask = (DTK_DATE_M | DTK_TIME_M);
 						*dtype = val;
 						break;
 
@@ -918,7 +918,7 @@ EncodeInterval(struct /* pg_ */ tm * tm, fsec_t fsec, int style, char *str)
 				AppendSeconds(cp, sec, fsec, MAX_INTERVAL_PRECISION, false);
 				cp += strlen(cp);
 				*cp++ = 'S';
-				*cp++ = '\0';
+				*cp = '\0';
 			}
 			break;
 

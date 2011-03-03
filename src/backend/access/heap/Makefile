@@ -4,7 +4,7 @@
 #    Makefile for access/heap
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/access/heap/Makefile
 #
 #-------------------------------------------------------------------------
 

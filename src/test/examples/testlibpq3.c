@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/test/examples/testlibpq3.c
  *
  *
  * testlibpq3.c
@@ -25,8 +25,14 @@
  *	t = (8 bytes) 'ho there'
  *	b = (5 bytes) \004\003\002\001\000
  */
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include "libpq-fe.h"

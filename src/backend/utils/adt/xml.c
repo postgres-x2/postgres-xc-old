@@ -4,10 +4,10 @@
  *	  XML data type support.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/backend/utils/adt/xml.c
  *
  *-------------------------------------------------------------------------
  */
@@ -846,7 +846,7 @@ xml_is_document(xmltype *arg)
  * pg_xml_init --- set up for use of libxml
  *
  * This should be called by each function that is about to use libxml
- * facilities.  It has two responsibilities: verify compatibility with the
+ * facilities.	It has two responsibilities: verify compatibility with the
  * loaded libxml version (done on first call in a session) and establish
  * or re-establish our libxml error handler.  The latter needs to be done
  * anytime we might have passed control to add-on modules (eg libperl) which
@@ -1121,7 +1121,7 @@ static bool
 print_xml_decl(StringInfo buf, const xmlChar *version,
 			   pg_enc encoding, int standalone)
 {
-	pg_xml_init();					/* why is this here? */
+	pg_xml_init();				/* why is this here? */
 
 	if ((version && strcmp((char *) version, PG_XML_DEFAULT_VERSION) != 0)
 		|| (encoding && encoding != PG_UTF8)
@@ -1338,8 +1338,8 @@ xml_ereport(int level, int sqlcode, const char *msg)
 	/*
 	 * It might seem that we should just pass xml_err_buf->data directly to
 	 * errdetail.  However, we want to clean out xml_err_buf before throwing
-	 * error, in case there is another function using libxml further down
-	 * the call stack.
+	 * error, in case there is another function using libxml further down the
+	 * call stack.
 	 */
 	if (xml_err_buf->len > 0)
 	{
@@ -1617,8 +1617,6 @@ map_xml_name_to_sql_identifier(char *name)
 char *
 map_sql_value_to_xml_value(Datum value, Oid type, bool xml_escape_strings)
 {
-	StringInfoData buf;
-
 	if (type_is_array(type))
 	{
 		ArrayType  *array;
@@ -1629,6 +1627,7 @@ map_sql_value_to_xml_value(Datum value, Oid type, bool xml_escape_strings)
 		int			num_elems;
 		Datum	   *elem_values;
 		bool	   *elem_nulls;
+		StringInfoData buf;
 		int			i;
 
 		array = DatumGetArrayTypeP(value);
@@ -1662,8 +1661,7 @@ map_sql_value_to_xml_value(Datum value, Oid type, bool xml_escape_strings)
 	{
 		Oid			typeOut;
 		bool		isvarlena;
-		char	   *p,
-				   *str;
+		char	   *str;
 
 		/*
 		 * Special XSD formatting for some data types
@@ -1812,32 +1810,47 @@ map_sql_value_to_xml_value(Datum value, Oid type, bool xml_escape_strings)
 			return str;
 
 		/* otherwise, translate special characters as needed */
-		initStringInfo(&buf);
-
-		for (p = str; *p; p++)
-		{
-			switch (*p)
-			{
-				case '&':
-					appendStringInfoString(&buf, "&amp;");
-					break;
-				case '<':
-					appendStringInfoString(&buf, "&lt;");
-					break;
-				case '>':
-					appendStringInfoString(&buf, "&gt;");
-					break;
-				case '\r':
-					appendStringInfoString(&buf, "&#x0d;");
-					break;
-				default:
-					appendStringInfoCharMacro(&buf, *p);
-					break;
-			}
-		}
-
-		return buf.data;
+		return escape_xml(str);
 	}
+}
+
+
+/*
+ * Escape characters in text that have special meanings in XML.
+ *
+ * Returns a palloc'd string.
+ *
+ * NB: this is intentionally not dependent on libxml.
+ */
+char *
+escape_xml(const char *str)
+{
+	StringInfoData buf;
+	const char *p;
+
+	initStringInfo(&buf);
+	for (p = str; *p; p++)
+	{
+		switch (*p)
+		{
+			case '&':
+				appendStringInfoString(&buf, "&amp;");
+				break;
+			case '<':
+				appendStringInfoString(&buf, "&lt;");
+				break;
+			case '>':
+				appendStringInfoString(&buf, "&gt;");
+				break;
+			case '\r':
+				appendStringInfoString(&buf, "&#x0d;");
+				break;
+			default:
+				appendStringInfoCharMacro(&buf, *p);
+				break;
+		}
+	}
+	return buf.data;
 }
 
 
@@ -2616,9 +2629,7 @@ map_sql_table_to_xmlschema(TupleDesc tupdesc, Oid relid, bool nulls,
 		HeapTuple	tuple;
 		Form_pg_class reltuple;
 
-		tuple = SearchSysCache(RELOID,
-							   ObjectIdGetDatum(relid),
-							   0, 0, 0);
+		tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
 		if (!HeapTupleIsValid(tuple))
 			elog(ERROR, "cache lookup failed for relation %u", relid);
 		reltuple = (Form_pg_class) GETSTRUCT(tuple);
@@ -2916,9 +2927,7 @@ map_sql_type_to_xml_name(Oid typeoid, int typmod)
 				HeapTuple	tuple;
 				Form_pg_type typtuple;
 
-				tuple = SearchSysCache(TYPEOID,
-									   ObjectIdGetDatum(typeoid),
-									   0, 0, 0);
+				tuple = SearchSysCache1(TYPEOID, ObjectIdGetDatum(typeoid));
 				if (!HeapTupleIsValid(tuple))
 					elog(ERROR, "cache lookup failed for type %u", typeoid);
 				typtuple = (Form_pg_type) GETSTRUCT(tuple);

@@ -2,7 +2,7 @@
 #
 # pageinspect Makefile
 #
-# $PostgreSQL$
+# contrib/pageinspect/Makefile
 #
 #-------------------------------------------------------------------------
 

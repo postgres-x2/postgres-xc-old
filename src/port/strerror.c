@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/port/strerror.c
 
 /*
  * strerror - map error number to descriptive string

@@ -211,7 +211,7 @@ create trigger tg_pfield_ad after delete
 create function tg_pslot_biu() returns trigger as $proc$
 declare
     pfrec	record;
-    rename new to ps;
+    ps          alias for new;
 begin
     select into pfrec * from PField where name = ps.pfname;
     if not found then
@@ -347,11 +347,9 @@ begin
     if new.slotno < 1 or new.slotno > hubrec.nslots then
         raise exception ''no manual manipulation of HSlot'';
     end if;
-    if tg_op = ''UPDATE'' then
-	if new.hubname != old.hubname then
-	    if count(*) > 0 from Hub where name = old.hubname then
-		raise exception ''no manual manipulation of HSlot'';
-	    end if;
+    if tg_op = ''UPDATE'' and new.hubname != old.hubname then
+	if count(*) > 0 from Hub where name = old.hubname then
+	    raise exception ''no manual manipulation of HSlot'';
 	end if;
     end if;
     sname := ''HS.'' || trim(new.hubname);
@@ -1028,7 +1026,7 @@ begin
         declare
 	    rec		record;
 	begin
-	    select into rec * from PLine where slotname = outer.rec.backlink;
+	    select into rec * from PLine where slotname = "outer".rec.backlink;
 	    retval := ''Phone line '' || trim(rec.phonenumber);
 	    if rec.comment != '''' then
 	        retval := retval || '' ('';
@@ -2513,6 +2511,24 @@ select * from sc_test() order by 1;
 
 create or replace function sc_test() returns setof integer as $$
 declare
+  c refcursor;
+  x integer;
+begin
+  open c scroll for execute 'select f1 from int4_tbl';
+  fetch last from c into x;
+  while found loop
+    return next x;
+    move backward 2 from c;
+    fetch relative -1 from c into x;
+  end loop;
+  close c;
+end;
+$$ language plpgsql;
+
+select * from sc_test();
+
+create or replace function sc_test() returns setof integer as $$
+declare
   c cursor for select * from generate_series(1, 10);
   x integer;
 begin
@@ -2532,6 +2548,23 @@ end;
 $$ language plpgsql;
 
 select * from sc_test() order by 1;
+
+create or replace function sc_test() returns setof integer as $$
+declare
+  c cursor for select * from generate_series(1, 10);
+  x integer;
+begin
+  open c;
+  move forward all in c;
+  fetch backward from c into x;
+  if found then
+    return next x;
+  end if;
+  close c;
+end;
+$$ language plpgsql;
+
+select * from sc_test();
 
 drop function sc_test();
 
@@ -2596,6 +2629,28 @@ $$ language plpgsql;
 
 select exc_using(5, 'foobar');
 
+drop function exc_using(int, text);
+
+create or replace function exc_using(int) returns void as $$
+declare 
+  c refcursor;
+  i int;
+begin
+  open c for execute 'select * from generate_series(1,$1)' using $1+1;
+  loop
+    fetch c into i;
+    exit when not found;
+    raise notice '%', i;
+  end loop;
+  close c;
+  return;  
+end;
+$$ language plpgsql;
+
+select exc_using(5);
+
+drop function exc_using(int);
+
 -- test FOR-over-cursor
 
 create or replace function forc01() returns void as $$
@@ -2656,6 +2711,26 @@ select forc01();
 
 select * from forc_test order by 1, 2;
 
+-- same, with a cursor whose portal name doesn't match variable name
+create or replace function forc01() returns void as $$
+declare
+  c refcursor := 'fooled_ya';
+  r record;
+begin
+  open c for select * from forc_test;
+  loop
+    fetch c into r;
+    exit when not found;
+    raise notice '%, %', r.i, r.j;
+    update forc_test set i = i * 100, j = r.j * 2 where current of c;
+  end loop;
+end;
+$$ language plpgsql;
+
+select forc01();
+
+select * from forc_test;
+
 drop function forc01();
 
 -- fail because cursor has no query bound to it
@@ -2683,6 +2758,36 @@ $$ language plpgsql;
 select * from return_dquery() order by 1;
 
 drop function return_dquery();
+
+-- test RETURN QUERY with dropped columns
+
+create table tabwithcols(a int, b int, c int, d int);
+insert into tabwithcols values(10,20,30,40),(50,60,70,80);
+
+create or replace function returnqueryf()
+returns setof tabwithcols as $$
+begin
+  return query select * from tabwithcols;
+  return query execute 'select * from tabwithcols';
+end;
+$$ language plpgsql;
+
+select * from returnqueryf();
+
+alter table tabwithcols drop column b;
+
+select * from returnqueryf();
+
+alter table tabwithcols drop column d;
+
+select * from returnqueryf();
+
+alter table tabwithcols add column d int;
+
+select * from returnqueryf();
+
+drop function returnqueryf();
+drop table tabwithcols;
 
 -- Tests for 8.4's new RAISE features
 
@@ -2806,6 +2911,20 @@ select raise_test();
 create or replace function raise_test() returns void as $$
 begin
   raise;
+end;
+$$ language plpgsql;
+
+select raise_test();
+
+-- check cases where implicit SQLSTATE variable could be confused with
+-- SQLSTATE as a keyword, cf bug #5524
+create or replace function raise_test() returns void as $$
+begin
+  perform 1/0;
+exception
+  when sqlstate '22012' then
+    raise notice using message = sqlstate;
+    raise sqlstate '22012' using message = 'substitute message';
 end;
 $$ language plpgsql;
 
@@ -3006,6 +3125,88 @@ SELECT * FROM leaker_1(true);
 DROP FUNCTION leaker_1(bool);
 DROP FUNCTION leaker_2(bool);
 
+-- Test for appropriate cleanup of non-simple expression evaluations
+-- (bug in all versions prior to August 2010)
+
+CREATE FUNCTION nonsimple_expr_test() RETURNS text[] AS $$
+DECLARE
+  arr text[];
+  lr text;
+  i integer;
+BEGIN
+  arr := array[array['foo','bar'], array['baz', 'quux']];
+  lr := 'fool';
+  i := 1;
+  -- use sub-SELECTs to make expressions non-simple
+  arr[(SELECT i)][(SELECT i+1)] := (SELECT lr);
+  RETURN arr;
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT nonsimple_expr_test();
+
+DROP FUNCTION nonsimple_expr_test();
+
+CREATE FUNCTION nonsimple_expr_test() RETURNS integer AS $$
+declare
+   i integer NOT NULL := 0;
+begin
+  begin
+    i := (SELECT NULL::integer);  -- should throw error
+  exception
+    WHEN OTHERS THEN
+      i := (SELECT 1::integer);
+  end;
+  return i;
+end;
+$$ LANGUAGE plpgsql;
+
+SELECT nonsimple_expr_test();
+
+DROP FUNCTION nonsimple_expr_test();
+
+--
+-- Test cases involving recursion and error recovery in simple expressions
+-- (bugs in all versions before October 2010).  The problems are most
+-- easily exposed by mutual recursion between plpgsql and sql functions.
+--
+
+create function recurse(float8) returns float8 as
+$$
+begin
+  if ($1 > 0) then
+    return sql_recurse($1 - 1);
+  else
+    return $1;
+  end if;
+end;
+$$ language plpgsql;
+
+-- "limit" is to prevent this from being inlined
+create function sql_recurse(float8) returns float8 as
+$$ select recurse($1) limit 1; $$ language sql;
+
+select recurse(5);
+
+create function error1(text) returns text language sql as
+$$ SELECT relname::text FROM pg_class c WHERE c.oid = $1::regclass $$;
+
+create function error2(p_name_table text) returns text language plpgsql as $$
+begin
+  return error1(p_name_table);
+end$$;
+
+BEGIN;
+create table public.stuffs (stuff text);
+SAVEPOINT a;
+select error2('nonexistent.stuffs');
+ROLLBACK TO a;
+select error2('public.stuffs');
+rollback;
+
+drop function error2(p_name_table text);
+drop function error1(text);
+
 -- Test handling of string literals.
 
 set standard_conforming_strings = off;
@@ -3049,3 +3250,103 @@ $$ language plpgsql;
 select strtest();
 
 drop function strtest();
+
+-- Test anonymous code blocks.
+
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT rtrim(roomno) AS roomno, comment FROM Room ORDER BY roomno
+    LOOP
+        RAISE NOTICE '%, %', r.roomno, r.comment;
+    END LOOP;
+END$$;
+
+-- these are to check syntax error reporting
+DO LANGUAGE plpgsql $$begin return 1; end$$;
+
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT rtrim(roomno) AS roomno, foo FROM Room ORDER BY roomno
+    LOOP
+        RAISE NOTICE '%, %', r.roomno, r.comment;
+    END LOOP;
+END$$;
+
+-- Check variable scoping -- a var is not available in its own or prior
+-- default expressions.
+
+create function scope_test() returns int as $$
+declare x int := 42;
+begin
+  declare y int := x + 1;
+          x int := x + 2;
+  begin
+    return x * 100 + y;
+  end;
+end;
+$$ language plpgsql;
+
+select scope_test();
+
+drop function scope_test();
+
+-- Check handling of conflicts between plpgsql vars and table columns.
+
+set plpgsql.variable_conflict = error;
+
+create function conflict_test() returns setof int8_tbl as $$
+declare r record;
+  q1 bigint := 42;
+begin
+  for r in select q1,q2 from int8_tbl loop
+    return next r;
+  end loop;
+end;
+$$ language plpgsql;
+
+select * from conflict_test();
+
+create or replace function conflict_test() returns setof int8_tbl as $$
+#variable_conflict use_variable
+declare r record;
+  q1 bigint := 42;
+begin
+  for r in select q1,q2 from int8_tbl loop
+    return next r;
+  end loop;
+end;
+$$ language plpgsql;
+
+select * from conflict_test();
+
+create or replace function conflict_test() returns setof int8_tbl as $$
+#variable_conflict use_column
+declare r record;
+  q1 bigint := 42;
+begin
+  for r in select q1,q2 from int8_tbl loop
+    return next r;
+  end loop;
+end;
+$$ language plpgsql;
+
+select * from conflict_test();
+
+drop function conflict_test();
+
+-- Check that an unreserved keyword can be used as a variable name
+
+create function unreserved_test() returns int as $$
+declare
+  forward int := 21;
+begin
+  forward := forward * 2;
+  return forward;
+end
+$$ language plpgsql;
+
+select unreserved_test();
+
+drop function unreserved_test();

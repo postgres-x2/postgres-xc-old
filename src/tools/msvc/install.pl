@@ -1,7 +1,7 @@
 #
 # Script that provides 'make install' functionality for msvc builds
 #
-# $PostgreSQL$
+# src/tools/msvc/install.pl
 #
 use strict;
 use warnings;

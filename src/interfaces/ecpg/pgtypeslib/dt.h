@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/pgtypeslib/dt.h */
 
 #ifndef DT_H
 #define DT_H

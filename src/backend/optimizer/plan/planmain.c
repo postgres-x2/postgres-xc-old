@@ -9,12 +9,12 @@
  * shorn of features like subselects, inheritance, aggregates, grouping,
  * and so on.  (Those are the things planner.c deals with.)
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/optimizer/plan/planmain.c
  *
  *-------------------------------------------------------------------------
  */
@@ -142,6 +142,8 @@ query_planner(PlannerInfo *root, List *tlist,
 		palloc0(root->simple_rel_array_size * sizeof(RelOptInfo *));
 	root->join_rel_list = NIL;
 	root->join_rel_hash = NULL;
+	root->join_rel_level = NULL;
+	root->join_cur_level = 0;
 	root->canon_pathkeys = NIL;
 	root->left_join_clauses = NIL;
 	root->right_join_clauses = NIL;
@@ -178,38 +180,18 @@ query_planner(PlannerInfo *root, List *tlist,
 	add_base_rels_to_query(root, (Node *) parse->jointree);
 
 	/*
-	 * We should now have size estimates for every actual table involved in
-	 * the query, so we can compute total_table_pages.	Note that appendrels
-	 * are not double-counted here, even though we don't bother to distinguish
-	 * RelOptInfos for appendrel parents, because the parents will still have
-	 * size zero.
-	 *
-	 * XXX if a table is self-joined, we will count it once per appearance,
-	 * which perhaps is the wrong thing ... but that's not completely clear,
-	 * and detecting self-joins here is difficult, so ignore it for now.
-	 */
-	total_pages = 0;
-	for (rti = 1; rti < root->simple_rel_array_size; rti++)
-	{
-		RelOptInfo *brel = root->simple_rel_array[rti];
-
-		if (brel == NULL)
-			continue;
-
-		Assert(brel->relid == rti);		/* sanity check on array */
-
-		total_pages += (double) brel->pages;
-	}
-	root->total_table_pages = total_pages;
-
-	/*
-	 * Examine the targetlist and qualifications, adding entries to baserel
-	 * targetlists for all referenced Vars.  Restrict and join clauses are
-	 * added to appropriate lists belonging to the mentioned relations.  We
-	 * also build EquivalenceClasses for provably equivalent expressions, and
-	 * form a target joinlist for make_one_rel() to work from.
+	 * Examine the targetlist and join tree, adding entries to baserel
+	 * targetlists for all referenced Vars, and generating PlaceHolderInfo
+	 * entries for all referenced PlaceHolderVars.  Restrict and join clauses
+	 * are added to appropriate lists belonging to the mentioned relations.
+	 * We also build EquivalenceClasses for provably equivalent expressions.
+	 * The SpecialJoinInfo list is also built to hold information about join
+	 * order restrictions.  Finally, we form a target joinlist for
+	 * make_one_rel() to work from.
 	 */
 	build_base_rel_tlists(root, tlist);
+
+	find_placeholders_in_jointree(root);
 
 	joinlist = deconstruct_jointree(root);
 
@@ -241,10 +223,55 @@ query_planner(PlannerInfo *root, List *tlist,
 
 	/*
 	 * Examine any "placeholder" expressions generated during subquery pullup.
-	 * Make sure that we know what level to evaluate them at, and that the
-	 * Vars they need are marked as needed.
+	 * Make sure that the Vars they need are marked as needed at the relevant
+	 * join level.  This must be done before join removal because it might
+	 * cause Vars or placeholders to be needed above a join when they weren't
+	 * so marked before.
 	 */
-	fix_placeholder_eval_levels(root);
+	fix_placeholder_input_needed_levels(root);
+
+	/*
+	 * Remove any useless outer joins.	Ideally this would be done during
+	 * jointree preprocessing, but the necessary information isn't available
+	 * until we've built baserel data structures and classified qual clauses.
+	 */
+	joinlist = remove_useless_joins(root, joinlist);
+
+	/*
+	 * Now distribute "placeholders" to base rels as needed.  This has to be
+	 * done after join removal because removal could change whether a
+	 * placeholder is evaluatable at a base rel.
+	 */
+	add_placeholders_to_base_rels(root);
+
+	/*
+	 * We should now have size estimates for every actual table involved in
+	 * the query, and we also know which if any have been deleted from the
+	 * query by join removal; so we can compute total_table_pages.
+	 *
+	 * Note that appendrels are not double-counted here, even though we don't
+	 * bother to distinguish RelOptInfos for appendrel parents, because the
+	 * parents will still have size zero.
+	 *
+	 * XXX if a table is self-joined, we will count it once per appearance,
+	 * which perhaps is the wrong thing ... but that's not completely clear,
+	 * and detecting self-joins here is difficult, so ignore it for now.
+	 */
+	total_pages = 0;
+	for (rti = 1; rti < root->simple_rel_array_size; rti++)
+	{
+		RelOptInfo *brel = root->simple_rel_array[rti];
+
+		if (brel == NULL)
+			continue;
+
+		Assert(brel->relid == rti);		/* sanity check on array */
+
+		if (brel->reloptkind == RELOPT_BASEREL ||
+			brel->reloptkind == RELOPT_OTHER_MEMBER_REL)
+			total_pages += (double) brel->pages;
+	}
+	root->total_table_pages = total_pages;
 
 	/*
 	 * Ready to do the primary planning.

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/datetime.h */
 
 #ifndef _ECPG_DATETIME_H
 #define _ECPG_DATETIME_H

@@ -4,10 +4,10 @@
  *
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/executor/nodeIndexscan.h
  *
  *-------------------------------------------------------------------------
  */
@@ -16,7 +16,6 @@
 
 #include "nodes/execnodes.h"
 
-extern int	ExecCountSlotsIndexScan(IndexScan *node);
 extern IndexScanState *ExecInitIndexScan(IndexScan *node, EState *estate, int eflags);
 extern TupleTableSlot *ExecIndexScan(IndexScanState *node);
 extern void ExecEndIndexScan(IndexScanState *node);

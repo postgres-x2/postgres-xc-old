@@ -31,7 +31,7 @@ GROUP BY four, ten ORDER BY four, ten;
 
 SELECT depname, empno, salary, sum(salary) OVER w FROM empsalary WINDOW w AS (PARTITION BY depname) ORDER BY empno,salary;
 
-SELECT depname, empno, salary, rank() OVER w FROM empsalary WINDOW w AS (PARTITION BY depname ORDER BY salary) ORDER BY rank() OVER w,empno;
+SELECT depname, empno, salary, rank() OVER w FROM empsalary WINDOW w AS (PARTITION BY depname ORDER BY salary) ORDER BY rank() OVER w;
 
 -- empty window specification
 SELECT COUNT(*) OVER () FROM tenk1 WHERE unique2 < 10 ORDER BY 1;
@@ -162,6 +162,58 @@ SELECT four, ten/4 as two,
 	sum(ten/4) over (partition by four order by ten/4 rows between unbounded preceding and current row),
 	last_value(ten/4) over (partition by four order by ten/4 rows between unbounded preceding and current row)
 FROM (select distinct ten, four from tenk1) ss ORDER BY 1, 2, 3, 4;
+
+SELECT sum(unique1) over (order by four range between current row and unbounded following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (rows between current row and unbounded following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (rows between 2 preceding and 2 following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (rows between 2 preceding and 1 preceding),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (rows between 1 following and 3 following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (rows between unbounded preceding and 1 following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT sum(unique1) over (w range between current row and unbounded following),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10 WINDOW w AS (order by four);
+
+-- fail: not implemented yet
+SELECT sum(unique1) over (order by four range between 2::int8 preceding and 1::int2 preceding),
+	unique1, four
+FROM tenk1 WHERE unique1 < 10;
+
+SELECT first_value(unique1) over w,
+	nth_value(unique1, 2) over w AS nth_2,
+	last_value(unique1) over w, unique1, four
+FROM tenk1 WHERE unique1 < 10
+WINDOW w AS (order by four range between current row and unbounded following);
+
+SELECT sum(unique1) over
+	(rows (SELECT unique1 FROM tenk1 ORDER BY unique1 LIMIT 1) + 1 PRECEDING),
+	unique1
+FROM tenk1 WHERE unique1 < 10;
+
+CREATE TEMP VIEW v_window AS
+	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following) as sum_rows
+	FROM generate_series(1, 10) i;
+
+SELECT * FROM v_window;
+
+SELECT pg_get_viewdef('v_window');
 
 -- with UNION
 SELECT count(*) OVER (PARTITION BY four) FROM (SELECT * FROM tenk1 UNION ALL SELECT * FROM tenk2)s LIMIT 0;

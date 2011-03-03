@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/seg/segdata.h
  */
 typedef struct SEG
 {

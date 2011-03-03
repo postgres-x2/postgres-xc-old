@@ -9,10 +9,10 @@
  *
  *	CAUTION: if you change this file, see also qsort_arg.c
  *
- *	$PostgreSQL$
+ *	src/port/qsort.c
  */
 
-/*	$NetBSD$	*/
+/*	$NetBSD: qsort.c,v 1.13 2003/08/07 16:43:42 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993

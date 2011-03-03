@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/include/port/nextstep.h
 
 #include "libc.h"
 #include <sys/ioctl.h>

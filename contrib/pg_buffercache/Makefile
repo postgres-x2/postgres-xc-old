@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/pg_buffercache/Makefile
 
 MODULE_big = pg_buffercache
 OBJS	= pg_buffercache_pages.o

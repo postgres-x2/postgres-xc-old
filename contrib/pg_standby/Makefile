@@ -1,10 +1,10 @@
-# $PostgreSQL$
+# contrib/pg_standby/Makefile
+
+PGFILEDESC = "pg_standby - supports creation of a warm standby"
+PGAPPICON=win32
 
 PROGRAM = pg_standby
 OBJS	= pg_standby.o
-
-PG_CPPFLAGS = -I$(libpq_srcdir)
-PG_LIBS = $(libpq_pgport)
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config

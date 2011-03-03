@@ -1,7 +1,7 @@
 %{
 /* 
 ** A scanner for EMP-style numeric ranges 
- * $PostgreSQL$
+ * contrib/cube/cubescan.l
 */
 
 #include "postgres.h"

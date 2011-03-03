@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/interfaces/ecpg/README.dynSQL
 
 descriptor statements have the following shortcomings
 

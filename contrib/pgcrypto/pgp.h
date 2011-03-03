@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $PostgreSQL$
+ * contrib/pgcrypto/pgp.h
  */
 
 enum PGP_S2K_TYPE

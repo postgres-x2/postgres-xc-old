@@ -4,7 +4,7 @@
 #    Makefile for backend/nodes
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/nodes/Makefile
 #
 #-------------------------------------------------------------------------
 

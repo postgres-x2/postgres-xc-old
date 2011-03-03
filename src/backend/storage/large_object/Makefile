@@ -4,7 +4,7 @@
 #    Makefile for storage/large_object
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/storage/large_object/Makefile
 #
 #-------------------------------------------------------------------------
 

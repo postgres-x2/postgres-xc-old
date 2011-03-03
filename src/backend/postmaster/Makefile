@@ -4,7 +4,7 @@
 #    Makefile for src/backend/postmaster
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/postmaster/Makefile
 #
 #-------------------------------------------------------------------------
 

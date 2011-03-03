@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/port/win32/sys/socket.h
  */
 #ifndef WIN32_SYS_SOCKET_H
 #define WIN32_SYS_SOCKET_H

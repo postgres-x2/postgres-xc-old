@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/ltree/_ltree_op.c
  *
  *
  * op function for ltree[]

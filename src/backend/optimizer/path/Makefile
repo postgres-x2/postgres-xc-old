@@ -4,7 +4,7 @@
 #    Makefile for optimizer/path
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/optimizer/path/Makefile
 #
 #-------------------------------------------------------------------------
 

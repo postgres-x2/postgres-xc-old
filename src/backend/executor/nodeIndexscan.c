@@ -3,12 +3,12 @@
  * nodeIndexscan.c
  *	  Routines to support indexed scans of relations
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/executor/nodeIndexscan.c
  *
  *-------------------------------------------------------------------------
  */
@@ -52,7 +52,6 @@ IndexNext(IndexScanState *node)
 	ExprContext *econtext;
 	ScanDirection direction;
 	IndexScanDesc scandesc;
-	Index		scanrelid;
 	HeapTuple	tuple;
 	TupleTableSlot *slot;
 
@@ -72,36 +71,6 @@ IndexNext(IndexScanState *node)
 	scandesc = node->iss_ScanDesc;
 	econtext = node->ss.ps.ps_ExprContext;
 	slot = node->ss.ss_ScanTupleSlot;
-	scanrelid = ((IndexScan *) node->ss.ps.plan)->scan.scanrelid;
-
-	/*
-	 * Check if we are evaluating PlanQual for tuple of this relation.
-	 * Additional checking is not good, but no other way for now. We could
-	 * introduce new nodes for this case and handle IndexScan --> NewNode
-	 * switching in Init/ReScan plan...
-	 */
-	if (estate->es_evTuple != NULL &&
-		estate->es_evTuple[scanrelid - 1] != NULL)
-	{
-		if (estate->es_evTupleNull[scanrelid - 1])
-			return ExecClearTuple(slot);
-
-		ExecStoreTuple(estate->es_evTuple[scanrelid - 1],
-					   slot, InvalidBuffer, false);
-
-		/* Does the tuple meet the indexqual condition? */
-		econtext->ecxt_scantuple = slot;
-
-		ResetExprContext(econtext);
-
-		if (!ExecQual(node->indexqualorig, econtext, false))
-			ExecClearTuple(slot);		/* would not be returned by scan */
-
-		/* Flag for the next call that no more tuples */
-		estate->es_evTupleNull[scanrelid - 1] = true;
-
-		return slot;
-	}
 
 	/*
 	 * ok, now that we have what we need, fetch the next tuple.
@@ -140,6 +109,27 @@ IndexNext(IndexScanState *node)
 	return ExecClearTuple(slot);
 }
 
+/*
+ * IndexRecheck -- access method routine to recheck a tuple in EvalPlanQual
+ */
+static bool
+IndexRecheck(IndexScanState *node, TupleTableSlot *slot)
+{
+	ExprContext *econtext;
+
+	/*
+	 * extract necessary information from index scan node
+	 */
+	econtext = node->ss.ps.ps_ExprContext;
+
+	/* Does the tuple meet the indexqual condition? */
+	econtext->ecxt_scantuple = slot;
+
+	ResetExprContext(econtext);
+
+	return ExecQual(node->indexqualorig, econtext, false);
+}
+
 /* ----------------------------------------------------------------
  *		ExecIndexScan(node)
  * ----------------------------------------------------------------
@@ -153,10 +143,9 @@ ExecIndexScan(IndexScanState *node)
 	if (node->iss_NumRuntimeKeys != 0 && !node->iss_RuntimeKeysReady)
 		ExecReScan((PlanState *) node, NULL);
 
-	/*
-	 * use IndexNext as access method
-	 */
-	return ExecScan(&node->ss, (ExecScanAccessMtd) IndexNext);
+	return ExecScan(&node->ss,
+					(ExecScanAccessMtd) IndexNext,
+					(ExecScanRecheckMtd) IndexRecheck);
 }
 
 /* ----------------------------------------------------------------
@@ -172,15 +161,9 @@ ExecIndexScan(IndexScanState *node)
 void
 ExecIndexReScan(IndexScanState *node, ExprContext *exprCtxt)
 {
-	EState	   *estate;
 	ExprContext *econtext;
-	Index		scanrelid;
 
-	estate = node->ss.ps.state;
 	econtext = node->iss_RuntimeContext;		/* context for runtime keys */
-	scanrelid = ((IndexScan *) node->ss.ps.plan)->scan.scanrelid;
-
-	node->ss.ps.ps_TupFromTlist = false;
 
 	if (econtext)
 	{
@@ -216,16 +199,10 @@ ExecIndexReScan(IndexScanState *node, ExprContext *exprCtxt)
 								 node->iss_NumRuntimeKeys);
 	node->iss_RuntimeKeysReady = true;
 
-	/* If this is re-scanning of PlanQual ... */
-	if (estate->es_evTuple != NULL &&
-		estate->es_evTuple[scanrelid - 1] != NULL)
-	{
-		estate->es_evTupleNull[scanrelid - 1] = false;
-		return;
-	}
-
 	/* reset index scan */
 	index_rescan(node->iss_ScanDesc, node->iss_ScanKeys);
+
+	ExecScanReScan(&node->ss);
 }
 
 
@@ -263,9 +240,9 @@ ExecIndexEvalRuntimeKeys(ExprContext *econtext,
 		 * necessary.
 		 *
 		 * It's also entirely possible that the result of the eval is a
-		 * toasted value.  In this case we should forcibly detoast it,
-		 * to avoid repeat detoastings each time the value is examined
-		 * by an index support function.
+		 * toasted value.  In this case we should forcibly detoast it, to
+		 * avoid repeat detoastings each time the value is examined by an
+		 * index support function.
 		 */
 		scanvalue = ExecEvalExpr(key_expr,
 								 econtext,
@@ -537,8 +514,6 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
 		ExecInitExpr((Expr *) node->indexqualorig,
 					 (PlanState *) indexstate);
 
-#define INDEXSCAN_NSLOTS 2
-
 	/*
 	 * tuple table initialization
 	 */
@@ -665,7 +640,8 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
  * (Note that we treat all array-expressions as requiring runtime evaluation,
  * even if they happen to be constants.)
  *
- * 5. NullTest ("indexkey IS NULL").  We just fill in the ScanKey properly.
+ * 5. NullTest ("indexkey IS NULL/IS NOT NULL").  We just fill in the
+ * ScanKey properly.
  *
  * Input params are:
  *
@@ -1012,13 +988,14 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index, Index scanrelid,
 		}
 		else if (IsA(clause, NullTest))
 		{
-			/* indexkey IS NULL */
-			Assert(((NullTest *) clause)->nulltesttype == IS_NULL);
+			/* indexkey IS NULL or indexkey IS NOT NULL */
+			NullTest   *ntest = (NullTest *) clause;
+			int			flags;
 
 			/*
 			 * argument should be the index key Var, possibly relabeled
 			 */
-			leftop = ((NullTest *) clause)->arg;
+			leftop = ntest->arg;
 
 			if (leftop && IsA(leftop, RelabelType))
 				leftop = ((RelabelType *) leftop)->arg;
@@ -1034,8 +1011,23 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index, Index scanrelid,
 			/*
 			 * initialize the scan key's fields appropriately
 			 */
+			switch (ntest->nulltesttype)
+			{
+				case IS_NULL:
+					flags = SK_ISNULL | SK_SEARCHNULL;
+					break;
+				case IS_NOT_NULL:
+					flags = SK_ISNULL | SK_SEARCHNOTNULL;
+					break;
+				default:
+					elog(ERROR, "unrecognized nulltesttype: %d",
+						 (int) ntest->nulltesttype);
+					flags = 0;	/* keep compiler quiet */
+					break;
+			}
+
 			ScanKeyEntryInitialize(this_scan_key,
-								   SK_ISNULL | SK_SEARCHNULL,
+								   flags,
 								   varattno,	/* attribute number to scan */
 								   InvalidStrategy,		/* no strategy */
 								   InvalidOid,	/* no strategy subtype */
@@ -1073,11 +1065,4 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index, Index scanrelid,
 	}
 	else if (n_array_keys != 0)
 		elog(ERROR, "ScalarArrayOpExpr index qual found where not allowed");
-}
-
-int
-ExecCountSlotsIndexScan(IndexScan *node)
-{
-	return ExecCountSlotsNode(outerPlan((Plan *) node)) +
-		ExecCountSlotsNode(innerPlan((Plan *) node)) + INDEXSCAN_NSLOTS;
 }

@@ -4,10 +4,10 @@
  * External declarations pertaining to backend/utils/misc/guc.c and
  * backend/utils/misc/guc-file.l
  *
- * Copyright (c) 2000-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2010, PostgreSQL Global Development Group
  * Written by Peter Eisentraut <peter_e@gmx.net>.
  *
- * $PostgreSQL$
+ * src/include/utils/guc.h
  *--------------------------------------------------------------------
  */
 #ifndef GUC_H
@@ -77,6 +77,8 @@ typedef enum
  * as the actual source of any value).	This is an interactive case, but
  * it needs its own source value because some assign hooks need to make
  * different validity checks in this case.
+ *
+ * NB: see GucSource_Names in guc.c if you change this.
  */
 typedef enum
 {
@@ -86,6 +88,7 @@ typedef enum
 	PGC_S_ARGV,					/* postmaster command line */
 	PGC_S_DATABASE,				/* per-database setting */
 	PGC_S_USER,					/* per-user setting */
+	PGC_S_DATABASE_USER,		/* per-user-and-database setting */
 	PGC_S_CLIENT,				/* from client connection request */
 	PGC_S_OVERRIDE,				/* special case to forcibly set default */
 	PGC_S_INTERACTIVE,			/* dividing line for error reporting */
@@ -178,6 +181,8 @@ extern char *HbaFileName;
 extern char *IdentFileName;
 extern char *external_pid_file;
 
+extern char *application_name;
+
 extern int	tcp_keepalives_idle;
 extern int	tcp_keepalives_interval;
 extern int	tcp_keepalives_count;
@@ -247,9 +252,8 @@ extern void DefineCustomEnumVariable(
 
 extern void EmitWarningsOnPlaceholders(const char *className);
 
-extern const char *GetConfigOption(const char *name);
+extern const char *GetConfigOption(const char *name, bool restrict_superuser);
 extern const char *GetConfigOptionResetString(const char *name);
-extern bool IsSuperuserConfigOption(const char *name);
 extern void ProcessConfigFile(GucContext context);
 extern void InitializeGUCOptions(void);
 extern bool SelectConfigFiles(const char *userDoption, const char *progname);
@@ -280,6 +284,7 @@ extern void ProcessGUCArray(ArrayType *array,
 				GucContext context, GucSource source, GucAction action);
 extern ArrayType *GUCArrayAdd(ArrayType *array, const char *name, const char *value);
 extern ArrayType *GUCArrayDelete(ArrayType *array, const char *name);
+extern ArrayType *GUCArrayReset(ArrayType *array);
 
 extern int	GUC_complaint_elevel(GucSource source);
 

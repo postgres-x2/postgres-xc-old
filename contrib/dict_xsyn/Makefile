@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/dict_xsyn/Makefile
 
 MODULE_big = dict_xsyn
 OBJS = dict_xsyn.o

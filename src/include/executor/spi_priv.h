@@ -3,10 +3,10 @@
  * spi_priv.h
  *				Server Programming Interface private declarations
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/executor/spi_priv.h
  *
  *-------------------------------------------------------------------------
  */
@@ -68,6 +68,8 @@ typedef struct _SPI_plan
 	int			cursor_options; /* Cursor options used for planning */
 	int			nargs;			/* number of plan arguments */
 	Oid		   *argtypes;		/* Argument types (NULL if nargs is 0) */
+	ParserSetupHook parserSetup;	/* alternative parameter spec method */
+	void	   *parserSetupArg;
 } _SPI_plan;
 
 #endif   /* SPI_PRIV_H */

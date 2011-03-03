@@ -1,5 +1,5 @@
 #! /bin/sh
-# $PostgreSQL$
+# src/test/mb/mbregress.sh
 
 if echo '\c' | grep -s c >/dev/null 2>&1
 then
@@ -49,7 +49,7 @@ do
   
 	if [ `diff ${EXPECTED} results/${i}.out | wc -l` -ne 0 ]
 	then
-		( diff -wC3 ${EXPECTED} results/${i}.out; \
+		( diff -C3 ${EXPECTED} results/${i}.out; \
 		echo "";  \
 		echo "----------------------"; \
 		echo "" ) >> regression.diffs

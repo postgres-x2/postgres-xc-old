@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/test/locale/test-ctype.c
  */
 
 /*

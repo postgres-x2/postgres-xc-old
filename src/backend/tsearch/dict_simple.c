@@ -3,11 +3,11 @@
  * dict_simple.c
  *		Simple dictionary: just lowercase and check for stopword
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/tsearch/dict_simple.c
  *
  *-------------------------------------------------------------------------
  */

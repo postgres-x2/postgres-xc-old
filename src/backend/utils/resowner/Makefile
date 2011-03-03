@@ -4,7 +4,7 @@
 #    Makefile for utils/resowner
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/resowner/Makefile
 #
 #-------------------------------------------------------------------------
 

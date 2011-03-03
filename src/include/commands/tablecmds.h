@@ -4,10 +4,10 @@
  *	  prototypes for tablecmds.c.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/commands/tablecmds.h
  *
  *-------------------------------------------------------------------------
  */
@@ -18,7 +18,7 @@
 #include "utils/relcache.h"
 
 
-extern Oid	DefineRelation(CreateStmt *stmt, char relkind);
+extern Oid	DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId);
 
 extern void RemoveRelations(DropStmt *drop);
 
@@ -43,7 +43,7 @@ extern void renameatt(Oid myrelid,
 		  const char *oldattname,
 		  const char *newattname,
 		  bool recurse,
-		  bool recursing);
+		  int expected_parents);
 
 extern void RenameRelation(Oid myrelid,
 			   const char *newrelname,
@@ -57,7 +57,7 @@ extern void find_composite_type_dependencies(Oid typeOid,
 								 const char *origTblName,
 								 const char *origTypeName);
 
-extern AttrNumber *varattnos_map(TupleDesc old, TupleDesc new);
+extern AttrNumber *varattnos_map(TupleDesc olddesc, TupleDesc newdesc);
 extern AttrNumber *varattnos_map_schema(TupleDesc old, List *schema);
 extern void change_varattnos_of_a_node(Node *node, const AttrNumber *newattno);
 

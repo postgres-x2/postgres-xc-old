@@ -4,7 +4,7 @@
 #    Makefile for main
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/main/Makefile
 #
 #-------------------------------------------------------------------------
 

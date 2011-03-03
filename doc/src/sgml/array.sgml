@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/array.sgml
 
 <sect1 id="arrays">
  <title>Arrays</title>

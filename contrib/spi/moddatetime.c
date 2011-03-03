@@ -1,7 +1,7 @@
 /*
 moddatetime.c
 
-$PostgreSQL$
+contrib/spi/moddatetime.c
 
 What is this?
 It is a function to be called from a trigger for the purpose of updating

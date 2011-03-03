@@ -4,7 +4,7 @@
 --    Tutorial on the basics (table creation and data manipulation)
 --
 --
--- $PostgreSQL$
+-- src/tutorial/basics.source
 --
 ---------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
-/* $PostgreSQL$ */
-/*	$NetBSD$	*/
+/* src/port/crypt.c
+/*	$NetBSD: crypt.c,v 1.18 2001/03/01 14:37:35 wiz Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)crypt.c	8.1.1.1 (Berkeley) 8/18/93";
 #else
-__RCSID("$NetBSD$");
+__RCSID("$NetBSD: crypt.c,v 1.18 2001/03/01 14:37:35 wiz Exp $");
 #endif
 #endif   /* not lint */
 
@@ -236,7 +236,7 @@ typedef union
 #if defined(B64)
 	B64			b64;
 #endif
-} C_block;
+}	C_block;
 
 /*
  * Convert twenty-four-bit long in host-order

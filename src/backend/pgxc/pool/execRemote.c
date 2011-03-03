@@ -5,7 +5,7 @@
  *	  Functions to execute commands on remote data nodes
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  * IDENTIFICATION
@@ -2779,16 +2779,6 @@ DataNodeCopyFinish(PGXCNodeHandle** copy_connections, int primary_data_node,
 				(errcode(ERRCODE_INTERNAL_ERROR),
 				 errmsg("Error while running COPY")));
 }
-
-#define REMOTE_QUERY_NSLOTS 2
-int
-ExecCountSlotsRemoteQuery(RemoteQuery *node)
-{
-	return ExecCountSlotsNode(outerPlan((Plan *) node)) +
-		ExecCountSlotsNode(innerPlan((Plan *) node)) +
-		REMOTE_QUERY_NSLOTS;
-}
-
 
 RemoteQueryState *
 ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags)

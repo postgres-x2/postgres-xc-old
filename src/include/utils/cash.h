@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/utils/cash.h
  *
  *
  * cash.h

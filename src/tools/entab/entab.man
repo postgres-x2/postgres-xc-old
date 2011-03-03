@@ -1,4 +1,4 @@
-.\" $PostgreSQL$
+.\" src/tools/entab/entab.man
 .TH ENTAB 1 local
 .SH NAME
 entab - tab processor

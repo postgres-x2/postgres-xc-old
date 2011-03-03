@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/citext.sgml
 
 <sect1 id="citext">
  <title>citext</title>
@@ -22,9 +22,9 @@
    in <productname>PostgreSQL</> has been to use the <function>lower</>
    function when comparing values, for example
 
-  <programlisting>
-   SELECT * FROM tab WHERE lower(col) = LOWER(?);
-  </programlisting>
+<programlisting>
+SELECT * FROM tab WHERE lower(col) = LOWER(?);
+</programlisting>
   </para>
 
   <para>
@@ -58,11 +58,11 @@
     The <type>citext</> data type allows you to eliminate calls
     to <function>lower</> in SQL queries, and allows a primary key to
     be case-insensitive. <type>citext</> is locale-aware, just
-    like <type>text</>, which means that the comparison of uppercase and
-    lowercase characters is dependent on the rules of
+    like <type>text</>, which means that the comparison of upper case and
+    lower case characters is dependent on the rules of
     the <literal>LC_CTYPE</> locale setting. Again, this behavior is
     identical to the use of <function>lower</> in queries. But because it's
-    done transparently by the datatype, you don't have to remember to do
+    done transparently by the data type, you don't have to remember to do
     anything special in your queries.
    </para>
 
@@ -74,24 +74,24 @@
   <para>
    Here's a simple example of usage:
 
-  <programlisting>
-   CREATE TABLE users (
-       nick CITEXT PRIMARY KEY,
-       pass TEXT   NOT NULL
-   );
+<programlisting>
+CREATE TABLE users (
+    nick CITEXT PRIMARY KEY,
+    pass TEXT   NOT NULL
+);
 
-   INSERT INTO users VALUES ( 'larry',  md5(random()::text) );
-   INSERT INTO users VALUES ( 'Tom',    md5(random()::text) );
-   INSERT INTO users VALUES ( 'Damian', md5(random()::text) );
-   INSERT INTO users VALUES ( 'NEAL',   md5(random()::text) );
-   INSERT INTO users VALUES ( 'Bj&oslash;rn',  md5(random()::text) );
+INSERT INTO users VALUES ( 'larry',  md5(random()::text) );
+INSERT INTO users VALUES ( 'Tom',    md5(random()::text) );
+INSERT INTO users VALUES ( 'Damian', md5(random()::text) );
+INSERT INTO users VALUES ( 'NEAL',   md5(random()::text) );
+INSERT INTO users VALUES ( 'Bj&oslash;rn',  md5(random()::text) );
 
-   SELECT * FROM users WHERE nick = 'Larry';
-  </programlisting>
+SELECT * FROM users WHERE nick = 'Larry';
+</programlisting>
 
    The <command>SELECT</> statement will return one tuple, even though
-   the <structfield>nick</> column was set to <quote>larry</> and the query
-   was for <quote>Larry</>.
+   the <structfield>nick</> column was set to <literal>larry</> and the query
+   was for <literal>Larry</>.
   </para>
  </sect2>
 
@@ -184,7 +184,7 @@
     <listitem>
      <para>
        <type>citext</> is not as efficient as <type>text</> because the
-       operator functions and the btree comparison functions must make copies
+       operator functions and the B-tree comparison functions must make copies
        of the data and convert it to lower case for comparisons. It is,
        however, slightly more efficient than using <function>lower</> to get
        case-insensitive matching.
@@ -203,6 +203,15 @@
       as <type>citext</> and explicitly casting the column to <type>text</>
       when you want case-sensitive comparison.  In either situation, you
       will need two indexes if you want both types of searches to be fast.
+    </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      The schema containing the <type>citext</> operators must be
+      in the current <varname>search_path</> (typically <literal>public</>);
+      if it is not, a normal case-sensitive <type>text</> comparison
+      is performed.
     </para>
     </listitem>
    </itemizedlist>

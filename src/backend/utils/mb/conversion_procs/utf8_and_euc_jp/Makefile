@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------
 #
-# $PostgreSQL$
+# src/backend/utils/mb/conversion_procs/utf8_and_euc_jp/Makefile
 #
 #-------------------------------------------------------------------------
 subdir = src/backend/utils/mb/conversion_procs/utf8_and_euc_jp

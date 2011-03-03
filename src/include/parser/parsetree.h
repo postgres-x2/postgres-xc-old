@@ -5,10 +5,10 @@
  *	  parse trees.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/parser/parsetree.h
  *
  *-------------------------------------------------------------------------
  */
@@ -74,6 +74,6 @@ extern TargetEntry *get_tle_by_resno(List *tlist, AttrNumber resno);
  * ----------------
  */
 
-extern RowMarkClause *get_rowmark(Query *qry, Index rtindex);
+extern RowMarkClause *get_parse_rowmark(Query *qry, Index rtindex);
 
 #endif   /* PARSETREE_H */

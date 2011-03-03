@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/cube/cubedata.h
 
 #define CUBE_MAX_DIM (100)
 

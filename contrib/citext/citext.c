@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/citext/citext.c
  */
 #include "postgres.h"
 

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/pg_trgm/trgm.h
  */
 #ifndef __TRGM_H__
 #define __TRGM_H__

@@ -1,8 +1,8 @@
 #! /usr/bin/perl
 #
-# Copyright (c) 2001-2009, PostgreSQL Global Development Group
+# Copyright (c) 2001-2010, PostgreSQL Global Development Group
 #
-# $PostgreSQL$
+# src/backend/utils/mb/Unicode/UCS_to_EUC_JP.pl
 #
 # Generate UTF-8 <--> EUC_JP code conversion tables from
 # map files provided by Unicode organization.

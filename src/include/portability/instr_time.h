@@ -43,9 +43,9 @@
  * Beware of multiple evaluations of the macro arguments.
  *
  *
- * Copyright (c) 2001-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2001-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/include/portability/instr_time.h
  *
  *-------------------------------------------------------------------------
  */
@@ -141,7 +141,7 @@ typedef LARGE_INTEGER instr_time;
 #define INSTR_TIME_GET_MICROSEC(t) \
 	((uint64) (((double) (t).QuadPart * 1000000.0) / GetTimerFrequency()))
 
-static __inline__ double
+static inline double
 GetTimerFrequency(void)
 {
 	LARGE_INTEGER f;

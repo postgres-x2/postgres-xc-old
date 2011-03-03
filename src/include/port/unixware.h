@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/port/unixware.h
  *
  * see src/backend/libpq/pqcomm.c */
 #define SCO_ACCEPT_BUG

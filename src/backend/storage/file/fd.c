@@ -3,11 +3,11 @@
  * fd.c
  *	  Virtual file descriptor code.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/storage/file/fd.c
  *
  * NOTES:
  *
@@ -51,6 +51,7 @@
 
 #include "miscadmin.h"
 #include "access/xact.h"
+#include "catalog/catalog.h"
 #include "catalog/pg_tablespace.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
@@ -256,12 +257,13 @@ static void RemovePgTempFilesInDir(const char *tmpdirname);
 int
 pg_fsync(int fd)
 {
-#ifndef HAVE_FSYNC_WRITETHROUGH_ONLY
-	if (sync_method != SYNC_METHOD_FSYNC_WRITETHROUGH)
-		return pg_fsync_no_writethrough(fd);
+	/* #if is to skip the sync_method test if there's no need for it */
+#if defined(HAVE_FSYNC_WRITETHROUGH) && !defined(FSYNC_WRITETHROUGH_IS_FSYNC)
+	if (sync_method == SYNC_METHOD_FSYNC_WRITETHROUGH)
+		return pg_fsync_writethrough(fd);
 	else
 #endif
-		return pg_fsync_writethrough(fd);
+		return pg_fsync_no_writethrough(fd);
 }
 
 
@@ -291,6 +293,7 @@ pg_fsync_writethrough(int fd)
 #elif defined(F_FULLFSYNC)
 		return (fcntl(fd, F_FULLFSYNC, 0) == -1) ? -1 : 0;
 #else
+		errno = ENOSYS;
 		return -1;
 #endif
 	}
@@ -317,6 +320,22 @@ pg_fdatasync(int fd)
 	else
 		return 0;
 }
+
+/*
+ * pg_flush_data --- advise OS that the data described won't be needed soon
+ *
+ * Not all platforms have posix_fadvise; treat as noop if not available.
+ */
+int
+pg_flush_data(int fd, off_t offset, off_t amount)
+{
+#if defined(USE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
+	return posix_fadvise(fd, offset, amount, POSIX_FADV_DONTNEED);
+#else
+	return 0;
+#endif
+}
+
 
 /*
  * InitFileAccess --- initialize this module during backend startup
@@ -377,7 +396,7 @@ count_usable_fds(int max_to_probe, int *usable_fds, int *already_open)
 #ifdef HAVE_GETRLIMIT
 #ifdef RLIMIT_NOFILE			/* most platforms use RLIMIT_NOFILE */
 	getrlimit_status = getrlimit(RLIMIT_NOFILE, &rlim);
-#else	/* but BSD doesn't ... */
+#else							/* but BSD doesn't ... */
 	getrlimit_status = getrlimit(RLIMIT_OFILE, &rlim);
 #endif   /* RLIMIT_NOFILE */
 	if (getrlimit_status != 0)
@@ -963,8 +982,8 @@ OpenTemporaryFileInTablespace(Oid tblspcOid, bool rejectError)
 	else
 	{
 		/* All other tablespaces are accessed via symlinks */
-		snprintf(tempdirpath, sizeof(tempdirpath), "pg_tblspc/%u/%s",
-				 tblspcOid, PG_TEMP_FILES_DIR);
+		snprintf(tempdirpath, sizeof(tempdirpath), "pg_tblspc/%u/%s/%s",
+				 tblspcOid, TABLESPACE_VERSION_DIRECTORY, PG_TEMP_FILES_DIR);
 	}
 
 	/*
@@ -1011,7 +1030,6 @@ void
 FileClose(File file)
 {
 	Vfd		   *vfdP;
-	struct stat filestats;
 
 	Assert(FileIsValid(file));
 
@@ -1034,27 +1052,55 @@ FileClose(File file)
 	}
 
 	/*
-	 * Delete the file if it was temporary
+	 * Delete the file if it was temporary, and make a log entry if wanted
 	 */
 	if (vfdP->fdstate & FD_TEMPORARY)
 	{
-		/* reset flag so that die() interrupt won't cause problems */
+		/*
+		 * If we get an error, as could happen within the ereport/elog calls,
+		 * we'll come right back here during transaction abort.  Reset the
+		 * flag to ensure that we can't get into an infinite loop.  This code
+		 * is arranged to ensure that the worst-case consequence is failing
+		 * to emit log message(s), not failing to attempt the unlink.
+		 */
 		vfdP->fdstate &= ~FD_TEMPORARY;
+
 		if (log_temp_files >= 0)
 		{
-			if (stat(vfdP->fileName, &filestats) == 0)
+			struct stat filestats;
+			int		stat_errno;
+
+			/* first try the stat() */
+			if (stat(vfdP->fileName, &filestats))
+				stat_errno = errno;
+			else
+				stat_errno = 0;
+
+			/* in any case do the unlink */
+			if (unlink(vfdP->fileName))
+				elog(LOG, "could not unlink file \"%s\": %m", vfdP->fileName);
+
+			/* and last report the stat results */
+			if (stat_errno == 0)
 			{
-				if (filestats.st_size >= log_temp_files)
+				if ((filestats.st_size / 1024) >= log_temp_files)
 					ereport(LOG,
 							(errmsg("temporary file: path \"%s\", size %lu",
 									vfdP->fileName,
 									(unsigned long) filestats.st_size)));
 			}
 			else
+			{
+				errno = stat_errno;
 				elog(LOG, "could not stat file \"%s\": %m", vfdP->fileName);
+			}
 		}
-		if (unlink(vfdP->fileName))
-			elog(LOG, "could not unlink file \"%s\": %m", vfdP->fileName);
+		else
+		{
+			/* easy case, just do the unlink */
+			if (unlink(vfdP->fileName))
+				elog(LOG, "could not unlink file \"%s\": %m", vfdP->fileName);
+		}
 	}
 
 	/* Unregister it from the resource owner */
@@ -1327,6 +1373,20 @@ FileTruncate(File file, off_t offset)
 
 	returnCode = ftruncate(VfdCache[file].fd, offset);
 	return returnCode;
+}
+
+/*
+ * Return the pathname associated with an open file.
+ *
+ * The returned string points to an internal buffer, which is valid until
+ * the file is closed.
+ */
+char *
+FilePathName(File file)
+{
+	Assert(FileIsValid(file));
+
+	return VfdCache[file].fileName;
 }
 
 
@@ -1766,9 +1826,9 @@ CleanupTempFiles(bool isProcExit)
 				/*
 				 * If we're in the process of exiting a backend process, close
 				 * all temporary files. Otherwise, only close temporary files
-				 * local to the current transaction. They should be closed
-				 * by the ResourceOwner mechanism already, so this is just
-				 * a debugging cross-check.
+				 * local to the current transaction. They should be closed by
+				 * the ResourceOwner mechanism already, so this is just a
+				 * debugging cross-check.
 				 */
 				if (isProcExit)
 					FileClose(i);
@@ -1827,8 +1887,8 @@ RemovePgTempFiles(void)
 			strcmp(spc_de->d_name, "..") == 0)
 			continue;
 
-		snprintf(temp_path, sizeof(temp_path), "pg_tblspc/%s/%s",
-				 spc_de->d_name, PG_TEMP_FILES_DIR);
+		snprintf(temp_path, sizeof(temp_path), "pg_tblspc/%s/%s/%s",
+			spc_de->d_name, TABLESPACE_VERSION_DIRECTORY, PG_TEMP_FILES_DIR);
 		RemovePgTempFilesInDir(temp_path);
 	}
 

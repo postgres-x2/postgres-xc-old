@@ -1,9 +1,9 @@
 /*
  * psql - the PostgreSQL interactive terminal
  *
- * Copyright (c) 2000-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/bin/psql/command.h
  */
 #ifndef COMMAND_H
 #define COMMAND_H
@@ -34,7 +34,7 @@ extern bool do_pset(const char *param,
 		printQueryOpt *popt,
 		bool quiet);
 
-extern void connection_warnings(void);
+extern void connection_warnings(bool in_startup);
 
 extern void SyncVariables(void);
 

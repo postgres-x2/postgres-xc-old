@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/backend/port/dynloader/win32.h
  */
 #ifndef PORT_PROTOS_H
 #define PORT_PROTOS_H

@@ -1,5 +1,5 @@
 #! /bin/sh
-# $PostgreSQL$
+# src/pl/tcl/modules/pltcl_listmod.in
 #
 # Start tclsh \
 exec @TCLSH@ "$0" "$@"

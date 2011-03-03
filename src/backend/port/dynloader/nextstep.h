@@ -3,7 +3,7 @@
  * port_protos.h
  *	  port-specific prototypes for NeXT
  *
- * $PostgreSQL$
+ * src/backend/port/dynloader/nextstep.h
  */
 
 #ifndef PORT_PROTOS_H

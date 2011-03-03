@@ -2,10 +2,10 @@
  *
  * pg_ctl --- start/stops/restarts the PostgreSQL server
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
- * $PostgreSQL$
+ * src/bin/pg_ctl/pg_ctl.c
  *
  *-------------------------------------------------------------------------
  */
@@ -15,7 +15,7 @@
  * Need this to get defines for restricted tokens and jobs. And it
  * has to be set before any header from the Win32 API is loaded.
  */
-#define _WIN32_WINNT 0x0500
+#define _WIN32_WINNT 0x0501
 #endif
 
 #include "postgres_fe.h"
@@ -58,9 +58,10 @@ typedef enum
 typedef enum
 {
 	NO_COMMAND = 0,
+	INIT_COMMAND,
 	START_COMMAND,
-	RESTART_COMMAND,
 	STOP_COMMAND,
+	RESTART_COMMAND,
 	RELOAD_COMMAND,
 	STATUS_COMMAND,
 	KILL_COMMAND,
@@ -83,7 +84,7 @@ static char *pgdata_opt = NULL;
 static char *post_opts = NULL;
 static const char *progname;
 static char *log_file = NULL;
-static char *postgres_path = NULL;
+static char *exec_path = NULL;
 static char *register_servicename = "PostgreSQL";		/* FIXME: + version ID? */
 static char *register_username = NULL;
 static char *register_password = NULL;
@@ -104,6 +105,7 @@ static void do_advice(void);
 static void do_help(void);
 static void set_mode(char *modeopt);
 static void set_sig(char *signame);
+static void do_init(void);
 static void do_start(void);
 static void do_stop(void);
 static void do_restart(void);
@@ -144,6 +146,7 @@ static char postopts_file[MAXPGPATH];
 static char pid_file[MAXPGPATH];
 static char conf_file[MAXPGPATH];
 static char backup_file[MAXPGPATH];
+static char recovery_file[MAXPGPATH];
 
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
 static void unlimit_core_size(void);
@@ -363,20 +366,20 @@ start_postmaster(void)
 	if (log_file != NULL)
 #ifdef PGXC
 		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s %s%s < \"%s\" >> \"%s\" 2>&1 &" SYSTEMQUOTE,
-				postgres_path, pgxcCommand, pgdata_opt, post_opts,
+				exec_path, pgxcCommand, pgdata_opt, post_opts,
 				DEVNULL, log_file);
 #else
 		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s%s < \"%s\" >> \"%s\" 2>&1 &" SYSTEMQUOTE,
-				 postgres_path, pgdata_opt, post_opts,
+				 exec_path, pgdata_opt, post_opts,
 				 DEVNULL, log_file);
 #endif
 	else
 #ifdef PGXC
 		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s %s%s < \"%s\" 2>&1 &" SYSTEMQUOTE,
-				postgres_path, pgxcCommand, pgdata_opt, post_opts, DEVNULL);
+				exec_path, pgxcCommand, pgdata_opt, post_opts, DEVNULL);
 #else
 		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s%s < \"%s\" 2>&1 &" SYSTEMQUOTE,
-				 postgres_path, pgdata_opt, post_opts, DEVNULL);
+				 exec_path, pgdata_opt, post_opts, DEVNULL);
 #endif
 
 	return system(cmd);
@@ -391,10 +394,10 @@ start_postmaster(void)
 
 	if (log_file != NULL)
 		snprintf(cmd, MAXPGPATH, "CMD /C " SYSTEMQUOTE "\"%s\" %s%s < \"%s\" >> \"%s\" 2>&1" SYSTEMQUOTE,
-				 postgres_path, pgdata_opt, post_opts, DEVNULL, log_file);
+				 exec_path, pgdata_opt, post_opts, DEVNULL, log_file);
 	else
 		snprintf(cmd, MAXPGPATH, "CMD /C " SYSTEMQUOTE "\"%s\" %s%s < \"%s\" 2>&1" SYSTEMQUOTE,
-				 postgres_path, pgdata_opt, post_opts, DEVNULL);
+				 exec_path, pgdata_opt, post_opts, DEVNULL);
 
 	if (!CreateRestrictedProcess(cmd, &pi, false))
 		return GetLastError();
@@ -622,10 +625,70 @@ read_post_opts(void)
 										 * name */
 					post_opts = arg1 + 1;		/* point past whitespace */
 				}
-				if (postgres_path == NULL)
-					postgres_path = optline;
+				if (exec_path == NULL)
+					exec_path = optline;
 			}
 		}
+	}
+}
+
+static char *
+find_other_exec_or_die(const char *argv0, const char *target, const char *versionstr)
+{
+	int			ret;
+	char	   *found_path;
+
+	found_path = pg_malloc(MAXPGPATH);
+
+	if ((ret = find_other_exec(argv0, target, versionstr, found_path)) < 0)
+	{
+		char		full_path[MAXPGPATH];
+
+		if (find_my_exec(argv0, full_path) < 0)
+			strlcpy(full_path, progname, sizeof(full_path));
+
+		if (ret == -1)
+			write_stderr(_("The program \"%s\" is needed by %s "
+						   "but was not found in the\n"
+						   "same directory as \"%s\".\n"
+						   "Check your installation.\n"),
+						 target, progname, full_path);
+		else
+			write_stderr(_("The program \"%s\" was found by \"%s\"\n"
+						   "but was not the same version as %s.\n"
+						   "Check your installation.\n"),
+						 target, full_path, progname);
+		exit(1);
+	}
+
+	return found_path;
+}
+
+static void
+do_init(void)
+{
+	char		cmd[MAXPGPATH];
+
+	if (exec_path == NULL)
+		exec_path = find_other_exec_or_die(argv0, "initdb", "initdb (PostgreSQL) " PG_VERSION "\n");
+
+	if (pgdata_opt == NULL)
+		pgdata_opt = "";
+
+	if (post_opts == NULL)
+		post_opts = "";
+
+	if (!silent_mode)
+		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s%s" SYSTEMQUOTE,
+				 exec_path, pgdata_opt, post_opts);
+	else
+		snprintf(cmd, MAXPGPATH, SYSTEMQUOTE "\"%s\" %s%s > \"%s\"" SYSTEMQUOTE,
+				 exec_path, pgdata_opt, post_opts, DEVNULL);
+
+	if (system(cmd) != 0)
+	{
+		write_stderr(_("%s: database system initialization failed\n"), progname);
+		exit(1);
 	}
 }
 
@@ -651,40 +714,27 @@ do_start(void)
 	if (ctl_command == RESTART_COMMAND || pgdata_opt == NULL)
 		pgdata_opt = "";
 
-	if (postgres_path == NULL)
-	{
-		char	   *postmaster_path;
-		int			ret;
-
-		postmaster_path = pg_malloc(MAXPGPATH);
-
-		if ((ret = find_other_exec(argv0, "postgres", PG_BACKEND_VERSIONSTR,
-								   postmaster_path)) < 0)
-		{
-			char		full_path[MAXPGPATH];
-
-			if (find_my_exec(argv0, full_path) < 0)
-				strlcpy(full_path, progname, sizeof(full_path));
-
-			if (ret == -1)
-				write_stderr(_("The program \"postgres\" is needed by %s "
-							   "but was not found in the\n"
-							   "same directory as \"%s\".\n"
-							   "Check your installation.\n"),
-							 progname, full_path);
-			else
-				write_stderr(_("The program \"postgres\" was found by \"%s\"\n"
-							   "but was not the same version as %s.\n"
-							   "Check your installation.\n"),
-							 full_path, progname);
-			exit(1);
-		}
-		postgres_path = postmaster_path;
-	}
+	if (exec_path == NULL)
+		exec_path = find_other_exec_or_die(argv0, "postgres", PG_BACKEND_VERSIONSTR);
 
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
 	if (allow_core_files)
 		unlimit_core_size();
+#endif
+
+	/*
+	 * If possible, tell the postmaster our parent shell's PID (see the
+	 * comments in CreateLockFile() for motivation).  Windows hasn't got
+	 * getppid() unfortunately.
+	 */
+#ifndef WIN32
+	{
+		static char env_var[32];
+
+		snprintf(env_var, sizeof(env_var), "PG_GRANDPARENT_PID=%d",
+				 (int) getppid());
+		putenv(env_var);
+	}
 #endif
 
 	exitcode = start_postmaster();
@@ -714,7 +764,9 @@ do_start(void)
 
 		if (test_postmaster_connection(false) == false)
 		{
-			printf(_("could not start server\n"));
+			write_stderr(_("%s: could not start server\n"
+						   "Examine the log output.\n"),
+						 progname);
 			exit(1);
 		}
 		else
@@ -766,7 +818,15 @@ do_stop(void)
 	}
 	else
 	{
-		if ((shutdown_mode == SMART_MODE) && (stat(backup_file, &statbuf) == 0))
+		/*
+		 * If backup_label exists, an online backup is running. Warn the
+		 * user that smart shutdown will wait for it to finish. However, if
+		 * recovery.conf is also present, we're recovering from an online
+		 * backup instead of performing one.
+		 */
+		if (shutdown_mode == SMART_MODE &&
+			stat(backup_file, &statbuf) == 0 &&
+			stat(recovery_file, &statbuf) != 0)
 		{
 			print_msg(_("WARNING: online backup mode is active\n"
 						"Shutdown will not complete until pg_stop_backup() is called.\n\n"));
@@ -794,7 +854,7 @@ do_stop(void)
 		}
 		print_msg(_(" done\n"));
 
-		printf(_("server stopped\n"));
+		print_msg(_("server stopped\n"));
 	}
 }
 
@@ -843,7 +903,15 @@ do_restart(void)
 			exit(1);
 		}
 
-		if ((shutdown_mode == SMART_MODE) && (stat(backup_file, &statbuf) == 0))
+		/*
+		 * If backup_label exists, an online backup is running. Warn the
+		 * user that smart shutdown will wait for it to finish. However, if
+		 * recovery.conf is also present, we're recovering from an online
+		 * backup instead of performing one.
+		 */
+		if (shutdown_mode == SMART_MODE &&
+			stat(backup_file, &statbuf) == 0 &&
+			stat(recovery_file, &statbuf) != 0)
 		{
 			print_msg(_("WARNING: online backup mode is active\n"
 						"Shutdown will not complete until pg_stop_backup() is called.\n\n"));
@@ -873,7 +941,7 @@ do_restart(void)
 		}
 
 		print_msg(_(" done\n"));
-		printf(_("server stopped\n"));
+		print_msg(_("server stopped\n"));
 	}
 	else
 	{
@@ -1044,7 +1112,11 @@ pgwin32_CommandLine(bool registration)
 
 #ifdef __CYGWIN__
 	/* need to convert to windows path */
+#if CYGWIN_VERSION_DLL_MAJOR >= 1007
+	cygwin_conv_path(CCP_POSIX_TO_WIN_A, cmdLine, buf, sizeof(buf));
+#else
 	cygwin_conv_to_full_win32_path(cmdLine, buf);
+#endif
 	strcpy(cmdLine, buf);
 #endif
 
@@ -1536,22 +1608,26 @@ do_help(void)
 	printf(_("%s is a utility to start, stop, restart, reload configuration files,\n"
 			 "report the status of a PostgreSQL server, or signal a PostgreSQL process.\n\n"), progname);
 	printf(_("Usage:\n"));
+	printf(_("  %s init[db]               [-D DATADIR] [-s] [-o \"OPTIONS\"]\n"), progname);
 #ifdef PGXC
 	printf(_("  %s start   [-w] [-t SECS] [-S NODE-TYPE] [-D DATADIR] [-s] [-l FILENAME] [-o \"OPTIONS\"]\n"), progname);
-	printf(_("  %s restart [-w] [-t SECS] [-S NODE-TYPE] [-D DATADIR] [-s] [-m SHUTDOWN-MODE]\n"
-		 	 "                 [-o \"OPTIONS\"]\n"), progname);
 #else
 	printf(_("  %s start   [-w] [-t SECS] [-D DATADIR] [-s] [-l FILENAME] [-o \"OPTIONS\"]\n"), progname);
-	printf(_("  %s restart [-w] [-t SECS] [-D DATADIR] [-s] [-m SHUTDOWN-MODE]\n"
-		 	 "                 [-o \"OPTIONS\"]\n"), progname);
 #endif
 	printf(_("  %s stop    [-W] [-t SECS] [-D DATADIR] [-s] [-m SHUTDOWN-MODE]\n"), progname);
+#ifdef PGXC
+	printf(_("  %s restart [-w] [-t SECS] [-S NODE-TYPE] [-D DATADIR] [-s] [-m SHUTDOWN-MODE]\n"
+			 "                 [-o \"OPTIONS\"]\n"), progname);
+#else
+	printf(_("  %s restart [-w] [-t SECS] [-D DATADIR] [-s] [-m SHUTDOWN-MODE]\n"
+			 "                 [-o \"OPTIONS\"]\n"), progname);
+#endif
 	printf(_("  %s reload  [-D DATADIR] [-s]\n"), progname);
 	printf(_("  %s status  [-D DATADIR]\n"), progname);
 	printf(_("  %s kill    SIGNALNAME PID\n"), progname);
 #if defined(WIN32) || defined(__CYGWIN__)
 	printf(_("  %s register   [-N SERVICENAME] [-U USERNAME] [-P PASSWORD] [-D DATADIR]\n"
-		 	 "                    [-w] [-t SECS] [-o \"OPTIONS\"]\n"), progname);
+		 "                    [-w] [-t SECS] [-o \"OPTIONS\"]\n"), progname);
 	printf(_("  %s unregister [-N SERVICENAME]\n"), progname);
 #endif
 
@@ -1577,7 +1653,7 @@ do_help(void)
 #endif
 	printf(_("  -l, --log FILENAME     write (or append) server log to FILENAME\n"));
 	printf(_("  -o OPTIONS             command line options to pass to postgres\n"
-			 "                         (PostgreSQL server executable)\n"));
+	 "                         (PostgreSQL server executable) or initdb\n"));
 	printf(_("  -p PATH-TO-POSTGRES    normally not necessary\n"));
 	printf(_("\nOptions for stop or restart:\n"));
 	printf(_("  -m SHUTDOWN-MODE   can be \"smart\", \"fast\", or \"immediate\"\n"));
@@ -1783,7 +1859,7 @@ main(int argc, char **argv)
 					post_opts = xstrdup(optarg);
 					break;
 				case 'p':
-					postgres_path = xstrdup(optarg);
+					exec_path = xstrdup(optarg);
 					break;
 				case 'P':
 					register_password = xstrdup(optarg);
@@ -1844,12 +1920,16 @@ main(int argc, char **argv)
 				do_advice();
 				exit(1);
 			}
-			if (strcmp(argv[optind], "start") == 0)
+
+			if (strcmp(argv[optind], "init") == 0
+				|| strcmp(argv[optind], "initdb") == 0)
+				ctl_command = INIT_COMMAND;
+			else if (strcmp(argv[optind], "start") == 0)
 				ctl_command = START_COMMAND;
-			else if (strcmp(argv[optind], "restart") == 0)
-				ctl_command = RESTART_COMMAND;
 			else if (strcmp(argv[optind], "stop") == 0)
 				ctl_command = STOP_COMMAND;
+			else if (strcmp(argv[optind], "restart") == 0)
+				ctl_command = RESTART_COMMAND;
 			else if (strcmp(argv[optind], "reload") == 0)
 				ctl_command = RELOAD_COMMAND;
 			else if (strcmp(argv[optind], "status") == 0)
@@ -1949,21 +2029,25 @@ main(int argc, char **argv)
 		snprintf(pid_file, MAXPGPATH, "%s/postmaster.pid", pg_data);
 		snprintf(conf_file, MAXPGPATH, "%s/postgresql.conf", pg_data);
 		snprintf(backup_file, MAXPGPATH, "%s/backup_label", pg_data);
+		snprintf(recovery_file, MAXPGPATH, "%s/recovery.conf", pg_data);
 	}
 
 	switch (ctl_command)
 	{
+		case INIT_COMMAND:
+			do_init();
+			break;
 		case STATUS_COMMAND:
 			do_status();
 			break;
 		case START_COMMAND:
 			do_start();
 			break;
-		case RESTART_COMMAND:
-			do_restart();
-			break;
 		case STOP_COMMAND:
 			do_stop();
+			break;
+		case RESTART_COMMAND:
+			do_restart();
 			break;
 		case RELOAD_COMMAND:
 			do_reload();

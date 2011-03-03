@@ -7,10 +7,10 @@
  * accessed via the extended FE/BE query protocol.
  *
  *
- * Copyright (c) 2002-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2002-2010, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/commands/prepare.c
  *
  *-------------------------------------------------------------------------
  */
@@ -18,7 +18,6 @@
 
 #include "access/xact.h"
 #include "catalog/pg_type.h"
-#include "commands/explain.h"
 #include "commands/prepare.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
@@ -38,6 +37,7 @@
 #include "pgxc/poolmgr.h"
 #include "pgxc/execRemote.h"
 #endif
+
 
 /*
  * The hash table in which prepared queries are stored. This is
@@ -408,6 +408,11 @@ EvaluateParams(PreparedStatement *pstmt, List *params,
 	paramLI = (ParamListInfo)
 		palloc(sizeof(ParamListInfoData) +
 			   (num_params - 1) *sizeof(ParamExternData));
+	/* we have static list of params, so no hooks needed */
+	paramLI->paramFetch = NULL;
+	paramLI->paramFetchArg = NULL;
+	paramLI->parserSetup = NULL;
+	paramLI->parserSetupArg = NULL;
 	paramLI->numParams = num_params;
 
 	i = 0;
@@ -757,9 +762,8 @@ DropAllPreparedStatements(void)
  * not the original PREPARE; we get the latter string from the plancache.
  */
 void
-ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt,
-					const char *queryString,
-					ParamListInfo params, TupOutputState *tstate)
+ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainState *es,
+					const char *queryString, ParamListInfo params)
 {
 	PreparedStatement *entry;
 	const char *query_string;
@@ -803,9 +807,6 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt,
 	foreach(p, plan_list)
 	{
 		PlannedStmt *pstmt = (PlannedStmt *) lfirst(p);
-		bool		is_last_query;
-
-		is_last_query = (lnext(p) == NULL);
 
 		if (IsA(pstmt, PlannedStmt))
 		{
@@ -823,20 +824,18 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt,
 				pstmt->intoClause = execstmt->into;
 			}
 
-			ExplainOnePlan(pstmt, stmt, query_string,
-						   paramLI, tstate);
+			ExplainOnePlan(pstmt, es, query_string, paramLI);
 		}
 		else
 		{
-			ExplainOneUtility((Node *) pstmt, stmt, query_string,
-							  params, tstate);
+			ExplainOneUtility((Node *) pstmt, es, query_string, params);
 		}
 
 		/* No need for CommandCounterIncrement, as ExplainOnePlan did it */
 
-		/* put a blank line between plans */
-		if (!is_last_query)
-			do_text_output_oneline(tstate, "");
+		/* Separate plans with an appropriate separator */
+		if (lnext(p) != NULL)
+			ExplainSeparatePlans(es);
 	}
 
 	if (estate)

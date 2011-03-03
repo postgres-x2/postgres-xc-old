@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/isn/Makefile
 
 MODULES = isn
 DATA_built = isn.sql

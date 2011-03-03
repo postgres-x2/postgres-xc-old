@@ -2,9 +2,9 @@
 #
 # Makefile for src/tools/fsync
 #
-# Copyright (c) 2003-2009, PostgreSQL Global Development Group
+# Copyright (c) 2003-2010, PostgreSQL Global Development Group
 #
-# $PostgreSQL$
+# src/tools/fsync/Makefile
 #
 #-------------------------------------------------------------------------
 
@@ -19,7 +19,7 @@ OBJS= test_fsync.o
 all: submake-libpq submake-libpgport test_fsync
 
 test_fsync: test_fsync.o $(libpq_builddir)/libpq.a
-	$(CC) $(CFLAGS) test_fsync.o $(libpq_pgport) $(LDFLAGS) $(LIBS) -o $@$(X)
+	$(CC) $(CFLAGS) test_fsync.o $(libpq_pgport) $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
 
 clean distclean maintainer-clean:
 	rm -f test_fsync$(X) $(OBJS)

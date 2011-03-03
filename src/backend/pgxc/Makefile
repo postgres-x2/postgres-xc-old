@@ -4,7 +4,7 @@
 #
 # Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
 #
-# $PostgreSQL$
+# src/backend/pgxc/Makefile
 #
 
 subdir = src/backend/pgxc

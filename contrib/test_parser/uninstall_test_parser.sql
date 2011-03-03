@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/test_parser/uninstall_test_parser.sql
 
 -- Adjust this setting to control where the objects get dropped.
 SET search_path = public;

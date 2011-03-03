@@ -4,14 +4,14 @@
  *	  POSTGRES type cache code
  *
  * The type cache exists to speed lookup of certain information about data
- * types that is not directly available from a type's pg_type row.  In
- * particular, we use a type's default btree opclass, or the default hash
+ * types that is not directly available from a type's pg_type row.  For
+ * example, we use a type's default btree opclass, or the default hash
  * opclass if no btree opclass exists, to determine which operators should
  * be used for grouping and sorting the type (GROUP BY, ORDER BY ASC/DESC).
  *
  * Several seemingly-odd choices have been made to support use of the type
  * cache by the generic array comparison routines array_eq() and array_cmp().
- * Because these routines are used as index support operations, they cannot
+ * Because those routines are used as index support operations, they cannot
  * leak memory.  To allow them to execute efficiently, all information that
  * either of them would like to re-use across calls is made available in the
  * type cache.
@@ -32,11 +32,11 @@
  * entry, since that may need to change as a consequence of ALTER TABLE.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/utils/cache/typcache.c
  *
  *-------------------------------------------------------------------------
  */
@@ -48,6 +48,7 @@
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "utils/builtins.h"
+#include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
@@ -86,6 +87,8 @@ static TupleDesc *RecordCacheArray = NULL;
 static int32 RecordCacheArrayLen = 0;	/* allocated length of array */
 static int32 NextRecordTypmod = 0;		/* number of entries used */
 
+static void TypeCacheRelCallback(Datum arg, Oid relid);
+
 
 /*
  * lookup_type_cache
@@ -109,15 +112,19 @@ lookup_type_cache(Oid type_id, int flags)
 		/* First time through: initialize the hash table */
 		HASHCTL		ctl;
 
-		if (!CacheMemoryContext)
-			CreateCacheMemoryContext();
-
 		MemSet(&ctl, 0, sizeof(ctl));
 		ctl.keysize = sizeof(Oid);
 		ctl.entrysize = sizeof(TypeCacheEntry);
 		ctl.hash = oid_hash;
 		TypeCacheHash = hash_create("Type information cache", 64,
 									&ctl, HASH_ELEM | HASH_FUNCTION);
+
+		/* Also set up a callback for relcache SI invalidations */
+		CacheRegisterRelcacheCallback(TypeCacheRelCallback, (Datum) 0);
+
+		/* Also make sure CacheMemoryContext exists */
+		if (!CacheMemoryContext)
+			CreateCacheMemoryContext();
 	}
 
 	/* Try to look up an existing entry */
@@ -134,9 +141,7 @@ lookup_type_cache(Oid type_id, int flags)
 		HeapTuple	tp;
 		Form_pg_type typtup;
 
-		tp = SearchSysCache(TYPEOID,
-							ObjectIdGetDatum(type_id),
-							0, 0, 0);
+		tp = SearchSysCache1(TYPEOID, ObjectIdGetDatum(type_id));
 		if (!HeapTupleIsValid(tp))
 			elog(ERROR, "cache lookup failed for type %u", type_id);
 		typtup = (Form_pg_type) GETSTRUCT(tp);
@@ -249,8 +254,8 @@ lookup_type_cache(Oid type_id, int flags)
 	 * Set up fmgr lookup info as requested
 	 *
 	 * Note: we tell fmgr the finfo structures live in CacheMemoryContext,
-	 * which is not quite right (they're really in DynaHashContext) but this
-	 * will do for our purposes.
+	 * which is not quite right (they're really in the hash table's private
+	 * memory context) but this will do for our purposes.
 	 */
 	if ((flags & TYPECACHE_EQ_OPR_FINFO) &&
 		typentry->eq_opr_finfo.fn_oid == InvalidOid &&
@@ -424,15 +429,16 @@ assign_record_type_typmod(TupleDesc tupDesc)
 		/* First time through: initialize the hash table */
 		HASHCTL		ctl;
 
-		if (!CacheMemoryContext)
-			CreateCacheMemoryContext();
-
 		MemSet(&ctl, 0, sizeof(ctl));
 		ctl.keysize = REC_HASH_KEYS * sizeof(Oid);
 		ctl.entrysize = sizeof(RecordCacheEntry);
 		ctl.hash = tag_hash;
 		RecordCacheHash = hash_create("Record information cache", 64,
 									  &ctl, HASH_ELEM | HASH_FUNCTION);
+
+		/* Also make sure CacheMemoryContext exists */
+		if (!CacheMemoryContext)
+			CreateCacheMemoryContext();
 	}
 
 	/* Find or create a hashtable entry for this hash class */
@@ -497,36 +503,51 @@ assign_record_type_typmod(TupleDesc tupDesc)
 }
 
 /*
- * flush_rowtype_cache
+ * TypeCacheRelCallback
+ *		Relcache inval callback function
  *
- * If a typcache entry exists for a rowtype, delete the entry's cached
- * tuple descriptor link.  This is called from relcache.c when a cached
- * relation tupdesc is about to be dropped.
+ * Delete the cached tuple descriptor (if any) for the given rel's composite
+ * type, or for all composite types if relid == InvalidOid.
+ *
+ * This is called when a relcache invalidation event occurs for the given
+ * relid.  We must scan the whole typcache hash since we don't know the
+ * type OID corresponding to the relid.  We could do a direct search if this
+ * were a syscache-flush callback on pg_type, but then we would need all
+ * ALTER-TABLE-like commands that could modify a rowtype to issue syscache
+ * invals against the rel's pg_type OID.  The extra SI signaling could very
+ * well cost more than we'd save, since in most usages there are not very
+ * many entries in a backend's typcache.  The risk of bugs-of-omission seems
+ * high, too.
+ *
+ * Another possibility, with only localized impact, is to maintain a second
+ * hashtable that indexes composite-type typcache entries by their typrelid.
+ * But it's still not clear it's worth the trouble.
  */
-void
-flush_rowtype_cache(Oid type_id)
+static void
+TypeCacheRelCallback(Datum arg, Oid relid)
 {
+	HASH_SEQ_STATUS status;
 	TypeCacheEntry *typentry;
 
-	if (TypeCacheHash == NULL)
-		return;					/* no table, so certainly no entry */
+	/* TypeCacheHash must exist, else this callback wouldn't be registered */
+	hash_seq_init(&status, TypeCacheHash);
+	while ((typentry = (TypeCacheEntry *) hash_seq_search(&status)) != NULL)
+	{
+		if (typentry->tupDesc == NULL)
+			continue;	/* not composite, or tupdesc hasn't been requested */
 
-	typentry = (TypeCacheEntry *) hash_search(TypeCacheHash,
-											  (void *) &type_id,
-											  HASH_FIND, NULL);
-	if (typentry == NULL)
-		return;					/* no matching entry */
-	if (typentry->tupDesc == NULL)
-		return;					/* tupdesc hasn't been requested */
-
-	/*
-	 * Release our refcount and free the tupdesc if none remain. (Can't use
-	 * DecrTupleDescRefCount because this reference is not logged in current
-	 * resource owner.)
-	 */
-	Assert(typentry->tupDesc->tdrefcount > 0);
-	if (--typentry->tupDesc->tdrefcount == 0)
-		FreeTupleDesc(typentry->tupDesc);
-
-	typentry->tupDesc = NULL;
+		/* Delete if match, or if we're zapping all composite types */
+		if (relid == typentry->typrelid || relid == InvalidOid)
+		{
+			/*
+			 * Release our refcount, and free the tupdesc if none remain.
+			 * (Can't use DecrTupleDescRefCount because this reference is not
+			 * logged in current resource owner.)
+			 */
+			Assert(typentry->tupDesc->tdrefcount > 0);
+			if (--typentry->tupDesc->tdrefcount == 0)
+				FreeTupleDesc(typentry->tupDesc);
+			typentry->tupDesc = NULL;
+		}
+	}
 }

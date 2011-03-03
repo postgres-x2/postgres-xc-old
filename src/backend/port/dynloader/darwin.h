@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/backend/port/dynloader/darwin.h
 
 #include "fmgr.h"
 

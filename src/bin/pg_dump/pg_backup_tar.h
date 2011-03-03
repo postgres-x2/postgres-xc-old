@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/bin/pg_dump/pg_backup_tar.h
  *
  * TAR Header
  *

@@ -3,12 +3,12 @@
  * hash.c
  *	  Implementation of Margo Seltzer's Hashing package for postgres.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/hash/hash.c
  *
  * NOTES
  *	  This file contains only the public interface routines.
@@ -165,7 +165,7 @@ hashinsert(PG_FUNCTION_ARGS)
 
 #ifdef NOT_USED
 	Relation	heapRel = (Relation) PG_GETARG_POINTER(4);
-	bool		checkUnique = PG_GETARG_BOOL(5);
+	IndexUniqueCheck checkUnique = (IndexUniqueCheck) PG_GETARG_INT32(5);
 #endif
 	IndexTuple	itup;
 
@@ -192,7 +192,7 @@ hashinsert(PG_FUNCTION_ARGS)
 
 	pfree(itup);
 
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(false);
 }
 
 
@@ -233,7 +233,7 @@ hashgettuple(PG_FUNCTION_ARGS)
 		/*
 		 * An insertion into the current index page could have happened while
 		 * we didn't have read lock on it.  Re-find our position by looking
-		 * for the TID we previously returned.  (Because we hold share lock on
+		 * for the TID we previously returned.	(Because we hold share lock on
 		 * the bucket, no deletions or splits could have occurred; therefore
 		 * we can expect that the TID still exists in the current index page,
 		 * at an offset >= where we were.)

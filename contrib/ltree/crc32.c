@@ -1,6 +1,6 @@
 /* Both POSIX and CRC32 checksums */
 
-/* $PostgreSQL$ */
+/* contrib/ltree/crc32.c
 
 #include <sys/types.h>
 #include <stdio.h>

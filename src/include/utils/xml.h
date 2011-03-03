@@ -4,10 +4,10 @@
  *	  Declarations for XML data type support.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/utils/xml.h
  *
  *-------------------------------------------------------------------------
  */
@@ -72,6 +72,7 @@ extern xmltype *xmlpi(char *target, text *arg, bool arg_is_null, bool *result_is
 extern xmltype *xmlroot(xmltype *data, text *version, int standalone);
 extern bool xml_is_document(xmltype *arg);
 extern text *xmltotext_with_xmloption(xmltype *data, XmlOptionType xmloption_arg);
+extern char *escape_xml(const char *str);
 
 extern char *map_sql_identifier_to_xml_name(char *ident, bool fully_escaped, bool escape_period);
 extern char *map_xml_name_to_sql_identifier(char *name);

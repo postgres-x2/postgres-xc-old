@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/backend/port/nextstep/port.c
  */
 #include "postgres.h"
 

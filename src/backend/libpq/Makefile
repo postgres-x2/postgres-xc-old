@@ -4,7 +4,7 @@
 #    Makefile for libpq subsystem (backend half of libpq interface)
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/libpq/Makefile
 #
 #-------------------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/pgtypeslib/datetime.c */
 
 #include "postgres_fe.h"
 

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/intagg/int_aggregate.sql
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;

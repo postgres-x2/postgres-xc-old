@@ -4,10 +4,10 @@
  *	  prototypes for nodeAgg.c
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/executor/nodeAgg.h
  *
  *-------------------------------------------------------------------------
  */
@@ -16,7 +16,6 @@
 
 #include "nodes/execnodes.h"
 
-extern int	ExecCountSlotsAgg(Agg *node);
 extern AggState *ExecInitAgg(Agg *node, EState *estate, int eflags);
 extern TupleTableSlot *ExecAgg(AggState *node);
 extern void ExecEndAgg(AggState *node);

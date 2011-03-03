@@ -4,7 +4,7 @@
 #    Makefile for access/index
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/access/index/Makefile
 #
 #-------------------------------------------------------------------------
 

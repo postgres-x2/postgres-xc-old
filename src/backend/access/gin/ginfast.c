@@ -7,11 +7,11 @@
  *	  transfer pending entries into the regular index structure.  This
  *	  wins because bulk insertion is much more efficient than retail.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *			$PostgreSQL$
+ *			src/backend/access/gin/ginfast.c
  *
  *-------------------------------------------------------------------------
  */
@@ -765,8 +765,7 @@ ginInsertCleanup(Relation index, GinState *ginstate,
 		 */
 		if (GinPageGetOpaque(page)->rightlink == InvalidBlockNumber ||
 			(GinPageHasFullRow(page) &&
-			 (accum.allocatedMemory >= maintenance_work_mem * 1024L ||
-			  accum.maxdepth > GIN_MAX_TREE_DEPTH)))
+			 (accum.allocatedMemory >= maintenance_work_mem * 1024L)))
 		{
 			ItemPointerData *list;
 			uint32		nlist;
@@ -787,6 +786,7 @@ ginInsertCleanup(Relation index, GinState *ginstate,
 			 * significant amount of time - so, run it without locking pending
 			 * list.
 			 */
+			ginBeginBAScan(&accum);
 			while ((list = ginGetEntry(&accum, &attnum, &entry, &nlist)) != NULL)
 			{
 				ginEntryInsert(index, ginstate, attnum, entry, list, nlist, FALSE);
@@ -821,6 +821,7 @@ ginInsertCleanup(Relation index, GinState *ginstate,
 				ginInitBA(&accum);
 				processPendingPage(&accum, &datums, page, maxoff + 1);
 
+				ginBeginBAScan(&accum);
 				while ((list = ginGetEntry(&accum, &attnum, &entry, &nlist)) != NULL)
 					ginEntryInsert(index, ginstate, attnum, entry, list, nlist, FALSE);
 			}

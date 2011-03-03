@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/auto_explain/Makefile
 
 MODULE_big = auto_explain
 OBJS = auto_explain.o

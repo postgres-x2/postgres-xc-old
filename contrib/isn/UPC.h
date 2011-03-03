@@ -6,7 +6,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  contrib/isn/UPC.h
  *
  */
 

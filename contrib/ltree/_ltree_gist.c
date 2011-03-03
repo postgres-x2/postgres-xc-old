@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/ltree/_ltree_gist.c
  *
  *
  * GiST support for ltree[]

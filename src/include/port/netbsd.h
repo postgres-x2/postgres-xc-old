@@ -1,1 +1,1 @@
-/* $PostgreSQL$ */
+/* src/include/port/netbsd.h

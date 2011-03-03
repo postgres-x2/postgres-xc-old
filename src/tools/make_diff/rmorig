@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/make_diff/rmorig
 
 if [ "$#" -eq 0 ]
 then	APATH="."

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/tutorial/complex.c
  *
  ******************************************************************************
   This file contains routines that can be bound to a Postgres backend and

@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/storage.sgml
 
 <chapter id="storage">
 
@@ -78,6 +78,11 @@ Item
 </row>
 
 <row>
+ <entry><filename>pg_notify</></entry>
+ <entry>Subdirectory containing LISTEN/NOTIFY status data</entry>
+</row>
+
+<row>
  <entry><filename>pg_stat_tmp</></entry>
  <entry>Subdirectory containing temporary files for the statistics
   subsystem</entry>
@@ -147,6 +152,11 @@ Note that while a table's filenode often matches its OID, this is
 <command>TRUNCATE</>, <command>REINDEX</>, <command>CLUSTER</> and some forms
 of <command>ALTER TABLE</>, can change the filenode while preserving the OID.
 Avoid assuming that filenode and table OID are the same.
+Also, for certain system catalogs including <structname>pg_class</> itself,
+<structname>pg_class</>.<structfield>relfilenode</> contains zero.  The
+actual filenode number of these catalogs is stored in a lower-level data
+structure, and can be obtained using the <function>pg_relation_filenode()</>
+function.
 </para>
 </caution>
 
@@ -160,8 +170,6 @@ adjusted using the configuration option <option>--with-segsize</option>
 when building <productname>PostgreSQL</>.)
 In principle, free space map and visibility map forks could require multiple
 segments as well, though this is unlikely to happen in practice.
-The contents of tables and indexes are discussed further in
-<xref linkend="storage-page-layout">.
 </para>
 
 <para>
@@ -174,18 +182,40 @@ See <xref linkend="storage-toast"> for more information.
 </para>
 
 <para>
+The contents of tables and indexes are discussed further in
+<xref linkend="storage-page-layout">.
+</para>
+
+<para>
 Tablespaces make the scenario more complicated.  Each user-defined tablespace
 has a symbolic link inside the <varname>PGDATA</><filename>/pg_tblspc</>
-directory, which points to the physical tablespace directory (as specified in
-its <command>CREATE TABLESPACE</> command).  The symbolic link is named after
+directory, which points to the physical tablespace directory (i.e., the
+location specified in the tablespace's <command>CREATE TABLESPACE</> command).
+This symbolic link is named after
 the tablespace's OID.  Inside the physical tablespace directory there is
+a subdirectory with a name that depends on the <productname>PostgreSQL</>
+server version, such as <literal>PG_9.0_201008051</>.  (The reason for using
+this subdirectory is so that successive versions of the database can use
+the same <command>CREATE TABLESPACE</> location value without conflicts.)
+Within the version-specific subdirectory, there is
 a subdirectory for each database that has elements in the tablespace, named
-after the database's OID.  Tables within that directory follow the filenode
-naming scheme.  The <literal>pg_default</> tablespace is not accessed through
+after the database's OID.  Tables and indexes are stored within that
+directory, using the filenode naming scheme.
+The <literal>pg_default</> tablespace is not accessed through
 <filename>pg_tblspc</>, but corresponds to
 <varname>PGDATA</><filename>/base</>.  Similarly, the <literal>pg_global</>
 tablespace is not accessed through <filename>pg_tblspc</>, but corresponds to
 <varname>PGDATA</><filename>/global</>.
+</para>
+
+<para>
+The <function>pg_relation_filepath()</> function shows the entire path
+(relative to <varname>PGDATA</>) of any relation.  It is often useful
+as a substitute for remembering many of the above rules.  But keep in
+mind that this function just gives the name of the first segment of the
+main fork of the relation &mdash; you may need to append a segment number
+and/or <literal>_fsm</> or <literal>_vm</> to find all the files associated
+with the relation.
 </para>
 
 <para>
@@ -347,7 +377,7 @@ The <acronym>TOAST</> code recognizes four different strategies for storing
       <literal>MAIN</literal> allows compression but not out-of-line
       storage.  (Actually, out-of-line storage will still be performed
       for such columns, but only as a last resort when there is no other
-      way to make the row small enough.)
+      way to make the row small enough to fit on a page.)
      </para>
     </listitem>
    </itemizedlist>
@@ -797,7 +827,7 @@ data. Empty in ordinary tables.</entry>
   the next. Then make sure you have the right alignment.  If the field is a
   fixed width field, then all the bytes are simply placed. If it's a
   variable length field (attlen = -1) then it's a bit more complicated.
-  All variable-length datatypes share the common header structure
+  All variable-length data types share the common header structure
   <type>struct varlena</type>, which includes the total length of the stored
   value and some flag bits.  Depending on the flags, the data can be either
   inline or in a <acronym>TOAST</> table;

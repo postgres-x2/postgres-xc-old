@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/btree_gist/btree_gist.h
  */
 #ifndef __BTREE_GIST_H__
 #define __BTREE_GIST_H__

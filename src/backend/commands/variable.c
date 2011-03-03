@@ -4,12 +4,12 @@
  *		Routines for handling specialized SET variables.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/commands/variable.c
  *
  *-------------------------------------------------------------------------
  */
@@ -727,9 +727,7 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 			return NULL;
 		}
 
-		roleTup = SearchSysCache(AUTHNAME,
-								 PointerGetDatum(value),
-								 0, 0, 0);
+		roleTup = SearchSysCache1(AUTHNAME, PointerGetDatum(value));
 		if (!HeapTupleIsValid(roleTup))
 		{
 			ereport(GUC_complaint_elevel(source),
@@ -772,6 +770,10 @@ show_session_authorization(void)
 	const char *value = session_authorization_string;
 	Oid			savedoid;
 	char	   *endptr;
+
+	/* If session_authorization hasn't been set in this process, return "" */
+	if (value == NULL || value[0] == '\0')
+		return "";
 
 	Assert(strspn(value, "x") == NAMEDATALEN &&
 		   (value[NAMEDATALEN] == 'T' || value[NAMEDATALEN] == 'F'));
@@ -839,9 +841,7 @@ assign_role(const char *value, bool doit, GucSource source)
 			return NULL;
 		}
 
-		roleTup = SearchSysCache(AUTHNAME,
-								 PointerGetDatum(value),
-								 0, 0, 0);
+		roleTup = SearchSysCache1(AUTHNAME, PointerGetDatum(value));
 		if (!HeapTupleIsValid(roleTup))
 		{
 			ereport(GUC_complaint_elevel(source),

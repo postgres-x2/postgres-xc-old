@@ -4,7 +4,7 @@
 #    Makefile for storage/buffer
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/storage/buffer/Makefile
 #
 #-------------------------------------------------------------------------
 

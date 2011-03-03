@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/spi/autoinc.c
  */
 #include "postgres.h"
 

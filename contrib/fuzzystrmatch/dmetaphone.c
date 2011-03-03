@@ -1,7 +1,7 @@
 /*
  * This is a port of the Double Metaphone algorithm for use in PostgreSQL.
  *
- * $PostgreSQL$
+ * contrib/fuzzystrmatch/dmetaphone.c
  *
  * Double Metaphone computes 2 "sounds like" strings - a primary and an
  * alternate. In most cases they are the same, but for foreign names
@@ -461,7 +461,7 @@ DoubleMetaphone(char *str, char **codes)
 					current += 1;
 				break;
 
-			case 'Ç':
+			case '\xc7':		/* C with cedilla */
 				MetaphAdd(primary, "S");
 				MetaphAdd(secondary, "S");
 				current += 1;
@@ -1037,7 +1037,7 @@ DoubleMetaphone(char *str, char **codes)
 				MetaphAdd(secondary, "N");
 				break;
 
-			case 'Ñ':
+			case '\xd1':		/* N with tilde */
 				current += 1;
 				MetaphAdd(primary, "N");
 				MetaphAdd(secondary, "N");

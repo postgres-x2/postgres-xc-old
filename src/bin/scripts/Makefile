@@ -2,14 +2,16 @@
 #
 # Makefile for src/bin/scripts
 #
-# Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+# Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 #
-# $PostgreSQL$
+# src/bin/scripts/Makefile
 #
 #-------------------------------------------------------------------------
 
 PGFILEDESC = "PostgreSQL utility"
+PGAPPICON=win32
+
 subdir = src/bin/scripts
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
@@ -21,7 +23,7 @@ override CPPFLAGS := -I$(top_srcdir)/src/bin/pg_dump -I$(top_srcdir)/src/bin/psq
 all: submake-libpq $(PROGRAMS)
 
 %: %.o $(WIN32RES)
-	$(CC) $(CFLAGS) $^ $(libpq_pgport) $(LDFLAGS) $(LIBS) -o $@$(X)
+	$(CC) $(CFLAGS) $^ $(libpq_pgport) $(LDFLAGS) $(LDFLAGS_EX) $(LIBS) -o $@$(X)
 
 createdb: createdb.o common.o dumputils.o kwlookup.o keywords.o
 createlang: createlang.o common.o print.o mbprint.o
@@ -52,11 +54,12 @@ install: all installdirs
 	$(INSTALL_PROGRAM) clusterdb$(X)  '$(DESTDIR)$(bindir)'/clusterdb$(X)
 	$(INSTALL_PROGRAM) vacuumdb$(X)   '$(DESTDIR)$(bindir)'/vacuumdb$(X)
 	$(INSTALL_PROGRAM) reindexdb$(X)  '$(DESTDIR)$(bindir)'/reindexdb$(X)
+# PGXC_BEGIN
 	$(INSTALL_PROGRAM) pgxc_ddl$(X) '$(DESTDIR)$(bindir)'/pgxc_ddl$(X)
 	chmod 555 '$(DESTDIR)$(bindir)'/pgxc_ddl$(X)
-
+# PGXC_END
 installdirs:
-	$(mkinstalldirs) '$(DESTDIR)$(bindir)'
+	$(MKDIR_P) '$(DESTDIR)$(bindir)'
 
 uninstall:
 	rm -f $(addprefix '$(DESTDIR)$(bindir)'/, $(addsuffix $(X), $(PROGRAMS)))

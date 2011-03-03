@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/intarray/_int_op.c
  */
 #include "postgres.h"
 

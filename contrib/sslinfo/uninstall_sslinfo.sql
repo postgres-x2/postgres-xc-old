@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/sslinfo/uninstall_sslinfo.sql
 
 -- Adjust this setting to control where the objects get dropped.
 SET search_path = public;

@@ -2186,6 +2186,20 @@ select count(*) from tenk1 x where
      1
 (1 row)
 
+-- try that with GEQO too
+begin;
+set geqo = on;
+set geqo_threshold = 2;
+select count(*) from tenk1 x where
+  x.unique1 in (select a.f1 from int4_tbl a,float8_tbl b where a.f1=b.f1) and
+  x.unique1 = 0 and
+  x.unique1 in (select aa.f1 from int4_tbl aa,float8_tbl bb where aa.f1=bb.f1);
+ count 
+-------
+     1
+(1 row)
+
+rollback;
 --
 -- Clean up
 --
@@ -2230,6 +2244,19 @@ SELECT * FROM t3 ORDER By x, y;
  x | y 
 ---+---
 (0 rows)
+
+-- Test join against inheritance tree
+create temp table t2a () inherits (t2);
+insert into t2a values (200, 2001);
+select * from t1 left join t2 on (t1.a = t2.a);
+  a  |  b   |  a  |  b   
+-----+------+-----+------
+   5 |   10 |     |     
+  15 |   20 |     |     
+ 100 |  100 |     |     
+ 200 | 1000 | 200 | 2000
+ 200 | 1000 | 200 | 2001
+(5 rows)
 
 --
 -- regression test for 8.1 merge right join bug

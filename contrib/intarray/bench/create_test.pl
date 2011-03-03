@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# $PostgreSQL$
+# contrib/intarray/bench/create_test.pl
 
 use strict;
 print <<EOT;

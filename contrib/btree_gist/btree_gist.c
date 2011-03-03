@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/btree_gist/btree_gist.c
  */
 #include "btree_gist.h"
 

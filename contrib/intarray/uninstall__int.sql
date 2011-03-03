@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/intarray/uninstall__int.sql
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;

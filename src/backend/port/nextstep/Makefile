@@ -4,7 +4,7 @@
 #    Makefile for port/nextstep
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/port/nextstep/Makefile
 #
 #-------------------------------------------------------------------------
 

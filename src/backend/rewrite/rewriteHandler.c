@@ -3,11 +3,11 @@
  * rewriteHandler.c
  *		Primary module of query rewriter.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/rewrite/rewriteHandler.c
  *
  *-------------------------------------------------------------------------
  */
@@ -57,10 +57,12 @@ static Node *get_assignment_input(Node *node);
 static void rewriteValuesRTE(RangeTblEntry *rte, Relation target_relation,
 				 List *attrnos);
 static void markQueryForLocking(Query *qry, Node *jtnode,
-					bool forUpdate, bool noWait);
+					bool forUpdate, bool noWait, bool pushedDown);
 static List *matchLocks(CmdType event, RuleLock *rulelocks,
 		   int varno, Query *parsetree);
-static Query *fireRIRrules(Query *parsetree, List *activeRIRs);
+static Query *fireRIRrules(Query *parsetree, List *activeRIRs,
+			 bool forUpdatePushedDown);
+
 #ifdef PGXC
 static int GetRelPartColPos(const Query *query, const char *partColName);
 static void ProcessHashValue(List **valuesList, const List *subList, const int node);
@@ -76,6 +78,10 @@ static List *RewriteInsertStmt(Query *parsetree, RangeTblEntry *values_rte);
  *	  Acquire suitable locks on all the relations mentioned in the Query.
  *	  These locks will ensure that the relation schemas don't change under us
  *	  while we are rewriting and planning the query.
+ *
+ * forUpdatePushedDown indicates that a pushed-down FOR UPDATE/SHARE applies
+ * to the current subquery, requiring all rels to be opened with RowShareLock.
+ * This should always be false at the start of the recursion.
  *
  * A secondary purpose of this routine is to fix up JOIN RTE references to
  * dropped columns (see details below).  Because the RTEs are modified in
@@ -104,7 +110,7 @@ static List *RewriteInsertStmt(Query *parsetree, RangeTblEntry *values_rte);
  * construction of a nested join was O(N^2) in the nesting depth.)
  */
 void
-AcquireRewriteLocks(Query *parsetree)
+AcquireRewriteLocks(Query *parsetree, bool forUpdatePushedDown)
 {
 	ListCell   *l;
 	int			rt_index;
@@ -142,7 +148,8 @@ AcquireRewriteLocks(Query *parsetree)
 				 */
 				if (rt_index == parsetree->resultRelation)
 					lockmode = RowExclusiveLock;
-				else if (get_rowmark(parsetree, rt_index))
+				else if (forUpdatePushedDown ||
+						 get_parse_rowmark(parsetree, rt_index) != NULL)
 					lockmode = RowShareLock;
 				else
 					lockmode = AccessShareLock;
@@ -219,7 +226,9 @@ AcquireRewriteLocks(Query *parsetree)
 				 * The subquery RTE itself is all right, but we have to
 				 * recurse to process the represented subquery.
 				 */
-				AcquireRewriteLocks(rte->subquery);
+				AcquireRewriteLocks(rte->subquery,
+									(forUpdatePushedDown ||
+							get_parse_rowmark(parsetree, rt_index) != NULL));
 				break;
 
 			default:
@@ -233,7 +242,7 @@ AcquireRewriteLocks(Query *parsetree)
 	{
 		CommonTableExpr *cte = (CommonTableExpr *) lfirst(l);
 
-		AcquireRewriteLocks((Query *) cte->ctequery);
+		AcquireRewriteLocks((Query *) cte->ctequery, false);
 	}
 
 	/*
@@ -258,7 +267,7 @@ acquireLocksOnSubLinks(Node *node, void *context)
 		SubLink    *sub = (SubLink *) node;
 
 		/* Do what we came for */
-		AcquireRewriteLocks((Query *) sub->subselect);
+		AcquireRewriteLocks((Query *) sub->subselect, false);
 		/* Fall through to process lefthand args of SubLink */
 	}
 
@@ -311,7 +320,7 @@ rewriteRuleAction(Query *parsetree,
 	/*
 	 * Acquire necessary locks and fix any deleted JOIN RTE entries.
 	 */
-	AcquireRewriteLocks(rule_action);
+	AcquireRewriteLocks(rule_action, false);
 	(void) acquireLocksOnSubLinks(rule_qual, NULL);
 
 	current_varno = rt_index;
@@ -330,7 +339,7 @@ rewriteRuleAction(Query *parsetree,
 
 	OffsetVarNodes((Node *) sub_action, rt_length, 0);
 	OffsetVarNodes(rule_qual, rt_length, 0);
-	/* but references to *OLD* should point at original rt_index */
+	/* but references to OLD should point at original rt_index */
 	ChangeVarNodes((Node *) sub_action,
 				   PRS2_OLD_VARNO + rt_length, rt_index, 0);
 	ChangeVarNodes(rule_qual,
@@ -1147,7 +1156,8 @@ ApplyRetrieveRule(Query *parsetree,
 				  int rt_index,
 				  bool relation_level,
 				  Relation relation,
-				  List *activeRIRs)
+				  List *activeRIRs,
+				  bool forUpdatePushedDown)
 {
 	Query	   *rule_action;
 	RangeTblEntry *rte,
@@ -1162,17 +1172,24 @@ ApplyRetrieveRule(Query *parsetree,
 		elog(ERROR, "cannot handle per-attribute ON SELECT rule");
 
 	/*
+	 * If FOR UPDATE/SHARE of view, be sure we get right initial lock on the
+	 * relations it references.
+	 */
+	rc = get_parse_rowmark(parsetree, rt_index);
+	forUpdatePushedDown |= (rc != NULL);
+
+	/*
 	 * Make a modifiable copy of the view query, and acquire needed locks on
 	 * the relations it mentions.
 	 */
 	rule_action = copyObject(linitial(rule->actions));
 
-	AcquireRewriteLocks(rule_action);
+	AcquireRewriteLocks(rule_action, forUpdatePushedDown);
 
 	/*
 	 * Recursively expand any view references inside the view.
 	 */
-	rule_action = fireRIRrules(rule_action, activeRIRs);
+	rule_action = fireRIRrules(rule_action, activeRIRs, forUpdatePushedDown);
 
 	/*
 	 * VIEWs are really easy --- just plug the view query in as a subselect,
@@ -1187,7 +1204,7 @@ ApplyRetrieveRule(Query *parsetree,
 
 	/*
 	 * We move the view's permission check data down to its rangetable. The
-	 * checks will actually be done against the *OLD* entry therein.
+	 * checks will actually be done against the OLD entry therein.
 	 */
 	subrte = rt_fetch(PRS2_OLD_VARNO, rule_action->rtable);
 	Assert(subrte->relid == relation->rd_id);
@@ -1202,23 +1219,16 @@ ApplyRetrieveRule(Query *parsetree,
 	rte->modifiedCols = NULL;
 
 	/*
-	 * FOR UPDATE/SHARE of view?
+	 * If FOR UPDATE/SHARE of view, mark all the contained tables as implicit
+	 * FOR UPDATE/SHARE, the same as the parser would have done if the view's
+	 * subquery had been written out explicitly.
+	 *
+	 * Note: we don't consider forUpdatePushedDown here; such marks will be
+	 * made by recursing from the upper level in markQueryForLocking.
 	 */
-	if ((rc = get_rowmark(parsetree, rt_index)) != NULL)
-	{
-		/*
-		 * Remove the view from the list of rels that will actually be marked
-		 * FOR UPDATE/SHARE by the executor.  It will still be access-checked
-		 * for write access, though.
-		 */
-		parsetree->rowMarks = list_delete_ptr(parsetree->rowMarks, rc);
-
-		/*
-		 * Set up the view's referenced tables as if FOR UPDATE/SHARE.
-		 */
+	if (rc != NULL)
 		markQueryForLocking(rule_action, (Node *) rule_action->jointree,
-							rc->forUpdate, rc->noWait);
-	}
+							rc->forUpdate, rc->noWait, true);
 
 	return parsetree;
 }
@@ -1235,7 +1245,8 @@ ApplyRetrieveRule(Query *parsetree,
  * to scan the jointree to determine which rels are used.
  */
 static void
-markQueryForLocking(Query *qry, Node *jtnode, bool forUpdate, bool noWait)
+markQueryForLocking(Query *qry, Node *jtnode,
+					bool forUpdate, bool noWait, bool pushedDown)
 {
 	if (jtnode == NULL)
 		return;
@@ -1246,14 +1257,15 @@ markQueryForLocking(Query *qry, Node *jtnode, bool forUpdate, bool noWait)
 
 		if (rte->rtekind == RTE_RELATION)
 		{
-			applyLockingClause(qry, rti, forUpdate, noWait);
+			applyLockingClause(qry, rti, forUpdate, noWait, pushedDown);
 			rte->requiredPerms |= ACL_SELECT_FOR_UPDATE;
 		}
 		else if (rte->rtekind == RTE_SUBQUERY)
 		{
+			applyLockingClause(qry, rti, forUpdate, noWait, pushedDown);
 			/* FOR UPDATE/SHARE of subquery is propagated to subquery's rels */
 			markQueryForLocking(rte->subquery, (Node *) rte->subquery->jointree,
-								forUpdate, noWait);
+								forUpdate, noWait, true);
 		}
 		/* other RTE types are unaffected by FOR UPDATE */
 	}
@@ -1263,14 +1275,14 @@ markQueryForLocking(Query *qry, Node *jtnode, bool forUpdate, bool noWait)
 		ListCell   *l;
 
 		foreach(l, f->fromlist)
-			markQueryForLocking(qry, lfirst(l), forUpdate, noWait);
+			markQueryForLocking(qry, lfirst(l), forUpdate, noWait, pushedDown);
 	}
 	else if (IsA(jtnode, JoinExpr))
 	{
 		JoinExpr   *j = (JoinExpr *) jtnode;
 
-		markQueryForLocking(qry, j->larg, forUpdate, noWait);
-		markQueryForLocking(qry, j->rarg, forUpdate, noWait);
+		markQueryForLocking(qry, j->larg, forUpdate, noWait, pushedDown);
+		markQueryForLocking(qry, j->rarg, forUpdate, noWait, pushedDown);
 	}
 	else
 		elog(ERROR, "unrecognized node type: %d",
@@ -1302,7 +1314,7 @@ fireRIRonSubLink(Node *node, List *activeRIRs)
 
 		/* Do what we came for */
 		sub->subselect = (Node *) fireRIRrules((Query *) sub->subselect,
-											   activeRIRs);
+											   activeRIRs, false);
 		/* Fall through to process lefthand args of SubLink */
 	}
 
@@ -1320,7 +1332,7 @@ fireRIRonSubLink(Node *node, List *activeRIRs)
  *	Apply all RIR rules on each rangetable entry in a query
  */
 static Query *
-fireRIRrules(Query *parsetree, List *activeRIRs)
+fireRIRrules(Query *parsetree, List *activeRIRs, bool forUpdatePushedDown)
 {
 	int			rt_index;
 	ListCell   *lc;
@@ -1350,7 +1362,9 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		 */
 		if (rte->rtekind == RTE_SUBQUERY)
 		{
-			rte->subquery = fireRIRrules(rte->subquery, activeRIRs);
+			rte->subquery = fireRIRrules(rte->subquery, activeRIRs,
+										 (forUpdatePushedDown ||
+							get_parse_rowmark(parsetree, rt_index) != NULL));
 			continue;
 		}
 
@@ -1427,7 +1441,8 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 											  rt_index,
 											  rule->attrno == -1,
 											  rel,
-											  activeRIRs);
+											  activeRIRs,
+											  forUpdatePushedDown);
 			}
 
 			activeRIRs = list_delete_first(activeRIRs);
@@ -1442,7 +1457,7 @@ fireRIRrules(Query *parsetree, List *activeRIRs)
 		CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
 
 		cte->ctequery = (Node *)
-			fireRIRrules((Query *) cte->ctequery, activeRIRs);
+			fireRIRrules((Query *) cte->ctequery, activeRIRs, false);
 	}
 
 	/*
@@ -1940,18 +1955,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 	if (parsetree_list == NIL)
 	{
 #endif
-	/*
-	 * For INSERTs, the original query is done first; for UPDATE/DELETE, it is
-	 * done last.  This is needed because update and delete rule actions might
-	 * not do anything if they are invoked after the update or delete is
-	 * performed. The command counter increment between the query executions
-	 * makes the deleted (and maybe the updated) tuples disappear so the scans
-	 * for them in the rule actions cannot find them.
-	 *
-	 * If we found any unqualified INSTEAD, the original query is not done at
-	 * all, in any form.  Otherwise, we add the modified form if qualified
-	 * INSTEADs were found, else the unmodified form.
-	 */
 	if (!instead)
 	{
 		if (parsetree->commandType == CMD_INSERT)
@@ -2015,6 +2018,8 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 
 	return rewritten;
 }
+
+
 /*
  * QueryRewrite -
  *	  Primary entry point to the query rewriter.
@@ -2050,7 +2055,7 @@ QueryRewrite(Query *parsetree)
 	{
 		Query	   *query = (Query *) lfirst(l);
 
-		query = fireRIRrules(query, NIL);
+		query = fireRIRrules(query, NIL, false);
 
 		/*
 		 * If the query target was rewritten as a view, complain.
@@ -2390,4 +2395,3 @@ collect:
 	return rwInsertList;
 }
 #endif
-

@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/template/hpux
 
 CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE_EXTENDED"
 

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/isn/isn.sql.in
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;

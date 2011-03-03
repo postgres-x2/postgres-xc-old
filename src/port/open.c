@@ -4,9 +4,9 @@
  *	   Win32 open() replacement
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/port/open.c
  *
  *-------------------------------------------------------------------------
  */
@@ -124,7 +124,7 @@ pgwin32_open(const char *fileName, int fileFlags,...)
 	}
 
 	/* _open_osfhandle will, on error, set errno accordingly */
-	if ((fd = _open_osfhandle((long) h, fileFlags & O_APPEND)) < 0)
+	if ((fd = _open_osfhandle((intptr_t) h, fileFlags & O_APPEND)) < 0)
 		CloseHandle(h);			/* will not affect errno */
 	else if (fileFlags & (O_TEXT | O_BINARY) &&
 			 _setmode(fd, fileFlags & (O_TEXT | O_BINARY)) < 0)

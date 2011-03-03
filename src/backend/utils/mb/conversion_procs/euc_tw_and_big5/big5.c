@@ -7,7 +7,7 @@
  *
  * 1999/1/15 Tatsuo Ishii
  *
- * $PostgreSQL$
+ * src/backend/utils/mb/conversion_procs/euc_tw_and_big5/big5.c
  */
 
 /* can be used in either frontend or backend */

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/make_diff/difforig
 
 if [ "$#" -eq 0 ]
 then	APATH="."

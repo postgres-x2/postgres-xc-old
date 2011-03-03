@@ -3,12 +3,12 @@
  * hashutil.c
  *	  Utility code for Postgres hash implementation.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/hash/hashutil.c
  *
  *-------------------------------------------------------------------------
  */
@@ -38,11 +38,7 @@ _hash_checkqual(IndexScanDesc scan, IndexTuple itup)
 	TupleDesc	tupdesc = RelationGetDescr(scan->indexRelation);
 	ScanKey		key = scan->keyData;
 	int			scanKeySize = scan->numberOfKeys;
-#endif
 
-	IncrIndexProcessed();
-
-#ifdef NOT_USED
 	while (scanKeySize > 0)
 	{
 		Datum		datum;

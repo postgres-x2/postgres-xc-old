@@ -3,10 +3,10 @@
  * postmaster.h
  *	  Exports from postmaster/postmaster.c.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/postmaster/postmaster.h
  *
  *-------------------------------------------------------------------------
  */
@@ -27,6 +27,7 @@ extern int	PreAuthDelay;
 extern int	AuthenticationTimeout;
 extern bool Log_connections;
 extern bool log_hostname;
+extern bool enable_bonjour;
 extern char *bonjour_name;
 
 #ifdef WIN32

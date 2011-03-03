@@ -4,12 +4,12 @@
  *	  routines to convert a string (legal ascii representation of node) back
  *	  to nodes
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/nodes/read.c
  *
  * HISTORY
  *	  AUTHOR			DATE			MAJOR EVENT
@@ -289,7 +289,7 @@ nodeRead(char *token, int tok_len)
 
 	type = nodeTokenType(token, tok_len);
 
-	switch (type)
+	switch ((int) type)
 	{
 		case LEFT_BRACE:
 			result = parseNodeString();

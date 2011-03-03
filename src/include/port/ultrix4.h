@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/port/ultrix4.h
  */
 #define NOFIXADE
 #define NEED_STRDUP

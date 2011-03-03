@@ -3,7 +3,7 @@
  *
  *	Definitions for the builtin LZ compressor
  *
- * $PostgreSQL$
+ * src/include/utils/pg_lzcompress.h
  * ----------
  */
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $PostgreSQL$
+ * contrib/pgcrypto/pgp-s2k.c
  */
 
 #include "postgres.h"

@@ -4,7 +4,7 @@
 #    Makefile for access/gin
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/access/gin/Makefile
 #
 #-------------------------------------------------------------------------
 

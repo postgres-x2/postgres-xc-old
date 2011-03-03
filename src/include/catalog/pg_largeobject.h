@@ -5,13 +5,13 @@
  *	  along with the relation's initial contents.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/catalog/pg_largeobject.h
  *
  * NOTES
- *	  the genbki.sh script reads this file and generates .bki
+ *	  the genbki.pl script reads this file and generates .bki
  *	  information from the DATA() statements.
  *
  *-------------------------------------------------------------------------
@@ -51,8 +51,9 @@ typedef FormData_pg_largeobject *Form_pg_largeobject;
 #define Anum_pg_largeobject_pageno		2
 #define Anum_pg_largeobject_data		3
 
-extern void LargeObjectCreate(Oid loid);
+extern Oid	LargeObjectCreate(Oid loid);
 extern void LargeObjectDrop(Oid loid);
+extern void LargeObjectAlterOwner(Oid loid, Oid newOwnerId);
 extern bool LargeObjectExists(Oid loid);
 
 #endif   /* PG_LARGEOBJECT_H */

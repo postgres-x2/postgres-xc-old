@@ -3,12 +3,12 @@
  * dfmgr.c
  *	  Dynamic function manager code.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/utils/fmgr/dfmgr.c
  *
  *-------------------------------------------------------------------------
  */
@@ -443,7 +443,7 @@ internal_unload_library(const char *libname)
 		else
 			prv = file_scanner;
 	}
-#endif /* NOT_USED */
+#endif   /* NOT_USED */
 }
 
 static bool

@@ -2,7 +2,7 @@
  * gettimeofday.c
  *	  Win32 gettimeofday() replacement
  *
- * $PostgreSQL$
+ * src/port/gettimeofday.c
  *
  * Copyright (c) 2003 SRA, Inc.
  * Copyright (c) 2003 SKC, Inc.

@@ -5,12 +5,12 @@
  *	  Planning is complete, we just need to convert the selected
  *	  Path into a Plan.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/optimizer/plan/createplan.c
  *
  *-------------------------------------------------------------------------
  */
@@ -95,7 +95,6 @@ static MergeJoin *create_mergejoin_plan(PlannerInfo *root, MergePath *best_path,
 static HashJoin *create_hashjoin_plan(PlannerInfo *root, HashPath *best_path,
 					 Plan *outer_plan, Plan *inner_plan);
 static List *fix_indexqual_references(List *indexquals, IndexPath *index_path);
-static Node *fix_indexqual_operand(Node *node, IndexOptInfo *index);
 static List *get_switched_clauses(List *clauses, Relids outerrelids);
 static List *order_qual_clauses(PlannerInfo *root, List *clauses);
 static void copy_path_costsize(Plan *dest, Path *src);
@@ -141,6 +140,7 @@ static HashJoin *make_hashjoin(List *tlist,
 static Hash *make_hash(Plan *lefttree,
 		  Oid skewTable,
 		  AttrNumber skewColumn,
+		  bool skewInherit,
 		  Oid skewColType,
 		  int32 skewColTypmod);
 static MergeJoin *make_mergejoin(List *tlist,
@@ -1252,7 +1252,7 @@ create_append_plan(PlannerInfo *root, AppendPath *best_path)
 		subplans = lappend(subplans, create_plan(root, subpath));
 	}
 
-	plan = make_append(subplans, false, tlist);
+	plan = make_append(subplans, tlist);
 
 	return (Plan *) plan;
 }
@@ -1462,6 +1462,7 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path)
 		{
 			Oid			in_oper = lfirst_oid(l);
 			Oid			sortop;
+			Oid			eqop;
 			TargetEntry *tle;
 			SortGroupClause *sortcl;
 
@@ -1469,13 +1470,26 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path)
 			if (!OidIsValid(sortop))	/* shouldn't happen */
 				elog(ERROR, "could not find ordering operator for equality operator %u",
 					 in_oper);
+
+			/*
+			 * The Unique node will need equality operators.  Normally these
+			 * are the same as the IN clause operators, but if those are
+			 * cross-type operators then the equality operators are the ones
+			 * for the IN clause operators' RHS datatype.
+			 */
+			eqop = get_equality_op_for_ordering_op(sortop, NULL);
+			if (!OidIsValid(eqop))		/* shouldn't happen */
+				elog(ERROR, "could not find equality operator for ordering operator %u",
+					 sortop);
+
 			tle = get_tle_by_resno(subplan->targetlist,
 								   groupColIdx[groupColPos]);
 			Assert(tle != NULL);
+
 			sortcl = makeNode(SortGroupClause);
 			sortcl->tleSortGroupRef = assignSortGroupRef(tle,
 														 subplan->targetlist);
-			sortcl->eqop = in_oper;
+			sortcl->eqop = eqop;
 			sortcl->sortop = sortop;
 			sortcl->nulls_first = false;
 			sortList = lappend(sortList, sortcl);
@@ -1624,7 +1638,7 @@ create_indexscan_plan(PlannerInfo *root,
 			if (best_path->indexinfo->indpred)
 			{
 				if (baserelid != root->parse->resultRelation &&
-					get_rowmark(root->parse, baserelid) == NULL)
+					get_parse_rowmark(root->parse, baserelid) == NULL)
 					if (predicate_implied_by(clausel,
 											 best_path->indexinfo->indpred))
 						continue;
@@ -2009,7 +2023,8 @@ create_subqueryscan_plan(PlannerInfo *root, Path *best_path,
 								  scan_clauses,
 								  scan_relid,
 								  best_path->parent->subplan,
-								  best_path->parent->subrtable);
+								  best_path->parent->subrtable,
+								  best_path->parent->subrowmark);
 
 	copy_path_costsize(&scan_plan->scan.plan, best_path);
 
@@ -2527,9 +2542,8 @@ create_mergejoin_plan(PlannerInfo *root,
 							 best_path->jpath.outerjoinpath->parent->relids);
 
 	/*
-	 * Create explicit sort nodes for the outer and inner join paths if
-	 * necessary.  The sort cost was already accounted for in the path. Make
-	 * sure there are no excess columns in the inputs if sorting.
+	 * Create explicit sort nodes for the outer and inner paths if necessary.
+	 * Make sure there are no excess columns in the inputs if sorting.
 	 */
 	if (best_path->outersortkeys)
 	{
@@ -2558,26 +2572,20 @@ create_mergejoin_plan(PlannerInfo *root,
 		innerpathkeys = best_path->jpath.innerjoinpath->pathkeys;
 
 	/*
-	 * If inner plan is a sort that is expected to spill to disk, add a
-	 * materialize node to shield it from the need to handle mark/restore.
-	 * This will allow it to perform the last merge pass on-the-fly, while in
-	 * most cases not requiring the materialize to spill to disk.
-	 *
-	 * XXX really, Sort oughta do this for itself, probably, to avoid the
-	 * overhead of a separate plan node.
+	 * If specified, add a materialize node to shield the inner plan from the
+	 * need to handle mark/restore.
 	 */
-	if (IsA(inner_plan, Sort) &&
-		sort_exceeds_work_mem((Sort *) inner_plan))
+	if (best_path->materialize_inner)
 	{
 		Plan	   *matplan = (Plan *) make_material(inner_plan);
 
 		/*
 		 * We assume the materialize will not spill to disk, and therefore
-		 * charge just cpu_tuple_cost per tuple.  (Keep this estimate in sync
-		 * with similar ones in cost_mergejoin and create_mergejoin_path.)
+		 * charge just cpu_operator_cost per tuple.  (Keep this estimate in
+		 * sync with cost_mergejoin.)
 		 */
 		copy_plan_costsize(matplan, inner_plan);
-		matplan->total_cost += cpu_tuple_cost * matplan->plan_rows;
+		matplan->total_cost += cpu_operator_cost * matplan->plan_rows;
 
 		inner_plan = matplan;
 	}
@@ -2624,9 +2632,9 @@ create_mergejoin_plan(PlannerInfo *root,
 		Assert(ieclass != NULL);
 
 		/*
-		 * For debugging purposes, we check that the eclasses match the
-		 * paths' pathkeys.  In typical cases the merge clauses are one-to-one
-		 * with the pathkeys, but when dealing with partially redundant query
+		 * For debugging purposes, we check that the eclasses match the paths'
+		 * pathkeys.  In typical cases the merge clauses are one-to-one with
+		 * the pathkeys, but when dealing with partially redundant query
 		 * conditions, we might have clauses that re-reference earlier path
 		 * keys.  The case that we need to reject is where a pathkey is
 		 * entirely skipped over.
@@ -2731,9 +2739,9 @@ create_mergejoin_plan(PlannerInfo *root,
 	}
 
 	/*
-	 * Note: it is not an error if we have additional pathkey elements
-	 * (i.e., lop or lip isn't NULL here).  The input paths might be
-	 * better-sorted than we need for the current mergejoin.
+	 * Note: it is not an error if we have additional pathkey elements (i.e.,
+	 * lop or lip isn't NULL here).  The input paths might be better-sorted
+	 * than we need for the current mergejoin.
 	 */
 
 	/*
@@ -2750,6 +2758,7 @@ create_mergejoin_plan(PlannerInfo *root,
 							   inner_plan,
 							   best_path->jpath.jointype);
 
+	/* Costs of sort and material steps are included in path cost already */
 	copy_path_costsize(&join_plan->join.plan, &best_path->jpath.path);
 
 	return join_plan;
@@ -2767,6 +2776,7 @@ create_hashjoin_plan(PlannerInfo *root,
 	List	   *hashclauses;
 	Oid			skewTable = InvalidOid;
 	AttrNumber	skewColumn = InvalidAttrNumber;
+	bool		skewInherit = false;
 	Oid			skewColType = InvalidOid;
 	int32		skewColTypmod = -1;
 	HashJoin   *join_plan;
@@ -2838,6 +2848,7 @@ create_hashjoin_plan(PlannerInfo *root,
 			{
 				skewTable = rte->relid;
 				skewColumn = var->varattno;
+				skewInherit = rte->inh;
 				skewColType = var->vartype;
 				skewColTypmod = var->vartypmod;
 			}
@@ -2850,6 +2861,7 @@ create_hashjoin_plan(PlannerInfo *root,
 	hash_plan = make_hash(inner_plan,
 						  skewTable,
 						  skewColumn,
+						  skewInherit,
 						  skewColType,
 						  skewColTypmod);
 	join_plan = make_hashjoin(tlist,
@@ -2982,7 +2994,6 @@ fix_indexqual_references(List *indexquals, IndexPath *index_path)
 		{
 			NullTest   *nt = (NullTest *) clause;
 
-			Assert(nt->nulltesttype == IS_NULL);
 			nt->arg = (Expr *) fix_indexqual_operand((Node *) nt->arg,
 													 index);
 		}
@@ -2996,7 +3007,13 @@ fix_indexqual_references(List *indexquals, IndexPath *index_path)
 	return fixed_indexquals;
 }
 
-static Node *
+/*
+ * fix_indexqual_operand
+ *	  Convert an indexqual expression to a Var referencing the index column.
+ *
+ * This is exported because planagg.c needs it.
+ */
+Node *
 fix_indexqual_operand(Node *node, IndexOptInfo *index)
 {
 	/*
@@ -3372,7 +3389,8 @@ make_subqueryscan(List *qptlist,
 				  List *qpqual,
 				  Index scanrelid,
 				  Plan *subplan,
-				  List *subrtable)
+				  List *subrtable,
+				  List *subrowmark)
 {
 	SubqueryScan *node = makeNode(SubqueryScan);
 	Plan	   *plan = &node->scan.plan;
@@ -3392,6 +3410,7 @@ make_subqueryscan(List *qptlist,
 	node->scan.scanrelid = scanrelid;
 	node->subplan = subplan;
 	node->subrtable = subrtable;
+	node->subrowmark = subrowmark;
 
 	return node;
 }
@@ -3507,7 +3526,7 @@ make_remotequery(List *qptlist,
 #endif
 
 Append *
-make_append(List *appendplans, bool isTarget, List *tlist)
+make_append(List *appendplans, List *tlist)
 {
 	Append	   *node = makeNode(Append);
 	Plan	   *plan = &node->plan;
@@ -3543,7 +3562,6 @@ make_append(List *appendplans, bool isTarget, List *tlist)
 	plan->lefttree = NULL;
 	plan->righttree = NULL;
 	node->appendplans = appendplans;
-	node->isTarget = isTarget;
 
 	return node;
 }
@@ -3684,6 +3702,7 @@ static Hash *
 make_hash(Plan *lefttree,
 		  Oid skewTable,
 		  AttrNumber skewColumn,
+		  bool skewInherit,
 		  Oid skewColType,
 		  int32 skewColTypmod)
 {
@@ -3704,6 +3723,7 @@ make_hash(Plan *lefttree,
 
 	node->skewTable = skewTable;
 	node->skewColumn = skewColumn;
+	node->skewInherit = skewInherit;
 	node->skewColType = skewColType;
 	node->skewColTypmod = skewColTypmod;
 
@@ -4157,6 +4177,7 @@ materialize_finished_plan(Plan *subplan)
 
 	/* Set cost data */
 	cost_material(&matpath,
+				  subplan->startup_cost,
 				  subplan->total_cost,
 				  subplan->plan_rows,
 				  subplan->plan_width);
@@ -4243,7 +4264,8 @@ make_windowagg(PlannerInfo *root, List *tlist,
 			   int numWindowFuncs, Index winref,
 			   int partNumCols, AttrNumber *partColIdx, Oid *partOperators,
 			   int ordNumCols, AttrNumber *ordColIdx, Oid *ordOperators,
-			   int frameOptions, Plan *lefttree)
+			   int frameOptions, Node *startOffset, Node *endOffset,
+			   Plan *lefttree)
 {
 	WindowAgg  *node = makeNode(WindowAgg);
 	Plan	   *plan = &node->plan;
@@ -4258,6 +4280,8 @@ make_windowagg(PlannerInfo *root, List *tlist,
 	node->ordColIdx = ordColIdx;
 	node->ordOperators = ordOperators;
 	node->frameOptions = frameOptions;
+	node->startOffset = startOffset;
+	node->endOffset = endOffset;
 
 	copy_plan_costsize(plan, lefttree); /* only care about copying size */
 	cost_windowagg(&windowagg_path, root,
@@ -4477,6 +4501,32 @@ make_setop(SetOpCmd cmd, SetOpStrategy strategy, Plan *lefttree,
 }
 
 /*
+ * make_lockrows
+ *	  Build a LockRows plan node
+ */
+LockRows *
+make_lockrows(Plan *lefttree, List *rowMarks, int epqParam)
+{
+	LockRows   *node = makeNode(LockRows);
+	Plan	   *plan = &node->plan;
+
+	copy_plan_costsize(plan, lefttree);
+
+	/* charge cpu_tuple_cost to reflect locking costs (underestimate?) */
+	plan->total_cost += cpu_tuple_cost * plan->plan_rows;
+
+	plan->targetlist = lefttree->targetlist;
+	plan->qual = NIL;
+	plan->lefttree = lefttree;
+	plan->righttree = NULL;
+
+	node->rowMarks = rowMarks;
+	node->epqParam = epqParam;
+
+	return node;
+}
+
+/*
  * Note: offset_est and count_est are passed in to save having to repeat
  * work already done to estimate the values of the limitOffset and limitCount
  * expressions.  Their values are as returned by preprocess_limit (0 means
@@ -4597,6 +4647,76 @@ make_result(PlannerInfo *root,
 }
 
 /*
+ * make_modifytable
+ *	  Build a ModifyTable plan node
+ *
+ * Currently, we don't charge anything extra for the actual table modification
+ * work, nor for the RETURNING expressions if any.	It would only be window
+ * dressing, since these are always top-level nodes and there is no way for
+ * the costs to change any higher-level planning choices.  But we might want
+ * to make it look better sometime.
+ */
+ModifyTable *
+make_modifytable(CmdType operation, List *resultRelations,
+				 List *subplans, List *returningLists,
+				 List *rowMarks, int epqParam)
+{
+	ModifyTable *node = makeNode(ModifyTable);
+	Plan	   *plan = &node->plan;
+	double		total_size;
+	ListCell   *subnode;
+
+	Assert(list_length(resultRelations) == list_length(subplans));
+	Assert(returningLists == NIL ||
+		   list_length(resultRelations) == list_length(returningLists));
+
+	/*
+	 * Compute cost as sum of subplan costs.
+	 */
+	plan->startup_cost = 0;
+	plan->total_cost = 0;
+	plan->plan_rows = 0;
+	total_size = 0;
+	foreach(subnode, subplans)
+	{
+		Plan	   *subplan = (Plan *) lfirst(subnode);
+
+		if (subnode == list_head(subplans))		/* first node? */
+			plan->startup_cost = subplan->startup_cost;
+		plan->total_cost += subplan->total_cost;
+		plan->plan_rows += subplan->plan_rows;
+		total_size += subplan->plan_width * subplan->plan_rows;
+	}
+	if (plan->plan_rows > 0)
+		plan->plan_width = rint(total_size / plan->plan_rows);
+	else
+		plan->plan_width = 0;
+
+	node->plan.lefttree = NULL;
+	node->plan.righttree = NULL;
+	node->plan.qual = NIL;
+
+	/*
+	 * Set up the visible plan targetlist as being the same as the first
+	 * RETURNING list.	This is for the use of EXPLAIN; the executor won't pay
+	 * any attention to the targetlist.
+	 */
+	if (returningLists)
+		node->plan.targetlist = copyObject(linitial(returningLists));
+	else
+		node->plan.targetlist = NIL;
+
+	node->operation = operation;
+	node->resultRelations = resultRelations;
+	node->plans = subplans;
+	node->returningLists = returningLists;
+	node->rowMarks = rowMarks;
+	node->epqParam = epqParam;
+
+	return node;
+}
+
+/*
  * is_projection_capable_plan
  *		Check whether a given Plan node is able to do projection.
  */
@@ -4611,7 +4731,9 @@ is_projection_capable_plan(Plan *plan)
 		case T_Sort:
 		case T_Unique:
 		case T_SetOp:
+		case T_LockRows:
 		case T_Limit:
+		case T_ModifyTable:
 		case T_Append:
 		case T_RecursiveUnion:
 			return false;
@@ -4825,7 +4947,7 @@ create_remotedelete_plan(PlannerInfo *root, Plan *topplan)
 		RemoteQuery	   *xstep;
 		List 		   *xtlist = NIL;
 		StringInfo 		xbuf = makeStringInfo();
-		int 			natts = get_relnatts(ttab->relid);
+		int 			natts/* = get_relnatts(ttab->relid)*/;
 		int 			att;
 
 		appendStringInfoString(xbuf, "SELECT ");

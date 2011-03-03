@@ -4,7 +4,7 @@
 #    Makefile for utils/sort
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/sort/Makefile
 #
 #-------------------------------------------------------------------------
 

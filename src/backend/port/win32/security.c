@@ -3,10 +3,10 @@
  * security.c
  *	  Microsoft Windows Win32 Security Support Functions
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/port/win32/security.c
  *
  *-------------------------------------------------------------------------
  */

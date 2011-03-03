@@ -2,11 +2,13 @@
 #
 # Makefile for src/bin/pgevent
 #
-# Copyright (c) 1996-2009, PostgreSQL Global Development Group
+# Copyright (c) 1996-2010, PostgreSQL Global Development Group
 #
 #-------------------------------------------------------------------------
 
 PGFILEDESC = "Eventlog message formatter"
+PGAPPICON=win32
+
 PGFILESHLIB = 1
 subdir = src/bin/pgevent
 top_builddir = ../../..
@@ -25,7 +27,7 @@ pgevent.dll: pgevent.def $(OBJS)
 	$(DLLWRAP) --def $< -o $(NAME) $(OBJS)
 
 pgmsgevent.o: pgmsgevent.rc win32ver.rc
-	$(WINDRES) $< -o $@ --include-dir=$(top_builddir)/src/include --include-dir=$(top_srcdir)/src/include --include-dir=$(srcdir)
+	$(WINDRES) $< -o $@ --include-dir=$(top_builddir)/src/include --include-dir=$(top_srcdir)/src/include --include-dir=$(srcdir) --include-dir=.
 
 all-lib: $(NAME)
 

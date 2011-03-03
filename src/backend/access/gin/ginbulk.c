@@ -4,11 +4,11 @@
  *	  routines for fast build of inverted index
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *			$PostgreSQL$
+ *			src/backend/access/gin/ginbulk.c
  *-------------------------------------------------------------------------
  */
 
@@ -19,23 +19,69 @@
 #include "utils/memutils.h"
 
 
-#define DEF_NENTRY	2048
-#define DEF_NPTR	4
+#define DEF_NENTRY	2048		/* EntryAccumulator allocation quantum */
+#define DEF_NPTR	5			/* ItemPointer initial allocation quantum */
 
-void
-ginInitBA(BuildAccumulator *accum)
+
+/* Combiner function for rbtree.c */
+static void
+ginCombineData(RBNode *existing, const RBNode *newdata, void *arg)
 {
-	accum->maxdepth = 1;
-	accum->stackpos = 0;
-	accum->entries = NULL;
-	accum->stack = NULL;
-	accum->allocatedMemory = 0;
-	accum->entryallocator = NULL;
+	EntryAccumulator *eo = (EntryAccumulator *) existing;
+	const EntryAccumulator *en = (const EntryAccumulator *) newdata;
+	BuildAccumulator *accum = (BuildAccumulator *) arg;
+
+	/*
+	 * Note this code assumes that newdata contains only one itempointer.
+	 */
+	if (eo->number >= eo->length)
+	{
+		accum->allocatedMemory -= GetMemoryChunkSpace(eo->list);
+		eo->length *= 2;
+		eo->list = (ItemPointerData *) repalloc(eo->list,
+									   sizeof(ItemPointerData) * eo->length);
+		accum->allocatedMemory += GetMemoryChunkSpace(eo->list);
+	}
+
+	/* If item pointers are not ordered, they will need to be sorted. */
+	if (eo->shouldSort == FALSE)
+	{
+		int			res;
+
+		res = compareItemPointers(eo->list + eo->number - 1, en->list);
+		Assert(res != 0);
+
+		if (res > 0)
+			eo->shouldSort = TRUE;
+	}
+
+	eo->list[eo->number] = en->list[0];
+	eo->number++;
 }
 
-static EntryAccumulator *
-EAAllocate(BuildAccumulator *accum)
+/* Comparator function for rbtree.c */
+static int
+cmpEntryAccumulator(const RBNode *a, const RBNode *b, void *arg)
 {
+	const EntryAccumulator *ea = (const EntryAccumulator *) a;
+	const EntryAccumulator *eb = (const EntryAccumulator *) b;
+	BuildAccumulator *accum = (BuildAccumulator *) arg;
+
+	return compareAttEntries(accum->ginstate, ea->attnum, ea->value,
+							 eb->attnum, eb->value);
+}
+
+/* Allocator function for rbtree.c */
+static RBNode *
+ginAllocEntryAccumulator(void *arg)
+{
+	BuildAccumulator *accum = (BuildAccumulator *) arg;
+	EntryAccumulator *ea;
+
+	/*
+	 * Allocate memory by rather big chunks to decrease overhead.  We have
+	 * no need to reclaim RBNodes individually, so this costs nothing.
+	 */
 	if (accum->entryallocator == NULL || accum->length >= DEF_NENTRY)
 	{
 		accum->entryallocator = palloc(sizeof(EntryAccumulator) * DEF_NENTRY);
@@ -43,38 +89,25 @@ EAAllocate(BuildAccumulator *accum)
 		accum->length = 0;
 	}
 
+	/* Allocate new RBNode from current chunk */
+	ea = accum->entryallocator + accum->length;
 	accum->length++;
-	return accum->entryallocator + accum->length - 1;
+
+	return (RBNode *) ea;
 }
 
-/*
- * Stores heap item pointer. For robust, it checks that
- * item pointer are ordered
- */
-static void
-ginInsertData(BuildAccumulator *accum, EntryAccumulator *entry, ItemPointer heapptr)
+void
+ginInitBA(BuildAccumulator *accum)
 {
-	if (entry->number >= entry->length)
-	{
-		accum->allocatedMemory -= GetMemoryChunkSpace(entry->list);
-		entry->length *= 2;
-		entry->list = (ItemPointerData *) repalloc(entry->list,
-									sizeof(ItemPointerData) * entry->length);
-		accum->allocatedMemory += GetMemoryChunkSpace(entry->list);
-	}
-
-	if (entry->shouldSort == FALSE)
-	{
-		int			res = compareItemPointers(entry->list + entry->number - 1, heapptr);
-
-		Assert(res != 0);
-
-		if (res > 0)
-			entry->shouldSort = TRUE;
-	}
-
-	entry->list[entry->number] = *heapptr;
-	entry->number++;
+	accum->allocatedMemory = 0;
+	accum->length = 0;
+	accum->entryallocator = NULL;
+	accum->tree = rb_create(sizeof(EntryAccumulator),
+							cmpEntryAccumulator,
+							ginCombineData,
+							ginAllocEntryAccumulator,
+							NULL,				/* no freefunc needed */
+							(void *) accum);
 }
 
 /*
@@ -103,111 +136,91 @@ getDatumCopy(BuildAccumulator *accum, OffsetNumber attnum, Datum value)
 static void
 ginInsertEntry(BuildAccumulator *accum, ItemPointer heapptr, OffsetNumber attnum, Datum entry)
 {
-	EntryAccumulator *ea = accum->entries,
-			   *pea = NULL;
-	int			res = 0;
-	uint32		depth = 1;
+	EntryAccumulator key;
+	EntryAccumulator *ea;
+	bool		isNew;
 
-	while (ea)
+	/*
+	 * For the moment, fill only the fields of key that will be looked at
+	 * by cmpEntryAccumulator or ginCombineData.
+	 */
+	key.attnum = attnum;
+	key.value = entry;
+	/* temporarily set up single-entry itempointer list */
+	key.list = heapptr;
+
+	ea = (EntryAccumulator *) rb_insert(accum->tree, (RBNode *) &key, &isNew);
+
+	if (isNew)
 	{
-		res = compareAttEntries(accum->ginstate, attnum, entry, ea->attnum, ea->value);
-		if (res == 0)
-			break;				/* found */
-		else
-		{
-			pea = ea;
-			if (res < 0)
-				ea = ea->left;
-			else
-				ea = ea->right;
-		}
-		depth++;
-	}
-
-	if (depth > accum->maxdepth)
-		accum->maxdepth = depth;
-
-	if (ea == NULL)
-	{
-		ea = EAAllocate(accum);
-
-		ea->left = ea->right = NULL;
-		ea->attnum = attnum;
+		/*
+		 * Finish initializing new tree entry, including making permanent
+		 * copies of the datum and itempointer.
+		 */
 		ea->value = getDatumCopy(accum, attnum, entry);
 		ea->length = DEF_NPTR;
 		ea->number = 1;
 		ea->shouldSort = FALSE;
-		ea->list = (ItemPointerData *) palloc(sizeof(ItemPointerData) * DEF_NPTR);
-		accum->allocatedMemory += GetMemoryChunkSpace(ea->list);
+		ea->list =
+			(ItemPointerData *) palloc(sizeof(ItemPointerData) * DEF_NPTR);
 		ea->list[0] = *heapptr;
-
-		if (pea == NULL)
-			accum->entries = ea;
-		else
-		{
-			Assert(res != 0);
-			if (res < 0)
-				pea->left = ea;
-			else
-				pea->right = ea;
-		}
+		accum->allocatedMemory += GetMemoryChunkSpace(ea->list);
 	}
 	else
-		ginInsertData(accum, ea, heapptr);
+	{
+		/*
+		 * ginCombineData did everything needed.
+		 */
+	}
 }
 
 /*
- * insert middle of left part the middle of right one,
- * then calls itself for each parts
- */
-static void
-ginChooseElem(BuildAccumulator *accum, ItemPointer heapptr, OffsetNumber attnum,
-			  Datum *entries, uint32 nentry,
-			  uint32 low, uint32 high, uint32 offset)
-{
-	uint32		pos;
-	uint32		middle = (low + high) >> 1;
-
-	pos = (low + middle) >> 1;
-	if (low != middle && pos >= offset && pos - offset < nentry)
-		ginInsertEntry(accum, heapptr, attnum, entries[pos - offset]);
-	pos = (high + middle + 1) >> 1;
-	if (middle + 1 != high && pos >= offset && pos - offset < nentry)
-		ginInsertEntry(accum, heapptr, attnum, entries[pos - offset]);
-
-	if (low != middle)
-		ginChooseElem(accum, heapptr, attnum, entries, nentry, low, middle, offset);
-	if (high != middle + 1)
-		ginChooseElem(accum, heapptr, attnum, entries, nentry, middle + 1, high, offset);
-}
-
-/*
- * Insert one heap pointer. Suppose entries is sorted.
- * Insertion order tries to get binary tree balanced: first insert middle value,
- * next middle on left part and middle of right part.
+ * Insert one heap pointer.
+ *
+ * Since the entries are being inserted into a balanced binary tree, you
+ * might think that the order of insertion wouldn't be critical, but it turns
+ * out that inserting the entries in sorted order results in a lot of
+ * rebalancing operations and is slow.	To prevent this, we attempt to insert
+ * the nodes in an order that will produce a nearly-balanced tree if the input
+ * is in fact sorted.
+ *
+ * We do this as follows.  First, we imagine that we have an array whose size
+ * is the smallest power of two greater than or equal to the actual array
+ * size.  Second, we insert the middle entry of our virtual array into the
+ * tree; then, we insert the middles of each half of out virtual array, then
+ * middles of quarters, etc.
  */
 void
 ginInsertRecordBA(BuildAccumulator *accum, ItemPointer heapptr, OffsetNumber attnum,
 				  Datum *entries, int32 nentry)
 {
-	uint32		i,
-				nbit = 0,
-				offset;
+	uint32		step = nentry;
 
 	if (nentry <= 0)
 		return;
 
 	Assert(ItemPointerIsValid(heapptr) && attnum >= FirstOffsetNumber);
 
-	i = nentry - 1;
-	for (; i > 0; i >>= 1)
-		nbit++;
+	/*
+	 * step will contain largest power of 2 and <= nentry
+	 */
+	step |= (step >> 1);
+	step |= (step >> 2);
+	step |= (step >> 4);
+	step |= (step >> 8);
+	step |= (step >> 16);
+	step >>= 1;
+	step++;
 
-	nbit = 1 << nbit;
-	offset = (nbit - nentry) / 2;
+	while (step > 0)
+	{
+		int			i;
 
-	ginInsertEntry(accum, heapptr, attnum, entries[(nbit >> 1) - offset]);
-	ginChooseElem(accum, heapptr, attnum, entries, nentry, 0, nbit, offset);
+		for (i = step - 1; i < nentry && i >= 0; i += step << 1 /* *2 */ )
+			ginInsertEntry(accum, heapptr, attnum, entries[i]);
+
+		step >>= 1;				/* /2 */
+	}
 }
 
 static int
@@ -219,48 +232,11 @@ qsortCompareItemPointers(const void *a, const void *b)
 	return res;
 }
 
-/*
- * walk on binary tree and returns ordered nodes
- */
-static EntryAccumulator *
-walkTree(BuildAccumulator *accum)
+/* Prepare to read out the rbtree contents using ginGetEntry */
+void
+ginBeginBAScan(BuildAccumulator *accum)
 {
-	EntryAccumulator *entry = accum->stack[accum->stackpos];
-
-	if (entry->list != NULL)
-	{
-		/* return entry itself: we already was at left sublink */
-		return entry;
-	}
-	else if (entry->right && entry->right != accum->stack[accum->stackpos + 1])
-	{
-		/* go on right sublink */
-		accum->stackpos++;
-		entry = entry->right;
-
-		/* find most-left value */
-		for (;;)
-		{
-			accum->stack[accum->stackpos] = entry;
-			if (entry->left)
-			{
-				accum->stackpos++;
-				entry = entry->left;
-			}
-			else
-				break;
-		}
-	}
-	else
-	{
-		/* we already return all left subtree, itself and  right subtree */
-		if (accum->stackpos == 0)
-			return 0;
-		accum->stackpos--;
-		return walkTree(accum);
-	}
-
-	return entry;
+	rb_begin_iterate(accum->tree, LeftRightWalk);
 }
 
 ItemPointerData *
@@ -269,36 +245,7 @@ ginGetEntry(BuildAccumulator *accum, OffsetNumber *attnum, Datum *value, uint32 
 	EntryAccumulator *entry;
 	ItemPointerData *list;
 
-	if (accum->stack == NULL)
-	{
-		/* first call */
-		accum->stack = palloc0(sizeof(EntryAccumulator *) * (accum->maxdepth + 1));
-		accum->allocatedMemory += GetMemoryChunkSpace(accum->stack);
-		entry = accum->entries;
-
-		if (entry == NULL)
-			return NULL;
-
-		/* find most-left value */
-		for (;;)
-		{
-			accum->stack[accum->stackpos] = entry;
-			if (entry->left)
-			{
-				accum->stackpos++;
-				entry = entry->left;
-			}
-			else
-				break;
-		}
-	}
-	else
-	{
-		accum->allocatedMemory -= GetMemoryChunkSpace(accum->stack[accum->stackpos]->list);
-		pfree(accum->stack[accum->stackpos]->list);
-		accum->stack[accum->stackpos]->list = NULL;
-		entry = walkTree(accum);
-	}
+	entry = (EntryAccumulator *) rb_iterate(accum->tree);
 
 	if (entry == NULL)
 		return NULL;

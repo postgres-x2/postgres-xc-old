@@ -10,12 +10,12 @@
  * before the lock is released (see notes in README).
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/storage/buffer/buf_table.c
  *
  *-------------------------------------------------------------------------
  */
@@ -66,9 +66,6 @@ InitBufTable(int size)
 								  size, size,
 								  &info,
 								  HASH_ELEM | HASH_FUNCTION | HASH_PARTITION);
-
-	if (!SharedBufHash)
-		elog(FATAL, "could not initialize shared buffer hash table");
 }
 
 /*

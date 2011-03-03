@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/spi/timetravel.c
  *
  *
  * timetravel.c --	function to get time travel feature

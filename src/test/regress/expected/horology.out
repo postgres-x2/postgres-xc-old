@@ -264,6 +264,19 @@ SELECT time with time zone 'T040506.789 -08';
 (1 row)
 
 SET DateStyle = 'Postgres, MDY';
+-- Check Julian dates BC
+SELECT date 'J1520447' AS "Confucius' Birthday";
+ Confucius' Birthday 
+---------------------
+ 09-28-0551 BC
+(1 row)
+
+SELECT date 'J0' AS "Julian Epoch";
+ Julian Epoch  
+---------------
+ 11-24-4714 BC
+(1 row)
+
 --
 -- date, time arithmetic
 --
@@ -1350,7 +1363,7 @@ CREATE TABLE TEMP_TIMESTAMP (f1 timestamp with time zone);
 INSERT INTO TEMP_TIMESTAMP (f1)
   SELECT d1 FROM TIMESTAMP_TBL
   WHERE d1 BETWEEN '13-jun-1957' AND '1-jan-1997'
-   OR d1 BETWEEN '1-jan-1999' AND '1-jan-2010' ;
+   OR d1 BETWEEN '1-jan-1999' AND '1-jan-2010';
 SELECT '' AS "16", f1 AS "timestamp"
   FROM TEMP_TIMESTAMP
   ORDER BY "timestamp";

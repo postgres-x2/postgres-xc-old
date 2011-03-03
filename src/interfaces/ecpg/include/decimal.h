@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/decimal.h */
 
 #ifndef _ECPG_DECIMAL_H
 #define _ECPG_DECIMAL_H

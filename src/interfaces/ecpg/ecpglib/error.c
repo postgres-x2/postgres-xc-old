@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/ecpglib/error.c */
 
 #define POSTGRES_ECPG_INTERNAL
 #include "postgres_fe.h"
@@ -308,8 +308,10 @@ ecpg_raise_backend(int line, PGresult *result, PGconn *conn, int compat)
 
 	if (strcmp(sqlstate, ECPG_SQLSTATE_ECPG_INTERNAL_ERROR) == 0)
 	{
-		/* we might get here if the connection breaks down, so let's
-		 * check for this instead of giving just the generic internal error */
+		/*
+		 * we might get here if the connection breaks down, so let's check for
+		 * this instead of giving just the generic internal error
+		 */
 		if (PQstatus(conn) == CONNECTION_BAD)
 		{
 			sqlstate = "57P02";
@@ -332,8 +334,9 @@ ecpg_raise_backend(int line, PGresult *result, PGconn *conn, int compat)
 	else
 		sqlca->sqlcode = ECPG_PGSQL;
 
-	ecpg_log("raising sqlstate %.*s (sqlcode %d) on line %d: %s\n",
-			 sizeof(sqlca->sqlstate), sqlca->sqlstate, sqlca->sqlcode, line, sqlca->sqlerrm.sqlerrmc);
+	/* %.*s is safe here as long as sqlstate is all-ASCII */
+	ecpg_log("raising sqlstate %.*s (sqlcode %d): %s\n",
+			 sizeof(sqlca->sqlstate), sqlca->sqlstate, sqlca->sqlcode, sqlca->sqlerrm.sqlerrmc);
 
 	/* free all memory we have allocated for the user */
 	ECPGfree_auto_mem();
@@ -345,7 +348,7 @@ ecpg_check_PQresult(PGresult *results, int lineno, PGconn *connection, enum COMP
 {
 	if (results == NULL)
 	{
-		ecpg_log("ecpg_check_PQresult on line %d: %s", lineno, PQerrorMessage(connection));
+		ecpg_log("ecpg_check_PQresult on line %d: no result - %s", lineno, PQerrorMessage(connection));
 		ecpg_raise_backend(lineno, NULL, connection, compat);
 		return (false);
 	}
@@ -368,7 +371,7 @@ ecpg_check_PQresult(PGresult *results, int lineno, PGconn *connection, enum COMP
 		case PGRES_NONFATAL_ERROR:
 		case PGRES_FATAL_ERROR:
 		case PGRES_BAD_RESPONSE:
-			ecpg_log("ecpg_check_PQresult on line %d: %s", lineno, PQresultErrorMessage(results));
+			ecpg_log("ecpg_check_PQresult on line %d: bad response - %s", lineno, PQresultErrorMessage(results));
 			ecpg_raise_backend(lineno, results, connection, compat);
 			PQclear(results);
 			return (false);

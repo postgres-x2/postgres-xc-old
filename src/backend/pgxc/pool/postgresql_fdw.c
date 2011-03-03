@@ -6,7 +6,7 @@
  * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
- *		  $PostgreSQL$
+ *		  src/backend/pgxc/pool/postgresql_fdw.c
  *
  *-------------------------------------------------------------------------
  */

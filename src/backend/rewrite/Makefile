@@ -4,7 +4,7 @@
 #    Makefile for rewrite
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/rewrite/Makefile
 #
 #-------------------------------------------------------------------------
 

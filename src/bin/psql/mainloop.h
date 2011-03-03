@@ -1,9 +1,9 @@
 /*
  * psql - the PostgreSQL interactive terminal
  *
- * Copyright (c) 2000-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/bin/psql/mainloop.h
  */
 #ifndef MAINLOOP_H
 #define MAINLOOP_H

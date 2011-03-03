@@ -1,7 +1,7 @@
 /*
  * FreeSec: libcrypt for NetBSD
  *
- * $PostgreSQL$
+ * contrib/pgcrypto/crypt-des.c
  *
  * Copyright (c) 1994 David Burren
  * All rights reserved.
@@ -38,7 +38,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD$
+ * $FreeBSD: src/secure/lib/libcrypt/crypt-des.c,v 1.12 1999/09/20 12:39:20 markm Exp $
  *
  * This is an original implementation of the DES and the crypt(3) interfaces
  * by David Burren <davidb@werj.com.au>.

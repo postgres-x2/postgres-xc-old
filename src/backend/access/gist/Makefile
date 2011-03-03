@@ -4,7 +4,7 @@
 #    Makefile for access/gist
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/access/gist/Makefile
 #
 #-------------------------------------------------------------------------
 

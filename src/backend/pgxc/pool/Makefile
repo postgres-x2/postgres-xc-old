@@ -6,7 +6,7 @@
 #  Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/pgxc/pool/Makefile
 #
 #-------------------------------------------------------------------------
 

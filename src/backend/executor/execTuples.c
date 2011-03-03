@@ -1,35 +1,35 @@
 /*-------------------------------------------------------------------------
  *
  * execTuples.c
- *	  Routines dealing with the executor tuple tables.	These are used to
- *	  ensure that the executor frees copies of tuples (made by
- *	  ExecTargetList) properly.
+ *	  Routines dealing with TupleTableSlots.  These are used for resource
+ *	  management associated with tuples (eg, releasing buffer pins for
+ *	  tuples in disk buffers, or freeing the memory occupied by transient
+ *	  tuples).	Slots also provide access abstraction that lets us implement
+ *	  "virtual" tuples to reduce data-copying overhead.
  *
  *	  Routines dealing with the type information for tuples. Currently,
  *	  the type information for a tuple is an array of FormData_pg_attribute.
  *	  This information is needed by routines manipulating tuples
  *	  (getattribute, formtuple, etc.).
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/executor/execTuples.c
  *
  *-------------------------------------------------------------------------
  */
 /*
  * INTERFACE ROUTINES
  *
- *	 TABLE CREATE/DELETE
- *		ExecCreateTupleTable	- create a new tuple table
- *		ExecDropTupleTable		- destroy a table
- *		MakeSingleTupleTableSlot - make a single-slot table
- *		ExecDropSingleTupleTableSlot - destroy same
- *
- *	 SLOT RESERVATION
- *		ExecAllocTableSlot		- find an available slot in the table
+ *	 SLOT CREATION/DESTRUCTION
+ *		MakeTupleTableSlot		- create an empty slot
+ *		ExecAllocTableSlot		- create a slot within a tuple table
+ *		ExecResetTupleTable		- clear and optionally delete a tuple table
+ *		MakeSingleTupleTableSlot - make a standalone slot, set its descriptor
+ *		ExecDropSingleTupleTableSlot - destroy a standalone slot
  *
  *	 SLOT ACCESSORS
  *		ExecSetSlotDescriptor	- set a slot's tuple descriptor
@@ -57,12 +57,9 @@
  *
  *		At ExecutorStart()
  *		----------------
- *		- InitPlan() calls ExecCreateTupleTable() to create the tuple
- *		  table which will hold tuples processed by the executor.
- *
  *		- ExecInitSeqScan() calls ExecInitScanTupleSlot() and
- *		  ExecInitResultTupleSlot() to reserve places in the tuple
- *		  table for the tuples returned by the access methods and the
+ *		  ExecInitResultTupleSlot() to construct TupleTableSlots
+ *		  for the tuples returned by the access methods and the
  *		  tuples resulting from performing target list projections.
  *
  *		During ExecutorRun()
@@ -79,7 +76,7 @@
  *
  *		At ExecutorEnd()
  *		----------------
- *		- EndPlan() calls ExecDropTupleTable() to clean up any remaining
+ *		- EndPlan() calls ExecResetTupleTable() to clean up any remaining
  *		  tuples left over from executing the query.
  *
  *		The important thing to watch in the executor code is how pointers
@@ -95,6 +92,7 @@
 #include "catalog/pg_type.h"
 #include "nodes/nodeFuncs.h"
 #include "storage/bufmgr.h"
+#include "utils/builtins.h"
 #include "utils/lsyscache.h"
 #include "utils/typcache.h"
 
@@ -109,127 +107,16 @@ static TupleDesc ExecTypeFromTLInternal(List *targetList,
  */
 
 /* --------------------------------
- *		ExecCreateTupleTable
+ *		MakeTupleTableSlot
  *
- *		This creates a new tuple table of the specified size.
- *
- *		This should be used by InitPlan() to allocate the table.
- *		The table's address will be stored in the EState structure.
- * --------------------------------
- */
-TupleTable
-ExecCreateTupleTable(int tableSize)
-{
-	TupleTable	newtable;
-	int			i;
-
-	/*
-	 * sanity checks
-	 */
-	Assert(tableSize >= 1);
-
-	/*
-	 * allocate the table itself
-	 */
-	newtable = (TupleTable) palloc(sizeof(TupleTableData) +
-								   (tableSize - 1) *sizeof(TupleTableSlot));
-	newtable->size = tableSize;
-	newtable->next = 0;
-
-	/*
-	 * initialize all the slots to empty states
-	 */
-	for (i = 0; i < tableSize; i++)
-	{
-		TupleTableSlot *slot = &(newtable->array[i]);
-
-		slot->type = T_TupleTableSlot;
-		slot->tts_isempty = true;
-		slot->tts_shouldFree = false;
-		slot->tts_shouldFreeMin = false;
-		slot->tts_tuple = NULL;
-		slot->tts_tupleDescriptor = NULL;
-#ifdef PGXC
-		slot->tts_shouldFreeRow = false;
-		slot->tts_dataRow = NULL;
-		slot->tts_dataLen = -1;
-		slot->tts_dataNode = 0;
-		slot->tts_attinmeta = NULL;
-#endif
-		slot->tts_mcxt = CurrentMemoryContext;
-		slot->tts_buffer = InvalidBuffer;
-		slot->tts_nvalid = 0;
-		slot->tts_values = NULL;
-		slot->tts_isnull = NULL;
-		slot->tts_mintuple = NULL;
-	}
-
-	return newtable;
-}
-
-/* --------------------------------
- *		ExecDropTupleTable
- *
- *		This frees the storage used by the tuple table itself
- *		and optionally frees the contents of the table also.
- *		It is expected that this routine be called by EndPlan().
- * --------------------------------
- */
-void
-ExecDropTupleTable(TupleTable table,	/* tuple table */
-				   bool shouldFree)		/* true if we should free slot
-										 * contents */
-{
-	/*
-	 * sanity checks
-	 */
-	Assert(table != NULL);
-
-	/*
-	 * first free all the valid pointers in the tuple array and drop refcounts
-	 * of any referenced buffers, if that's what the caller wants.  (There is
-	 * probably no good reason for the caller ever not to want it!)
-	 */
-	if (shouldFree)
-	{
-		int			next = table->next;
-		int			i;
-
-		for (i = 0; i < next; i++)
-		{
-			TupleTableSlot *slot = &(table->array[i]);
-
-			ExecClearTuple(slot);
-			if (slot->tts_tupleDescriptor)
-				ReleaseTupleDesc(slot->tts_tupleDescriptor);
-			if (slot->tts_values)
-				pfree(slot->tts_values);
-			if (slot->tts_isnull)
-				pfree(slot->tts_isnull);
-		}
-	}
-
-	/*
-	 * finally free the tuple table itself.
-	 */
-	pfree(table);
-}
-
-/* --------------------------------
- *		MakeSingleTupleTableSlot
- *
- *		This is a convenience routine for operations that need a
- *		standalone TupleTableSlot not gotten from the main executor
- *		tuple table.  It makes a single slot and initializes it as
- *		though by ExecSetSlotDescriptor(slot, tupdesc).
+ *		Basic routine to make an empty TupleTableSlot.
  * --------------------------------
  */
 TupleTableSlot *
-MakeSingleTupleTableSlot(TupleDesc tupdesc)
+MakeTupleTableSlot(void)
 {
 	TupleTableSlot *slot = makeNode(TupleTableSlot);
 
-	/* This should match ExecCreateTupleTable() */
 	slot->tts_isempty = true;
 	slot->tts_shouldFree = false;
 	slot->tts_shouldFreeMin = false;
@@ -249,6 +136,85 @@ MakeSingleTupleTableSlot(TupleDesc tupdesc)
 	slot->tts_isnull = NULL;
 	slot->tts_mintuple = NULL;
 
+	return slot;
+}
+
+/* --------------------------------
+ *		ExecAllocTableSlot
+ *
+ *		Create a tuple table slot within a tuple table (which is just a List).
+ * --------------------------------
+ */
+TupleTableSlot *
+ExecAllocTableSlot(List **tupleTable)
+{
+	TupleTableSlot *slot = MakeTupleTableSlot();
+
+	*tupleTable = lappend(*tupleTable, slot);
+
+	return slot;
+}
+
+/* --------------------------------
+ *		ExecResetTupleTable
+ *
+ *		This releases any resources (buffer pins, tupdesc refcounts)
+ *		held by the tuple table, and optionally releases the memory
+ *		occupied by the tuple table data structure.
+ *		It is expected that this routine be called by EndPlan().
+ * --------------------------------
+ */
+void
+ExecResetTupleTable(List *tupleTable,	/* tuple table */
+					bool shouldFree)	/* true if we should free memory */
+{
+	ListCell   *lc;
+
+	foreach(lc, tupleTable)
+	{
+		TupleTableSlot *slot = (TupleTableSlot *) lfirst(lc);
+
+		/* Sanity checks */
+		Assert(IsA(slot, TupleTableSlot));
+
+		/* Always release resources and reset the slot to empty */
+		ExecClearTuple(slot);
+		if (slot->tts_tupleDescriptor)
+		{
+			ReleaseTupleDesc(slot->tts_tupleDescriptor);
+			slot->tts_tupleDescriptor = NULL;
+		}
+
+		/* If shouldFree, release memory occupied by the slot itself */
+		if (shouldFree)
+		{
+			if (slot->tts_values)
+				pfree(slot->tts_values);
+			if (slot->tts_isnull)
+				pfree(slot->tts_isnull);
+			pfree(slot);
+		}
+	}
+
+	/* If shouldFree, release the list structure */
+	if (shouldFree)
+		list_free(tupleTable);
+}
+
+/* --------------------------------
+ *		MakeSingleTupleTableSlot
+ *
+ *		This is a convenience routine for operations that need a
+ *		standalone TupleTableSlot not gotten from the main executor
+ *		tuple table.  It makes a single slot and initializes it
+ *		to use the given tuple descriptor.
+ * --------------------------------
+ */
+TupleTableSlot *
+MakeSingleTupleTableSlot(TupleDesc tupdesc)
+{
+	TupleTableSlot *slot = MakeTupleTableSlot();
+
 	ExecSetSlotDescriptor(slot, tupdesc);
 
 	return slot;
@@ -258,16 +224,14 @@ MakeSingleTupleTableSlot(TupleDesc tupdesc)
  *		ExecDropSingleTupleTableSlot
  *
  *		Release a TupleTableSlot made with MakeSingleTupleTableSlot.
+ *		DON'T use this on a slot that's part of a tuple table list!
  * --------------------------------
  */
 void
 ExecDropSingleTupleTableSlot(TupleTableSlot *slot)
 {
-	/*
-	 * sanity checks
-	 */
-	Assert(slot != NULL);
-
+	/* This should match ExecResetTupleTable's processing of one slot */
+	Assert(IsA(slot, TupleTableSlot));
 	ExecClearTuple(slot);
 	if (slot->tts_tupleDescriptor)
 		ReleaseTupleDesc(slot->tts_tupleDescriptor);
@@ -275,49 +239,9 @@ ExecDropSingleTupleTableSlot(TupleTableSlot *slot)
 		pfree(slot->tts_values);
 	if (slot->tts_isnull)
 		pfree(slot->tts_isnull);
-
 	pfree(slot);
 }
 
-
-/* ----------------------------------------------------------------
- *				  tuple table slot reservation functions
- * ----------------------------------------------------------------
- */
-
-/* --------------------------------
- *		ExecAllocTableSlot
- *
- *		This routine is used to reserve slots in the table for
- *		use by the various plan nodes.	It is expected to be
- *		called by the node init routines (ex: ExecInitNestLoop)
- *		once per slot needed by the node.  Not all nodes need
- *		slots (some just pass tuples around).
- * --------------------------------
- */
-TupleTableSlot *
-ExecAllocTableSlot(TupleTable table)
-{
-	int			slotnum;		/* new slot number */
-
-	/*
-	 * sanity checks
-	 */
-	Assert(table != NULL);
-
-	/*
-	 * We expect that the table was made big enough to begin with. We cannot
-	 * reallocate it on the fly since previous plan nodes have already got
-	 * pointers to individual entries.
-	 */
-	if (table->next >= table->size)
-		elog(ERROR, "plan requires more slots than are available");
-
-	slotnum = table->next;
-	table->next++;
-
-	return &(table->array[slotnum]);
-}
 
 /* ----------------------------------------------------------------
  *				  tuple table slot accessor functions
@@ -542,64 +466,6 @@ ExecStoreMinimalTuple(MinimalTuple mtup,
 	return slot;
 }
 
-#ifdef PGXC
-/* --------------------------------
- *		ExecStoreDataRowTuple
- *
- *		Store a buffer in DataRow message format into the slot.
- *
- * --------------------------------
- */
-TupleTableSlot *
-ExecStoreDataRowTuple(char *msg, size_t len, int node, TupleTableSlot *slot,
-					  bool shouldFree)
-{
-	/*
-	 * sanity checks
-	 */
-	Assert(msg != NULL);
-	Assert(len > 0);
-	Assert(slot != NULL);
-	Assert(slot->tts_tupleDescriptor != NULL);
-
-	/*
-	 * Free any old physical tuple belonging to the slot.
-	 */
-	if (slot->tts_shouldFree)
-		heap_freetuple(slot->tts_tuple);
-	if (slot->tts_shouldFreeMin)
-		heap_free_minimal_tuple(slot->tts_mintuple);
-	if (slot->tts_shouldFreeRow)
-		pfree(slot->tts_dataRow);
-
-	/*
-	 * Drop the pin on the referenced buffer, if there is one.
-	 */
-	if (BufferIsValid(slot->tts_buffer))
-		ReleaseBuffer(slot->tts_buffer);
-
-	slot->tts_buffer = InvalidBuffer;
-
-	/*
-	 * Store the new tuple into the specified slot.
-	 */
-	slot->tts_isempty = false;
-	slot->tts_shouldFree = false;
-	slot->tts_shouldFreeMin = false;
-	slot->tts_shouldFreeRow = shouldFree;
-	slot->tts_tuple = NULL;
-	slot->tts_mintuple = NULL;
-	slot->tts_dataRow = msg;
-	slot->tts_dataLen = len;
-	slot->tts_dataNode = node;
-
-	/* Mark extracted state invalid */
-	slot->tts_nvalid = 0;
-
-	return slot;
-}
-#endif
-
 /* --------------------------------
  *		ExecClearTuple
  *
@@ -739,6 +605,7 @@ ExecCopySlotTuple(TupleTableSlot *slot)
 		return heap_copytuple(slot->tts_tuple);
 	if (slot->tts_mintuple)
 		return heap_tuple_from_minimal_tuple(slot->tts_mintuple);
+
 #ifdef PGXC
 	/*
 	 * Ensure values are extracted from data row to the Datum array
@@ -778,6 +645,7 @@ ExecCopySlotMinimalTuple(TupleTableSlot *slot)
 		return heap_copy_minimal_tuple(slot->tts_mintuple);
 	if (slot->tts_tuple)
 		return minimal_tuple_from_heap_tuple(slot->tts_tuple);
+
 #ifdef PGXC
 	/*
 	 * Ensure values are extracted from data row to the Datum array
@@ -1124,7 +992,7 @@ ExecCopySlot(TupleTableSlot *dstslot, TupleTableSlot *srcslot)
 void
 ExecInitResultTupleSlot(EState *estate, PlanState *planstate)
 {
-	planstate->ps_ResultTupleSlot = ExecAllocTableSlot(estate->es_tupleTable);
+	planstate->ps_ResultTupleSlot = ExecAllocTableSlot(&estate->es_tupleTable);
 }
 
 /* ----------------
@@ -1134,7 +1002,7 @@ ExecInitResultTupleSlot(EState *estate, PlanState *planstate)
 void
 ExecInitScanTupleSlot(EState *estate, ScanState *scanstate)
 {
-	scanstate->ss_ScanTupleSlot = ExecAllocTableSlot(estate->es_tupleTable);
+	scanstate->ss_ScanTupleSlot = ExecAllocTableSlot(&estate->es_tupleTable);
 }
 
 /* ----------------
@@ -1144,7 +1012,7 @@ ExecInitScanTupleSlot(EState *estate, ScanState *scanstate)
 TupleTableSlot *
 ExecInitExtraTupleSlot(EState *estate)
 {
-	return ExecAllocTableSlot(estate->es_tupleTable);
+	return ExecAllocTableSlot(&estate->es_tupleTable);
 }
 
 /* ----------------
@@ -1405,7 +1273,7 @@ BuildTupleFromCStrings(AttInMetadata *attinmeta, char **values)
  * Functions for sending tuples to the frontend (or other specified destination)
  * as though it is a SELECT result. These are used by utility commands that
  * need to project directly to the destination and don't need or want full
- * Table Function capability. Currently used by EXPLAIN and SHOW ALL
+ * table function capability. Currently used by EXPLAIN and SHOW ALL.
  */
 TupOutputState *
 begin_tup_output_tupdesc(DestReceiver *dest, TupleDesc tupdesc)
@@ -1414,7 +1282,6 @@ begin_tup_output_tupdesc(DestReceiver *dest, TupleDesc tupdesc)
 
 	tstate = (TupOutputState *) palloc(sizeof(TupOutputState));
 
-	tstate->metadata = TupleDescGetAttInMetadata(tupdesc);
 	tstate->slot = MakeSingleTupleTableSlot(tupdesc);
 	tstate->dest = dest;
 
@@ -1425,50 +1292,62 @@ begin_tup_output_tupdesc(DestReceiver *dest, TupleDesc tupdesc)
 
 /*
  * write a single tuple
- *
- * values is a list of the external C string representations of the values
- * to be projected.
- *
- * XXX This could be made more efficient, since in reality we probably only
- * need a virtual tuple.
  */
 void
-do_tup_output(TupOutputState *tstate, char **values)
+do_tup_output(TupOutputState *tstate, Datum *values, bool *isnull)
 {
-	/* build a tuple from the input strings using the tupdesc */
-	HeapTuple	tuple = BuildTupleFromCStrings(tstate->metadata, values);
+	TupleTableSlot *slot = tstate->slot;
+	int			natts = slot->tts_tupleDescriptor->natts;
 
-	/* put it in a slot */
-	ExecStoreTuple(tuple, tstate->slot, InvalidBuffer, true);
+	/* make sure the slot is clear */
+	ExecClearTuple(slot);
+
+	/* insert data */
+	memcpy(slot->tts_values, values, natts * sizeof(Datum));
+	memcpy(slot->tts_isnull, isnull, natts * sizeof(bool));
+
+	/* mark slot as containing a virtual tuple */
+	ExecStoreVirtualTuple(slot);
 
 	/* send the tuple to the receiver */
-	(*tstate->dest->receiveSlot) (tstate->slot, tstate->dest);
+	(*tstate->dest->receiveSlot) (slot, tstate->dest);
 
 	/* clean up */
-	ExecClearTuple(tstate->slot);
+	ExecClearTuple(slot);
 }
 
 /*
  * write a chunk of text, breaking at newline characters
- *
- * NB: scribbles on its input!
  *
  * Should only be used with a single-TEXT-attribute tupdesc.
  */
 void
 do_text_output_multiline(TupOutputState *tstate, char *text)
 {
+	Datum		values[1];
+	bool		isnull[1] = {false};
+
 	while (*text)
 	{
 		char	   *eol;
+		int			len;
 
 		eol = strchr(text, '\n');
 		if (eol)
-			*eol++ = '\0';
-		else
-			eol = text +strlen(text);
+		{
+			len = eol - text;
 
-		do_tup_output(tstate, &text);
+			eol++;
+		}
+		else
+		{
+			len = strlen(text);
+			eol += len;
+		}
+
+		values[0] = PointerGetDatum(cstring_to_text_with_len(text, len));
+		do_tup_output(tstate, values, isnull);
+		pfree(DatumGetPointer(values[0]));
 		text = eol;
 	}
 }
@@ -1479,6 +1358,63 @@ end_tup_output(TupOutputState *tstate)
 	(*tstate->dest->rShutdown) (tstate->dest);
 	/* note that destroying the dest is not ours to do */
 	ExecDropSingleTupleTableSlot(tstate->slot);
-	/* XXX worth cleaning up the attinmetadata? */
 	pfree(tstate);
 }
+
+#ifdef PGXC
+/* --------------------------------
+ *		ExecStoreDataRowTuple
+ *
+ *		Store a buffer in DataRow message format into the slot.
+ *
+ * --------------------------------
+ */
+TupleTableSlot *
+ExecStoreDataRowTuple(char *msg, size_t len, int node, TupleTableSlot *slot,
+					  bool shouldFree)
+{
+	/*
+	 * sanity checks
+	 */
+	Assert(msg != NULL);
+	Assert(len > 0);
+	Assert(slot != NULL);
+	Assert(slot->tts_tupleDescriptor != NULL);
+
+	/*
+	 * Free any old physical tuple belonging to the slot.
+	 */
+	if (slot->tts_shouldFree)
+		heap_freetuple(slot->tts_tuple);
+	if (slot->tts_shouldFreeMin)
+		heap_free_minimal_tuple(slot->tts_mintuple);
+	if (slot->tts_shouldFreeRow)
+		pfree(slot->tts_dataRow);
+
+	/*
+	 * Drop the pin on the referenced buffer, if there is one.
+	 */
+	if (BufferIsValid(slot->tts_buffer))
+		ReleaseBuffer(slot->tts_buffer);
+
+	slot->tts_buffer = InvalidBuffer;
+
+	/*
+	 * Store the new tuple into the specified slot.
+	 */
+	slot->tts_isempty = false;
+	slot->tts_shouldFree = false;
+	slot->tts_shouldFreeMin = false;
+	slot->tts_shouldFreeRow = shouldFree;
+	slot->tts_tuple = NULL;
+	slot->tts_mintuple = NULL;
+	slot->tts_dataRow = msg;
+	slot->tts_dataLen = len;
+	slot->tts_dataNode = node;
+
+	/* Mark extracted state invalid */
+	slot->tts_nvalid = 0;
+
+	return slot;
+}
+#endif

@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/ltree/ltree.h
 
 #ifndef __LTREE_H__
 #define __LTREE_H__

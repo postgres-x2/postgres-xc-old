@@ -4,11 +4,11 @@
  *	  page utilities routines for the postgres inverted index access method.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *			$PostgreSQL$
+ *			src/backend/access/gin/ginentrypage.c
  *-------------------------------------------------------------------------
  */
 
@@ -104,7 +104,7 @@ GinFormTuple(Relation index, GinState *ginstate,
 		 * Gin tuple without any ItemPointers should be large enough to keep
 		 * one ItemPointer, to prevent inconsistency between
 		 * ginHeapTupleFastCollect and ginEntryInsert called by
-		 * ginHeapTupleInsert.  ginHeapTupleFastCollect forms tuple without
+		 * ginHeapTupleInsert.	ginHeapTupleFastCollect forms tuple without
 		 * extra pointer to heap, but ginEntryInsert (called for pending list
 		 * cleanup during vacuum) will form the same tuple with one
 		 * ItemPointer.
@@ -615,7 +615,7 @@ entrySplitPage(GinBtree btree, Buffer lbuf, Buffer rbuf, OffsetNumber off, XLogR
 }
 
 /*
- * return newly allocate rightmost tuple
+ * return newly allocated rightmost tuple
  */
 IndexTuple
 ginPageGetLinkItup(Buffer buf)
@@ -646,10 +646,12 @@ entryFillRoot(GinBtree btree, Buffer root, Buffer lbuf, Buffer rbuf)
 	itup = ginPageGetLinkItup(lbuf);
 	if (PageAddItem(page, (Item) itup, IndexTupleSize(itup), InvalidOffsetNumber, false, false) == InvalidOffsetNumber)
 		elog(ERROR, "failed to add item to index root page");
+	pfree(itup);
 
 	itup = ginPageGetLinkItup(rbuf);
 	if (PageAddItem(page, (Item) itup, IndexTupleSize(itup), InvalidOffsetNumber, false, false) == InvalidOffsetNumber)
 		elog(ERROR, "failed to add item to index root page");
+	pfree(itup);
 }
 
 void

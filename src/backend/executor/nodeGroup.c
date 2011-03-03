@@ -3,7 +3,7 @@
  * nodeGroup.c
  *	  Routines to handle group nodes (used for queries with GROUP BY clause).
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -15,7 +15,7 @@
  *	  locate group boundaries.
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/executor/nodeGroup.c
  *
  *-------------------------------------------------------------------------
  */
@@ -213,8 +213,6 @@ ExecInitGroup(Group *node, EState *estate, int eflags)
 	 */
 	ExecAssignExprContext(estate, &grpstate->ss.ps);
 
-#define GROUP_NSLOTS 2
-
 	/*
 	 * tuple table initialization
 	 */
@@ -257,12 +255,6 @@ ExecInitGroup(Group *node, EState *estate, int eflags)
 							   node->grpOperators);
 
 	return grpstate;
-}
-
-int
-ExecCountSlotsGroup(Group *node)
-{
-	return ExecCountSlotsNode(outerPlan(node)) + GROUP_NSLOTS;
 }
 
 /* ------------------------

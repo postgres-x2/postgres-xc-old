@@ -4,12 +4,12 @@
  *	  creator functions for primitive nodes. The functions here are for
  *	  the most frequently created nodes.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/nodes/makefuncs.c
  *
  *-------------------------------------------------------------------------
  */
@@ -17,6 +17,7 @@
 
 #include "catalog/pg_type.h"
 #include "nodes/makefuncs.h"
+#include "nodes/nodeFuncs.h"
 #include "utils/lsyscache.h"
 
 
@@ -88,6 +89,93 @@ makeVar(Index varno,
 	var->location = -1;
 
 	return var;
+}
+
+/*
+ * makeWholeRowVar -
+ *	  creates a Var node representing a whole row of the specified RTE
+ *
+ * A whole-row reference is a Var with varno set to the correct range
+ * table entry, and varattno == 0 to signal that it references the whole
+ * tuple.  (Use of zero here is unclean, since it could easily be confused
+ * with error cases, but it's not worth changing now.)  The vartype indicates
+ * a rowtype; either a named composite type, or RECORD.  This function
+ * encapsulates the logic for determining the correct rowtype OID to use.
+ */
+Var *
+makeWholeRowVar(RangeTblEntry *rte,
+				Index varno,
+				Index varlevelsup)
+{
+	Var		   *result;
+	Oid			toid;
+
+	switch (rte->rtekind)
+	{
+		case RTE_RELATION:
+			/* relation: the rowtype is a named composite type */
+			toid = get_rel_type_id(rte->relid);
+			if (!OidIsValid(toid))
+				elog(ERROR, "could not find type OID for relation %u",
+					 rte->relid);
+			result = makeVar(varno,
+							 InvalidAttrNumber,
+							 toid,
+							 -1,
+							 varlevelsup);
+			break;
+		case RTE_FUNCTION:
+			toid = exprType(rte->funcexpr);
+			if (type_is_rowtype(toid))
+			{
+				/* func returns composite; same as relation case */
+				result = makeVar(varno,
+								 InvalidAttrNumber,
+								 toid,
+								 -1,
+								 varlevelsup);
+			}
+			else
+			{
+				/*
+				 * func returns scalar; instead of making a whole-row Var,
+				 * just reference the function's scalar output.  (XXX this
+				 * seems a tad inconsistent, especially if "f.*" was
+				 * explicitly written ...)
+				 */
+				result = makeVar(varno,
+								 1,
+								 toid,
+								 -1,
+								 varlevelsup);
+			}
+			break;
+		case RTE_VALUES:
+			toid = RECORDOID;
+			/* returns composite; same as relation case */
+			result = makeVar(varno,
+							 InvalidAttrNumber,
+							 toid,
+							 -1,
+							 varlevelsup);
+			break;
+		default:
+
+			/*
+			 * RTE is a join or subselect.	We represent this as a whole-row
+			 * Var of RECORD type.	(Note that in most cases the Var will be
+			 * expanded to a RowExpr during planning, but that is not our
+			 * concern here.)
+			 */
+			result = makeVar(varno,
+							 InvalidAttrNumber,
+							 RECORDOID,
+							 -1,
+							 varlevelsup);
+			break;
+	}
+
+	return result;
 }
 
 /*
@@ -316,11 +404,11 @@ makeTypeNameFromNameList(List *names)
  *	build a TypeName node to represent a type already known by OID/typmod.
  */
 TypeName *
-makeTypeNameFromOid(Oid typeid, int32 typmod)
+makeTypeNameFromOid(Oid typeOid, int32 typmod)
 {
 	TypeName   *n = makeNode(TypeName);
 
-	n->typeid = typeid;
+	n->typeOid = typeOid;
 	n->typemod = typmod;
 	n->location = -1;
 	return n;
@@ -373,12 +461,12 @@ makeDefElem(char *name, Node *arg)
  *	build a DefElem node with all fields available to be specified
  */
 DefElem *
-makeDefElemExtended(char *namespace, char *name, Node *arg,
+makeDefElemExtended(char *nameSpace, char *name, Node *arg,
 					DefElemAction defaction)
 {
 	DefElem    *res = makeNode(DefElem);
 
-	res->defnamespace = namespace;
+	res->defnamespace = nameSpace;
 	res->defname = name;
 	res->arg = arg;
 	res->defaction = defaction;

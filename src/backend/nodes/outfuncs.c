@@ -3,12 +3,12 @@
  * outfuncs.c
  *	  Output functions for Postgres tree nodes.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/nodes/outfuncs.c
  *
  * NOTES
  *	  Every node type that can appear in stored rules' parsetrees *must*
@@ -242,7 +242,9 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 	WRITE_NODE_TYPE("PLANNEDSTMT");
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
+	WRITE_BOOL_FIELD(hasReturning);
 	WRITE_BOOL_FIELD(canSetTag);
+	WRITE_BOOL_FIELD(transientPlan);
 	WRITE_NODE_FIELD(planTree);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(resultRelations);
@@ -250,7 +252,6 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 	WRITE_NODE_FIELD(intoClause);
 	WRITE_NODE_FIELD(subplans);
 	WRITE_BITMAPSET_FIELD(rewindPlanIDs);
-	WRITE_NODE_FIELD(returningLists);
 	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(relationOids);
 	WRITE_NODE_FIELD(invalItems);
@@ -319,6 +320,21 @@ _outResult(StringInfo str, Result *node)
 }
 
 static void
+_outModifyTable(StringInfo str, ModifyTable *node)
+{
+	WRITE_NODE_TYPE("MODIFYTABLE");
+
+	_outPlanInfo(str, (Plan *) node);
+
+	WRITE_ENUM_FIELD(operation, CmdType);
+	WRITE_NODE_FIELD(resultRelations);
+	WRITE_NODE_FIELD(plans);
+	WRITE_NODE_FIELD(returningLists);
+	WRITE_NODE_FIELD(rowMarks);
+	WRITE_INT_FIELD(epqParam);
+}
+
+static void
 _outAppend(StringInfo str, Append *node)
 {
 	WRITE_NODE_TYPE("APPEND");
@@ -326,7 +342,6 @@ _outAppend(StringInfo str, Append *node)
 	_outPlanInfo(str, (Plan *) node);
 
 	WRITE_NODE_FIELD(appendplans);
-	WRITE_BOOL_FIELD(isTarget);
 }
 
 static void
@@ -442,6 +457,7 @@ _outSubqueryScan(StringInfo str, SubqueryScan *node)
 
 	WRITE_NODE_FIELD(subplan);
 	WRITE_NODE_FIELD(subrtable);
+	WRITE_NODE_FIELD(subrowmark);
 }
 
 static void
@@ -595,6 +611,8 @@ _outWindowAgg(StringInfo str, WindowAgg *node)
 		appendStringInfo(str, " %u", node->ordOperators[i]);
 
 	WRITE_INT_FIELD(frameOptions);
+	WRITE_NODE_FIELD(startOffset);
+	WRITE_NODE_FIELD(endOffset);
 }
 
 static void
@@ -678,6 +696,7 @@ _outHash(StringInfo str, Hash *node)
 
 	WRITE_OID_FIELD(skewTable);
 	WRITE_INT_FIELD(skewColumn);
+	WRITE_BOOL_FIELD(skewInherit);
 	WRITE_OID_FIELD(skewColType);
 	WRITE_INT_FIELD(skewColTypmod);
 }
@@ -709,6 +728,17 @@ _outSetOp(StringInfo str, SetOp *node)
 }
 
 static void
+_outLockRows(StringInfo str, LockRows *node)
+{
+	WRITE_NODE_TYPE("LOCKROWS");
+
+	_outPlanInfo(str, (Plan *) node);
+
+	WRITE_NODE_FIELD(rowMarks);
+	WRITE_INT_FIELD(epqParam);
+}
+
+static void
 _outLimit(StringInfo str, Limit *node)
 {
 	WRITE_NODE_TYPE("LIMIT");
@@ -717,6 +747,18 @@ _outLimit(StringInfo str, Limit *node)
 
 	WRITE_NODE_FIELD(limitOffset);
 	WRITE_NODE_FIELD(limitCount);
+}
+
+static void
+_outPlanRowMark(StringInfo str, PlanRowMark *node)
+{
+	WRITE_NODE_TYPE("PLANROWMARK");
+
+	WRITE_UINT_FIELD(rti);
+	WRITE_UINT_FIELD(prti);
+	WRITE_ENUM_FIELD(markType, RowMarkType);
+	WRITE_BOOL_FIELD(noWait);
+	WRITE_BOOL_FIELD(isParent);
 }
 
 static void
@@ -828,9 +870,10 @@ _outAggref(StringInfo str, Aggref *node)
 	WRITE_OID_FIELD(aggfnoid);
 	WRITE_OID_FIELD(aggtype);
 	WRITE_NODE_FIELD(args);
-	WRITE_UINT_FIELD(agglevelsup);
+	WRITE_NODE_FIELD(aggorder);
+	WRITE_NODE_FIELD(aggdistinct);
 	WRITE_BOOL_FIELD(aggstar);
-	WRITE_BOOL_FIELD(aggdistinct);
+	WRITE_UINT_FIELD(agglevelsup);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -872,6 +915,17 @@ _outFuncExpr(StringInfo str, FuncExpr *node)
 	WRITE_BOOL_FIELD(funcretset);
 	WRITE_ENUM_FIELD(funcformat, CoercionForm);
 	WRITE_NODE_FIELD(args);
+	WRITE_LOCATION_FIELD(location);
+}
+
+static void
+_outNamedArgExpr(StringInfo str, NamedArgExpr *node)
+{
+	WRITE_NODE_TYPE("NAMEDARGEXPR");
+
+	WRITE_NODE_FIELD(arg);
+	WRITE_STRING_FIELD(name);
+	WRITE_INT_FIELD(argnumber);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1175,6 +1229,7 @@ _outNullTest(StringInfo str, NullTest *node)
 
 	WRITE_NODE_FIELD(arg);
 	WRITE_ENUM_FIELD(nulltesttype, NullTestType);
+	WRITE_BOOL_FIELD(argisrow);
 }
 
 static void
@@ -1259,7 +1314,7 @@ _outJoinExpr(StringInfo str, JoinExpr *node)
 	WRITE_BOOL_FIELD(isNatural);
 	WRITE_NODE_FIELD(larg);
 	WRITE_NODE_FIELD(rarg);
-	WRITE_NODE_FIELD(using);
+	WRITE_NODE_FIELD(usingClause);
 	WRITE_NODE_FIELD(quals);
 	WRITE_NODE_FIELD(alias);
 	WRITE_INT_FIELD(rtindex);
@@ -1439,6 +1494,7 @@ _outMergePath(StringInfo str, MergePath *node)
 	WRITE_NODE_FIELD(path_mergeclauses);
 	WRITE_NODE_FIELD(outersortkeys);
 	WRITE_NODE_FIELD(innersortkeys);
+	WRITE_BOOL_FIELD(materialize_inner);
 }
 
 static void
@@ -1461,8 +1517,10 @@ _outPlannerGlobal(StringInfo str, PlannerGlobal *node)
 	WRITE_NODE_FIELD(paramlist);
 	WRITE_NODE_FIELD(subplans);
 	WRITE_NODE_FIELD(subrtables);
+	WRITE_NODE_FIELD(subrowmarks);
 	WRITE_BITMAPSET_FIELD(rewindPlanIDs);
 	WRITE_NODE_FIELD(finalrtable);
+	WRITE_NODE_FIELD(finalrowmarks);
 	WRITE_NODE_FIELD(relationOids);
 	WRITE_NODE_FIELD(invalItems);
 	WRITE_UINT_FIELD(lastPHId);
@@ -1479,8 +1537,8 @@ _outPlannerInfo(StringInfo str, PlannerInfo *node)
 	WRITE_NODE_FIELD(glob);
 	WRITE_UINT_FIELD(query_level);
 	WRITE_NODE_FIELD(join_rel_list);
+	WRITE_INT_FIELD(join_cur_level);
 	WRITE_NODE_FIELD(resultRelations);
-	WRITE_NODE_FIELD(returningLists);
 	WRITE_NODE_FIELD(init_plans);
 	WRITE_NODE_FIELD(cte_plan_ids);
 	WRITE_NODE_FIELD(eq_classes);
@@ -1490,6 +1548,7 @@ _outPlannerInfo(StringInfo str, PlannerInfo *node)
 	WRITE_NODE_FIELD(full_join_clauses);
 	WRITE_NODE_FIELD(join_info_list);
 	WRITE_NODE_FIELD(append_rel_list);
+	WRITE_NODE_FIELD(rowMarks);
 	WRITE_NODE_FIELD(placeholder_list);
 	WRITE_NODE_FIELD(query_pathkeys);
 	WRITE_NODE_FIELD(group_pathkeys);
@@ -1498,6 +1557,7 @@ _outPlannerInfo(StringInfo str, PlannerInfo *node)
 	WRITE_NODE_FIELD(sort_pathkeys);
 	WRITE_FLOAT_FIELD(total_table_pages, "%.0f");
 	WRITE_FLOAT_FIELD(tuple_fraction, "%.4f");
+	WRITE_BOOL_FIELD(hasInheritedTarget);
 	WRITE_BOOL_FIELD(hasJoinRTEs);
 	WRITE_BOOL_FIELD(hasHavingQual);
 	WRITE_BOOL_FIELD(hasPseudoConstantQuals);
@@ -1524,6 +1584,7 @@ _outRelOptInfo(StringInfo str, RelOptInfo *node)
 	WRITE_NODE_FIELD(cheapest_total_path);
 	WRITE_NODE_FIELD(cheapest_unique_path);
 	WRITE_UINT_FIELD(relid);
+	WRITE_UINT_FIELD(reltablespace);
 	WRITE_ENUM_FIELD(rtekind, RTEKind);
 	WRITE_INT_FIELD(min_attr);
 	WRITE_INT_FIELD(max_attr);
@@ -1532,6 +1593,7 @@ _outRelOptInfo(StringInfo str, RelOptInfo *node)
 	WRITE_FLOAT_FIELD(tuples, "%.0f");
 	WRITE_NODE_FIELD(subplan);
 	WRITE_NODE_FIELD(subrtable);
+	WRITE_NODE_FIELD(subrowmark);
 	WRITE_NODE_FIELD(baserestrictinfo);
 	WRITE_NODE_FIELD(joininfo);
 	WRITE_BOOL_FIELD(has_eclass_joins);
@@ -1690,6 +1752,7 @@ _outPlaceHolderInfo(StringInfo str, PlaceHolderInfo *node)
 	WRITE_NODE_FIELD(ph_var);
 	WRITE_BITMAPSET_FIELD(ph_eval_at);
 	WRITE_BITMAPSET_FIELD(ph_needed);
+	WRITE_BITMAPSET_FIELD(ph_may_need);
 	WRITE_INT_FIELD(ph_width);
 }
 
@@ -1716,6 +1779,7 @@ _outCreateStmt(StringInfo str, CreateStmt *node)
 	WRITE_NODE_FIELD(relation);
 	WRITE_NODE_FIELD(tableElts);
 	WRITE_NODE_FIELD(inhRelations);
+	WRITE_NODE_FIELD(ofTypename);
 	WRITE_NODE_FIELD(constraints);
 	WRITE_NODE_FIELD(options);
 	WRITE_ENUM_FIELD(oncommit, OnCommitAction);
@@ -1734,9 +1798,12 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_NODE_FIELD(indexParams);
 	WRITE_NODE_FIELD(options);
 	WRITE_NODE_FIELD(whereClause);
+	WRITE_NODE_FIELD(excludeOpNames);
 	WRITE_BOOL_FIELD(unique);
 	WRITE_BOOL_FIELD(primary);
 	WRITE_BOOL_FIELD(isconstraint);
+	WRITE_BOOL_FIELD(deferrable);
+	WRITE_BOOL_FIELD(initdeferred);
 	WRITE_BOOL_FIELD(concurrent);
 }
 
@@ -1746,6 +1813,7 @@ _outNotifyStmt(StringInfo str, NotifyStmt *node)
 	WRITE_NODE_TYPE("NOTIFY");
 
 	WRITE_STRING_FIELD(conditionname);
+	WRITE_STRING_FIELD(payload);
 }
 
 static void
@@ -1790,6 +1858,7 @@ _outFuncCall(StringInfo str, FuncCall *node)
 
 	WRITE_NODE_FIELD(funcname);
 	WRITE_NODE_FIELD(args);
+	WRITE_NODE_FIELD(agg_order);
 	WRITE_BOOL_FIELD(agg_star);
 	WRITE_BOOL_FIELD(agg_distinct);
 	WRITE_BOOL_FIELD(func_variadic);
@@ -1809,6 +1878,15 @@ _outDefElem(StringInfo str, DefElem *node)
 }
 
 static void
+_outInhRelation(StringInfo str, InhRelation *node)
+{
+	WRITE_NODE_TYPE("INHRELATION");
+
+	WRITE_NODE_FIELD(relation);
+	WRITE_UINT_FIELD(options);
+}
+
+static void
 _outLockingClause(StringInfo str, LockingClause *node)
 {
 	WRITE_NODE_TYPE("LOCKINGCLAUSE");
@@ -1825,7 +1903,7 @@ _outXmlSerialize(StringInfo str, XmlSerialize *node)
 
 	WRITE_ENUM_FIELD(xmloption, XmlOptionType);
 	WRITE_NODE_FIELD(expr);
-	WRITE_NODE_FIELD(typename);
+	WRITE_NODE_FIELD(typeName);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1835,10 +1913,11 @@ _outColumnDef(StringInfo str, ColumnDef *node)
 	WRITE_NODE_TYPE("COLUMNDEF");
 
 	WRITE_STRING_FIELD(colname);
-	WRITE_NODE_FIELD(typename);
+	WRITE_NODE_FIELD(typeName);
 	WRITE_INT_FIELD(inhcount);
 	WRITE_BOOL_FIELD(is_local);
 	WRITE_BOOL_FIELD(is_not_null);
+	WRITE_INT_FIELD(storage);
 	WRITE_NODE_FIELD(raw_default);
 	WRITE_NODE_FIELD(cooked_default);
 	WRITE_NODE_FIELD(constraints);
@@ -1850,7 +1929,7 @@ _outTypeName(StringInfo str, TypeName *node)
 	WRITE_NODE_TYPE("TYPENAME");
 
 	WRITE_NODE_FIELD(names);
-	WRITE_OID_FIELD(typeid);
+	WRITE_OID_FIELD(typeOid);
 	WRITE_BOOL_FIELD(setof);
 	WRITE_BOOL_FIELD(pct_type);
 	WRITE_NODE_FIELD(typmods);
@@ -1865,7 +1944,7 @@ _outTypeCast(StringInfo str, TypeCast *node)
 	WRITE_NODE_TYPE("TYPECAST");
 
 	WRITE_NODE_FIELD(arg);
-	WRITE_NODE_FIELD(typename);
+	WRITE_NODE_FIELD(typeName);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -1876,6 +1955,7 @@ _outIndexElem(StringInfo str, IndexElem *node)
 
 	WRITE_STRING_FIELD(name);
 	WRITE_NODE_FIELD(expr);
+	WRITE_STRING_FIELD(indexcolname);
 	WRITE_NODE_FIELD(opclass);
 	WRITE_ENUM_FIELD(ordering, SortByDir);
 	WRITE_ENUM_FIELD(nulls_ordering, SortByNulls);
@@ -1922,6 +2002,7 @@ _outQuery(StringInfo str, Query *node)
 	WRITE_BOOL_FIELD(hasSubLinks);
 	WRITE_BOOL_FIELD(hasDistinctOn);
 	WRITE_BOOL_FIELD(hasRecursive);
+	WRITE_BOOL_FIELD(hasForUpdate);
 	WRITE_NODE_FIELD(cteList);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(jointree);
@@ -1959,6 +2040,8 @@ _outWindowClause(StringInfo str, WindowClause *node)
 	WRITE_NODE_FIELD(partitionClause);
 	WRITE_NODE_FIELD(orderClause);
 	WRITE_INT_FIELD(frameOptions);
+	WRITE_NODE_FIELD(startOffset);
+	WRITE_NODE_FIELD(endOffset);
 	WRITE_UINT_FIELD(winref);
 	WRITE_BOOL_FIELD(copiedOrder);
 }
@@ -1969,10 +2052,9 @@ _outRowMarkClause(StringInfo str, RowMarkClause *node)
 	WRITE_NODE_TYPE("ROWMARKCLAUSE");
 
 	WRITE_UINT_FIELD(rti);
-	WRITE_UINT_FIELD(prti);
 	WRITE_BOOL_FIELD(forUpdate);
 	WRITE_BOOL_FIELD(noWait);
-	WRITE_BOOL_FIELD(isParent);
+	WRITE_BOOL_FIELD(pushedDown);
 }
 
 static void
@@ -2274,6 +2356,8 @@ _outWindowDef(StringInfo str, WindowDef *node)
 	WRITE_NODE_FIELD(partitionClause);
 	WRITE_NODE_FIELD(orderClause);
 	WRITE_INT_FIELD(frameOptions);
+	WRITE_NODE_FIELD(startOffset);
+	WRITE_NODE_FIELD(endOffset);
 	WRITE_LOCATION_FIELD(location);
 }
 
@@ -2301,29 +2385,20 @@ _outConstraint(StringInfo str, Constraint *node)
 {
 	WRITE_NODE_TYPE("CONSTRAINT");
 
-	WRITE_STRING_FIELD(name);
+	WRITE_STRING_FIELD(conname);
+	WRITE_BOOL_FIELD(deferrable);
+	WRITE_BOOL_FIELD(initdeferred);
+	WRITE_LOCATION_FIELD(location);
 
 	appendStringInfo(str, " :contype ");
 	switch (node->contype)
 	{
-		case CONSTR_PRIMARY:
-			appendStringInfo(str, "PRIMARY_KEY");
-			WRITE_NODE_FIELD(keys);
-			WRITE_NODE_FIELD(options);
-			WRITE_STRING_FIELD(indexspace);
+		case CONSTR_NULL:
+			appendStringInfo(str, "NULL");
 			break;
 
-		case CONSTR_UNIQUE:
-			appendStringInfo(str, "UNIQUE");
-			WRITE_NODE_FIELD(keys);
-			WRITE_NODE_FIELD(options);
-			WRITE_STRING_FIELD(indexspace);
-			break;
-
-		case CONSTR_CHECK:
-			appendStringInfo(str, "CHECK");
-			WRITE_NODE_FIELD(raw_expr);
-			WRITE_STRING_FIELD(cooked_expr);
+		case CONSTR_NOTNULL:
+			appendStringInfo(str, "NOT_NULL");
 			break;
 
 		case CONSTR_DEFAULT:
@@ -2332,31 +2407,69 @@ _outConstraint(StringInfo str, Constraint *node)
 			WRITE_STRING_FIELD(cooked_expr);
 			break;
 
-		case CONSTR_NOTNULL:
-			appendStringInfo(str, "NOT_NULL");
+		case CONSTR_CHECK:
+			appendStringInfo(str, "CHECK");
+			WRITE_NODE_FIELD(raw_expr);
+			WRITE_STRING_FIELD(cooked_expr);
+			break;
+
+		case CONSTR_PRIMARY:
+			appendStringInfo(str, "PRIMARY_KEY");
+			WRITE_NODE_FIELD(keys);
+			WRITE_NODE_FIELD(options);
+			WRITE_STRING_FIELD(indexspace);
+			/* access_method and where_clause not currently used */
+			break;
+
+		case CONSTR_UNIQUE:
+			appendStringInfo(str, "UNIQUE");
+			WRITE_NODE_FIELD(keys);
+			WRITE_NODE_FIELD(options);
+			WRITE_STRING_FIELD(indexspace);
+			/* access_method and where_clause not currently used */
+			break;
+
+		case CONSTR_EXCLUSION:
+			appendStringInfo(str, "EXCLUSION");
+			WRITE_NODE_FIELD(exclusions);
+			WRITE_NODE_FIELD(options);
+			WRITE_STRING_FIELD(indexspace);
+			WRITE_STRING_FIELD(access_method);
+			WRITE_NODE_FIELD(where_clause);
+			break;
+
+		case CONSTR_FOREIGN:
+			appendStringInfo(str, "FOREIGN_KEY");
+			WRITE_NODE_FIELD(pktable);
+			WRITE_NODE_FIELD(fk_attrs);
+			WRITE_NODE_FIELD(pk_attrs);
+			WRITE_CHAR_FIELD(fk_matchtype);
+			WRITE_CHAR_FIELD(fk_upd_action);
+			WRITE_CHAR_FIELD(fk_del_action);
+			WRITE_BOOL_FIELD(skip_validation);
+			break;
+
+		case CONSTR_ATTR_DEFERRABLE:
+			appendStringInfo(str, "ATTR_DEFERRABLE");
+			break;
+
+		case CONSTR_ATTR_NOT_DEFERRABLE:
+			appendStringInfo(str, "ATTR_NOT_DEFERRABLE");
+			break;
+
+		case CONSTR_ATTR_DEFERRED:
+			appendStringInfo(str, "ATTR_DEFERRED");
+			break;
+
+		case CONSTR_ATTR_IMMEDIATE:
+			appendStringInfo(str, "ATTR_IMMEDIATE");
 			break;
 
 		default:
-			appendStringInfo(str, "<unrecognized_constraint>");
+			appendStringInfo(str, "<unrecognized_constraint %d>",
+							 (int) node->contype);
 			break;
 	}
-}
-
-static void
-_outFkConstraint(StringInfo str, FkConstraint *node)
-{
-	WRITE_NODE_TYPE("FKCONSTRAINT");
-
-	WRITE_STRING_FIELD(constr_name);
-	WRITE_NODE_FIELD(pktable);
-	WRITE_NODE_FIELD(fk_attrs);
-	WRITE_NODE_FIELD(pk_attrs);
-	WRITE_CHAR_FIELD(fk_matchtype);
-	WRITE_CHAR_FIELD(fk_upd_action);
-	WRITE_CHAR_FIELD(fk_del_action);
-	WRITE_BOOL_FIELD(deferrable);
-	WRITE_BOOL_FIELD(initdeferred);
-	WRITE_BOOL_FIELD(skip_validation);
 }
 
 
@@ -2392,6 +2505,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_Result:
 				_outResult(str, obj);
+				break;
+			case T_ModifyTable:
+				_outModifyTable(str, obj);
 				break;
 			case T_Append:
 				_outAppend(str, obj);
@@ -2474,8 +2590,14 @@ _outNode(StringInfo str, void *obj)
 			case T_SetOp:
 				_outSetOp(str, obj);
 				break;
+			case T_LockRows:
+				_outLockRows(str, obj);
+				break;
 			case T_Limit:
 				_outLimit(str, obj);
+				break;
+			case T_PlanRowMark:
+				_outPlanRowMark(str, obj);
 				break;
 			case T_PlanInvalItem:
 				_outPlanInvalItem(str, obj);
@@ -2509,6 +2631,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_FuncExpr:
 				_outFuncExpr(str, obj);
+				break;
+			case T_NamedArgExpr:
+				_outNamedArgExpr(str, obj);
 				break;
 			case T_OpExpr:
 				_outOpExpr(str, obj);
@@ -2785,14 +2910,14 @@ _outNode(StringInfo str, void *obj)
 			case T_Constraint:
 				_outConstraint(str, obj);
 				break;
-			case T_FkConstraint:
-				_outFkConstraint(str, obj);
-				break;
 			case T_FuncCall:
 				_outFuncCall(str, obj);
 				break;
 			case T_DefElem:
 				_outDefElem(str, obj);
+				break;
+			case T_InhRelation:
+				_outInhRelation(str, obj);
 				break;
 			case T_LockingClause:
 				_outLockingClause(str, obj);

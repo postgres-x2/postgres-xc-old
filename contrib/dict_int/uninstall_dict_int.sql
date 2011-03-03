@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/dict_int/uninstall_dict_int.sql
 
 -- Adjust this setting to control where the objects get dropped.
 SET search_path = public;

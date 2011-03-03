@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/backend/storage/buffer/README
 
 Notes About Shared Buffer Access Rules
 ======================================

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/make_keywords
 
 cat <<END
 To get a list of keywords compared to SQL'92, take the keywords out of

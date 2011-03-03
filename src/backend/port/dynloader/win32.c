@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/backend/port/dynloader/win32.c
 
 #include "postgres.h"
 

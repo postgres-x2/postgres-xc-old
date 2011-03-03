@@ -4,7 +4,7 @@
 #    Makefile for foreign
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/foreign/Makefile
 #
 #-------------------------------------------------------------------------
 

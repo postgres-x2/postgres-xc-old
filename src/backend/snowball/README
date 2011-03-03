@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/backend/snowball/README
 
 Snowball-Based Stemming
 =======================

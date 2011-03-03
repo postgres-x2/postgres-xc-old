@@ -4,9 +4,9 @@
  *
  * Declarations for ISpell dictionary
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/include/tsearch/dicts/spell.h
  *
  *-------------------------------------------------------------------------
  */
@@ -37,7 +37,7 @@ typedef struct
 
 /*
  * Names of FF_ are correlated with Hunspell options in affix file
- * http://sourceforge.net/docman/display_doc.php?docid=29374&group_id=143754
+ * http://hunspell.sourceforge.net/
  */
 #define FF_COMPOUNDONLY		0x01
 #define FF_COMPOUNDBEGIN	0x02

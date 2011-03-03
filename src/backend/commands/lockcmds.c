@@ -3,12 +3,12 @@
  * lockcmds.c
  *	  LOCK command support code
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/commands/lockcmds.c
  *
  *-------------------------------------------------------------------------
  */
@@ -46,6 +46,15 @@ LockTableCommand(LockStmt *lockstmt)
 		Oid			reloid;
 
 		reloid = RangeVarGetRelid(relation, false);
+
+		/*
+		 * During recovery we only accept these variations: LOCK TABLE foo IN
+		 * ACCESS SHARE MODE LOCK TABLE foo IN ROW SHARE MODE LOCK TABLE foo
+		 * IN ROW EXCLUSIVE MODE This test must match the restrictions defined
+		 * in LockAcquire()
+		 */
+		if (lockstmt->mode > RowExclusiveLock)
+			PreventCommandDuringRecovery("LOCK TABLE");
 
 		LockTableRecurse(reloid, relation,
 						 lockstmt->mode, lockstmt->nowait, recurse);

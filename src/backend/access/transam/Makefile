@@ -4,7 +4,7 @@
 #    Makefile for access/transam
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/access/transam/Makefile
 #
 #-------------------------------------------------------------------------
 
@@ -19,5 +19,7 @@ include $(top_srcdir)/src/backend/common.mk
 # ensure that version checks in xlog.c get recompiled when catversion.h changes
 xlog.o: xlog.c $(top_srcdir)/src/include/catalog/catversion.h
 
+# PGXC BEGIN
 libpg-fe.h:
 	$(LN_S) $(top_builddir)/contrib/gtm/client/libpg-fe.h $(top_srcdir)/src/include/
+# PGXC END

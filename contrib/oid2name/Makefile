@@ -1,4 +1,7 @@
-# $PostgreSQL$
+# contrib/oid2name/Makefile
+
+PGFILEDESC = "oid2name - examine the file structure"
+PGAPPICON=win32
 
 PROGRAM = oid2name
 OBJS	= oid2name.o

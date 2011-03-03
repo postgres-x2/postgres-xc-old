@@ -4,7 +4,7 @@
 #   a template for timezones you could need.  See the `Date/Time Support'
 #   appendix in the PostgreSQL documentation for more information.
 #
-# $PostgreSQL$
+# src/timezone/tznames/Australia.txt
 #
 
 ACSST   37800 D  # Central Australia (not in zic)

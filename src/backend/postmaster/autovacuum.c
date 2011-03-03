@@ -35,7 +35,7 @@
  * worker and dealt with just by having the worker exit normally.  The launcher
  * will launch a new worker again later, per schedule.
  *
- * When the worker is done vacuuming it sends SIGUSR1 to the launcher.	The
+ * When the worker is done vacuuming it sends SIGUSR2 to the launcher.	The
  * launcher then wakes up and is able to launch another worker, if the schedule
  * is so tight that a new worker is needed immediately.  At this time the
  * launcher can also balance the settings for the various remaining workers'
@@ -50,12 +50,12 @@
  * there is a window (caused by pgstat delay) on which a worker may choose a
  * table that was already vacuumed; this is a bug in the current design.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/postmaster/autovacuum.c
  *
  *-------------------------------------------------------------------------
  */
@@ -67,18 +67,15 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "access/genam.h"
 #include "access/heapam.h"
 #include "access/reloptions.h"
 #include "access/transam.h"
 #include "access/xact.h"
 #include "catalog/dependency.h"
-#include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_database.h"
 #include "commands/dbcommands.h"
 #include "commands/vacuum.h"
-#include "libpq/hba.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "pgstat.h"
@@ -86,22 +83,23 @@
 #include "postmaster/fork_process.h"
 #include "postmaster/postmaster.h"
 #include "storage/bufmgr.h"
-#include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/pmsignal.h"
 #include "storage/proc.h"
-#include "storage/procarray.h"
+#include "storage/procsignal.h"
 #include "storage/sinvaladt.h"
 #include "tcop/tcopprot.h"
-#include "utils/dynahash.h"
-#include "utils/flatfiles.h"
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
+#include "utils/snapmgr.h"
 #include "utils/syscache.h"
 #include "utils/tqual.h"
 
+#ifdef PGXC
+#include "pgxc/pgxc.h"
+#endif
 
 /*
  * GUC parameters
@@ -132,7 +130,7 @@ static bool am_autovacuum_worker = false;
 
 /* Flags set by signal handlers */
 static volatile sig_atomic_t got_SIGHUP = false;
-static volatile sig_atomic_t got_SIGUSR1 = false;
+static volatile sig_atomic_t got_SIGUSR2 = false;
 static volatile sig_atomic_t got_SIGTERM = false;
 
 /* Comparison point for determining whether freeze_max_age is exceeded */
@@ -195,7 +193,7 @@ typedef struct autovac_table
  *
  * wi_links		entry into free list or running list
  * wi_dboid		OID of the database this worker is supposed to work on
- * wi_tableoid	OID of the table currently being vacuumed
+ * wi_tableoid	OID of the table currently being vacuumed, if any
  * wi_proc		pointer to PGPROC of the running worker, NULL if not started
  * wi_launchtime Time at which this worker was launched
  * wi_cost_*	Vacuum cost-based delay parameters current in this worker
@@ -302,9 +300,8 @@ static PgStat_StatTabEntry *get_pgstat_tabentry_relid(Oid relid, bool isshared,
 						  PgStat_StatDBEntry *dbentry);
 static void autovac_report_activity(autovac_table *tab);
 static void avl_sighup_handler(SIGNAL_ARGS);
-static void avl_sigusr1_handler(SIGNAL_ARGS);
+static void avl_sigusr2_handler(SIGNAL_ARGS);
 static void avl_sigterm_handler(SIGNAL_ARGS);
-static void avl_quickdie(SIGNAL_ARGS);
 static void autovac_refresh_stats(void);
 
 
@@ -406,6 +403,9 @@ AutoVacLauncherMain(int argc, char *argv[])
 	/* Identify myself via ps */
 	init_ps_display("autovacuum launcher process", "", "", "");
 
+	ereport(LOG,
+			(errmsg("autovacuum launcher started")));
+
 	if (PostAuthDelay)
 		pg_usleep(PostAuthDelay * 1000000L);
 
@@ -423,21 +423,20 @@ AutoVacLauncherMain(int argc, char *argv[])
 #endif
 
 	/*
-	 * Set up signal handlers.	Since this is an auxiliary process, it has
-	 * particular signal requirements -- no deadlock checker or sinval
-	 * catchup, for example.
+	 * Set up signal handlers.	We operate on databases much like a regular
+	 * backend, so we use the same signal handling.  See equivalent code in
+	 * tcop/postgres.c.
 	 */
 	pqsignal(SIGHUP, avl_sighup_handler);
-
-	pqsignal(SIGINT, SIG_IGN);
+	pqsignal(SIGINT, StatementCancelHandler);
 	pqsignal(SIGTERM, avl_sigterm_handler);
-	pqsignal(SIGQUIT, avl_quickdie);
-	pqsignal(SIGALRM, SIG_IGN);
+
+	pqsignal(SIGQUIT, quickdie);
+	pqsignal(SIGALRM, handle_sig_alarm);
 
 	pqsignal(SIGPIPE, SIG_IGN);
-	pqsignal(SIGUSR1, avl_sigusr1_handler);
-	/* We don't listen for async notifies */
-	pqsignal(SIGUSR2, SIG_IGN);
+	pqsignal(SIGUSR1, procsignal_sigusr1_handler);
+	pqsignal(SIGUSR2, avl_sigusr2_handler);
 	pqsignal(SIGFPE, FloatExceptionHandler);
 	pqsignal(SIGCHLD, SIG_DFL);
 
@@ -451,8 +450,12 @@ AutoVacLauncherMain(int argc, char *argv[])
 	 * had to do some stuff with LWLocks).
 	 */
 #ifndef EXEC_BACKEND
-	InitAuxiliaryProcess();
+	InitProcess();
 #endif
+
+	InitPostgres(NULL, InvalidOid, NULL, NULL);
+
+	SetProcessingMode(NormalProcessing);
 
 	/*
 	 * Create a memory context that we will do all our work in.  We do this so
@@ -466,11 +469,10 @@ AutoVacLauncherMain(int argc, char *argv[])
 										  ALLOCSET_DEFAULT_MAXSIZE);
 	MemoryContextSwitchTo(AutovacMemCxt);
 
-
 	/*
 	 * If an exception is encountered, processing resumes here.
 	 *
-	 * This code is heavily based on bgwriter.c, q.v.
+	 * This code is a stripped down version of PostgresMain error recovery.
 	 */
 	if (sigsetjmp(local_sigjmp_buf, 1) != 0)
 	{
@@ -480,17 +482,16 @@ AutoVacLauncherMain(int argc, char *argv[])
 		/* Prevents interrupts while cleaning up */
 		HOLD_INTERRUPTS();
 
+		/* Forget any pending QueryCancel request */
+		QueryCancelPending = false;
+		disable_sig_alarm(true);
+		QueryCancelPending = false;		/* again in case timeout occurred */
+
 		/* Report the error to the server log */
 		EmitErrorReport();
 
-		/*
-		 * These operations are really just a minimal subset of
-		 * AbortTransaction().	We don't have very many resources to worry
-		 * about, but we do have LWLocks.
-		 */
-		LWLockReleaseAll();
-		AtEOXact_Files();
-		AtEOXact_HashTables(false);
+		/* Abort the current transaction in order to recover */
+		AbortCurrentTransaction();
 
 		/*
 		 * Now return to normal top-level context and clear ErrorContext for
@@ -525,9 +526,6 @@ AutoVacLauncherMain(int argc, char *argv[])
 	/* We can now handle ereport(ERROR) */
 	PG_exception_stack = &local_sigjmp_buf;
 
-	ereport(LOG,
-			(errmsg("autovacuum launcher started")));
-
 	/* must unblock signals before calling rebuild_database_list */
 	PG_SETMASK(&UnBlockSig);
 
@@ -561,10 +559,13 @@ AutoVacLauncherMain(int argc, char *argv[])
 		 * necessity for manual cleanup of all postmaster children.
 		 */
 		if (!PostmasterIsAlive(true))
-			exit(1);
+			proc_exit(1);
 
 		launcher_determine_sleep((AutoVacuumShmem->av_freeWorkers != NULL),
 								 false, &nap);
+
+		/* Allow sinval catchup interrupts while sleeping */
+		EnableCatchupInterrupt();
 
 		/*
 		 * Sleep for a while according to schedule.
@@ -595,11 +596,13 @@ AutoVacLauncherMain(int argc, char *argv[])
 			 * necessity for manual cleanup of all postmaster children.
 			 */
 			if (!PostmasterIsAlive(true))
-				exit(1);
+				proc_exit(1);
 
-			if (got_SIGTERM || got_SIGHUP || got_SIGUSR1)
+			if (got_SIGTERM || got_SIGHUP || got_SIGUSR2)
 				break;
 		}
+
+		DisableCatchupInterrupt();
 
 		/* the normal shutdown case */
 		if (got_SIGTERM)
@@ -610,7 +613,7 @@ AutoVacLauncherMain(int argc, char *argv[])
 			got_SIGHUP = false;
 			ProcessConfigFile(PGC_SIGHUP);
 
-			/* shutdown requested in config file */
+			/* shutdown requested in config file? */
 			if (!AutoVacuumingActive())
 				break;
 
@@ -627,9 +630,9 @@ AutoVacLauncherMain(int argc, char *argv[])
 		 * a worker finished, or postmaster signalled failure to start a
 		 * worker
 		 */
-		if (got_SIGUSR1)
+		if (got_SIGUSR2)
 		{
-			got_SIGUSR1 = false;
+			got_SIGUSR2 = false;
 
 			/* rebalance cost limits, if needed */
 			if (AutoVacuumShmem->av_signal[AutoVacRebalance])
@@ -653,7 +656,7 @@ AutoVacLauncherMain(int argc, char *argv[])
 				 * of a worker will continue to fail in the same way.
 				 */
 				AutoVacuumShmem->av_signal[AutoVacForkFailed] = false;
-				pg_usleep(1000000L);		/* 1s */
+				pg_usleep(1000000L);	/* 1s */
 				SendPostmasterSignal(PMSIGNAL_START_AUTOVAC_WORKER);
 				continue;
 			}
@@ -1306,7 +1309,7 @@ launch_worker(TimestampTz now)
 
 /*
  * Called from postmaster to signal a failure to fork a process to become
- * worker.	The postmaster should kill(SIGUSR1) the launcher shortly
+ * worker.	The postmaster should kill(SIGUSR2) the launcher shortly
  * after calling this function.
  */
 void
@@ -1322,11 +1325,11 @@ avl_sighup_handler(SIGNAL_ARGS)
 	got_SIGHUP = true;
 }
 
-/* SIGUSR1: a worker is up and running, or just finished */
+/* SIGUSR2: a worker is up and running, or just finished, or failed to fork */
 static void
-avl_sigusr1_handler(SIGNAL_ARGS)
+avl_sigusr2_handler(SIGNAL_ARGS)
 {
-	got_SIGUSR1 = true;
+	got_SIGUSR2 = true;
 }
 
 /* SIGTERM: time to die */
@@ -1334,38 +1337,6 @@ static void
 avl_sigterm_handler(SIGNAL_ARGS)
 {
 	got_SIGTERM = true;
-}
-
-/*
- * avl_quickdie occurs when signalled SIGQUIT from postmaster.
- *
- * Some backend has bought the farm, so we need to stop what we're doing
- * and exit.
- */
-static void
-avl_quickdie(SIGNAL_ARGS)
-{
-	PG_SETMASK(&BlockSig);
-
-	/*
-	 * We DO NOT want to run proc_exit() callbacks -- we're here because
-	 * shared memory may be corrupted, so we don't want to try to clean up our
-	 * transaction.  Just nail the windows shut and get out of town.  Now that
-	 * there's an atexit callback to prevent third-party code from breaking
-	 * things by calling exit() directly, we have to reset the callbacks
-	 * explicitly to make this work as intended.
-	 */
-	on_exit_reset();
-
-	/*
-	 * Note we do exit(2) not exit(0).	This is to force the postmaster into a
-	 * system reset cycle if some idiot DBA sends a manual SIGQUIT to a random
-	 * backend.  This is necessary precisely because we don't clean up our
-	 * shared memory state.  (The "dead man switch" mechanism in pmsignal.c
-	 * should ensure the postmaster sees this as a crash, too, but no harm in
-	 * being doubly sure.)
-	 */
-	exit(2);
 }
 
 
@@ -1501,8 +1472,7 @@ AutoVacWorkerMain(int argc, char *argv[])
 	pqsignal(SIGALRM, handle_sig_alarm);
 
 	pqsignal(SIGPIPE, SIG_IGN);
-	pqsignal(SIGUSR1, CatchupInterruptHandler);
-	/* We don't listen for async notifies */
+	pqsignal(SIGUSR1, procsignal_sigusr1_handler);
 	pqsignal(SIGUSR2, SIG_IGN);
 	pqsignal(SIGFPE, FloatExceptionHandler);
 	pqsignal(SIGCHLD, SIG_DFL);
@@ -1591,7 +1561,7 @@ AutoVacWorkerMain(int argc, char *argv[])
 
 		/* wake up the launcher */
 		if (AutoVacuumShmem->av_launcherpid != 0)
-			kill(AutoVacuumShmem->av_launcherpid, SIGUSR1);
+			kill(AutoVacuumShmem->av_launcherpid, SIGUSR2);
 	}
 	else
 	{
@@ -1603,7 +1573,7 @@ AutoVacWorkerMain(int argc, char *argv[])
 
 	if (OidIsValid(dbid))
 	{
-		char	   *dbname;
+		char		dbname[NAMEDATALEN];
 
 		/*
 		 * Report autovac startup to the stats collector.  We deliberately do
@@ -1621,7 +1591,7 @@ AutoVacWorkerMain(int argc, char *argv[])
 		 * Note: if we have selected a just-deleted database (due to using
 		 * stale stats info), we'll fail and exit here.
 		 */
-		InitPostgres(NULL, dbid, NULL, &dbname);
+		InitPostgres(NULL, dbid, NULL, dbname);
 		SetProcessingMode(NormalProcessing);
 		set_ps_display(dbname, false);
 		ereport(DEBUG1,
@@ -1662,7 +1632,7 @@ FreeWorkerInfo(int code, Datum arg)
 		 * limit setting of the remaining workers.
 		 *
 		 * We somewhat ignore the risk that the launcher changes its PID
-		 * between we reading it and the actual kill; we expect ProcKill to be
+		 * between us reading it and the actual kill; we expect ProcKill to be
 		 * called shortly after us, and we assume that PIDs are not reused too
 		 * quickly after a process exits.
 		 */
@@ -1706,16 +1676,18 @@ AutoVacuumUpdateDelay(void)
 
 /*
  * autovac_balance_cost
- *		Recalculate the cost limit setting for each active workers.
+ *		Recalculate the cost limit setting for each active worker.
  *
  * Caller must hold the AutovacuumLock in exclusive mode.
  */
 static void
 autovac_balance_cost(void)
 {
-	WorkerInfo	worker;
-
 	/*
+	 * The idea here is that we ration out I/O equally.  The amount of I/O
+	 * that a worker can consume is determined by cost_limit/cost_delay, so
+	 * we try to equalize those ratios rather than the raw limit settings.
+	 *
 	 * note: in cost_limit, zero also means use value from elsewhere, because
 	 * zero is not a valid value.
 	 */
@@ -1725,6 +1697,7 @@ autovac_balance_cost(void)
 								autovacuum_vac_cost_delay : VacuumCostDelay);
 	double		cost_total;
 	double		cost_avail;
+	WorkerInfo	worker;
 
 	/* not set? nothing to do */
 	if (vac_cost_limit <= 0 || vac_cost_delay <= 0)
@@ -1751,7 +1724,7 @@ autovac_balance_cost(void)
 		return;
 
 	/*
-	 * Adjust each cost limit of active workers to balance the total of cost
+	 * Adjust cost limit of each active worker to balance the total of cost
 	 * limit to autovacuum_vacuum_cost_limit.
 	 */
 	cost_avail = (double) vac_cost_limit / vac_cost_delay;
@@ -1767,14 +1740,19 @@ autovac_balance_cost(void)
 			(cost_avail * worker->wi_cost_limit_base / cost_total);
 
 			/*
-			 * We put a lower bound of 1 to the cost_limit, to avoid division-
-			 * by-zero in the vacuum code.
+			 * We put a lower bound of 1 on the cost_limit, to avoid division-
+			 * by-zero in the vacuum code.  Also, in case of roundoff trouble
+			 * in these calculations, let's be sure we don't ever set
+			 * cost_limit to more than the base value.
 			 */
-			worker->wi_cost_limit = Max(Min(limit, worker->wi_cost_limit_base), 1);
+			worker->wi_cost_limit = Max(Min(limit,
+											worker->wi_cost_limit_base),
+										1);
 
-			elog(DEBUG2, "autovac_balance_cost(pid=%u db=%u, rel=%u, cost_limit=%d, cost_delay=%d)",
-				 worker->wi_proc->pid, worker->wi_dboid,
-				 worker->wi_tableoid, worker->wi_cost_limit, worker->wi_cost_delay);
+			elog(DEBUG2, "autovac_balance_cost(pid=%u db=%u, rel=%u, cost_limit=%d, cost_limit_base=%d, cost_delay=%d)",
+				 worker->wi_proc->pid, worker->wi_dboid, worker->wi_tableoid,
+				 worker->wi_cost_limit, worker->wi_cost_limit_base,
+				 worker->wi_cost_delay);
 		}
 
 		worker = (WorkerInfo) SHMQueueNext(&AutoVacuumShmem->av_runningWorkers,
@@ -1785,46 +1763,83 @@ autovac_balance_cost(void)
 
 /*
  * get_database_list
+ *		Return a list of all databases found in pg_database.
  *
- *		Return a list of all databases.  Note we cannot use pg_database,
- *		because we aren't connected; we use the flat database file.
+ * The list and associated data is allocated in the caller's memory context,
+ * which is in charge of ensuring that it's properly cleaned up afterwards.
+ *
+ * Note: this is the only function in which the autovacuum launcher uses a
+ * transaction.  Although we aren't attached to any particular database and
+ * therefore can't access most catalogs, we do have enough infrastructure
+ * to do a seqscan on pg_database.
  */
 static List *
 get_database_list(void)
 {
-	char	   *filename;
 	List	   *dblist = NIL;
-	char		thisname[NAMEDATALEN];
-	FILE	   *db_file;
-	Oid			db_id;
-	Oid			db_tablespace;
-	TransactionId db_frozenxid;
+	Relation	rel;
+	HeapScanDesc scan;
+	HeapTuple	tup;
+	MemoryContext	resultcxt;
 
-	filename = database_getflatfilename();
-	db_file = AllocateFile(filename, "r");
-	if (db_file == NULL)
-		ereport(FATAL,
-				(errcode_for_file_access(),
-				 errmsg("could not open file \"%s\": %m", filename)));
+	/* This is the context that we will allocate our output data in */
+	resultcxt = CurrentMemoryContext;
 
-	while (read_pg_database_line(db_file, thisname, &db_id,
-								 &db_tablespace, &db_frozenxid))
+#ifdef PGXC
+	/* PGXC_DATANODE, Force getting Xid from GTM */
+	if (IS_PGXC_DATANODE)
+		SetForceXidFromGTM(true);
+#endif
+
+	/*
+	 * Start a transaction so we can access pg_database, and get a snapshot.
+	 * We don't have a use for the snapshot itself, but we're interested in
+	 * the secondary effect that it sets RecentGlobalXmin.	(This is critical
+	 * for anything that reads heap pages, because HOT may decide to prune
+	 * them even if the process doesn't attempt to modify any tuples.)
+	 */
+	StartTransactionCommand();
+	(void) GetTransactionSnapshot();
+
+	rel = heap_open(DatabaseRelationId, AccessShareLock);
+	scan = heap_beginscan(rel, SnapshotNow, 0, NULL);
+
+	while (HeapTupleIsValid(tup = heap_getnext(scan, ForwardScanDirection)))
 	{
+		Form_pg_database pgdatabase = (Form_pg_database) GETSTRUCT(tup);
 		avw_dbase  *avdb;
+		MemoryContext	oldcxt;
+
+		/*
+		 * Allocate our results in the caller's context, not the transaction's.
+		 * We do this inside the loop, and restore the original context at the
+		 * end, so that leaky things like heap_getnext() are not called in a
+		 * potentially long-lived context.
+		 */
+		oldcxt = MemoryContextSwitchTo(resultcxt);
 
 		avdb = (avw_dbase *) palloc(sizeof(avw_dbase));
 
-		avdb->adw_datid = db_id;
-		avdb->adw_name = pstrdup(thisname);
-		avdb->adw_frozenxid = db_frozenxid;
+		avdb->adw_datid = HeapTupleGetOid(tup);
+		avdb->adw_name = pstrdup(NameStr(pgdatabase->datname));
+		avdb->adw_frozenxid = pgdatabase->datfrozenxid;
 		/* this gets set later: */
 		avdb->adw_entry = NULL;
 
 		dblist = lappend(dblist, avdb);
+		MemoryContextSwitchTo(oldcxt);
 	}
 
-	FreeFile(db_file);
-	pfree(filename);
+	heap_endscan(scan);
+	heap_close(rel, AccessShareLock);
+
+	CommitTransactionCommand();
+
+#ifdef PGXC
+	/* PGXC_DATANODE, revert to the default */
+	if (IS_PGXC_DATANODE)
+		SetForceXidFromGTM(false);
+#endif
 
 	return dblist;
 }
@@ -1885,9 +1900,7 @@ do_autovacuum(void)
 	 * zero in template and nonconnectable databases, else the system-wide
 	 * default.
 	 */
-	tuple = SearchSysCache(DATABASEOID,
-						   ObjectIdGetDatum(MyDatabaseId),
-						   0, 0, 0);
+	tuple = SearchSysCache1(DATABASEOID, ObjectIdGetDatum(MyDatabaseId));
 	if (!HeapTupleIsValid(tuple))
 		elog(ERROR, "cache lookup failed for database %u", MyDatabaseId);
 	dbForm = (Form_pg_database) GETSTRUCT(tuple);
@@ -2135,6 +2148,8 @@ do_autovacuum(void)
 		autovac_table *tab;
 		WorkerInfo	worker;
 		bool		skipit;
+		int			stdVacuumCostDelay;
+		int			stdVacuumCostLimit;
 
 		CHECK_FOR_INTERRUPTS();
 
@@ -2208,11 +2223,15 @@ do_autovacuum(void)
 		MyWorkerInfo->wi_tableoid = relid;
 		LWLockRelease(AutovacuumScheduleLock);
 
-		/* Set the initial vacuum cost parameters for this table */
-		VacuumCostDelay = tab->at_vacuum_cost_delay;
-		VacuumCostLimit = tab->at_vacuum_cost_limit;
+		/*
+		 * Remember the prevailing values of the vacuum cost GUCs.  We have
+		 * to restore these at the bottom of the loop, else we'll compute
+		 * wrong values in the next iteration of autovac_balance_cost().
+		 */
+		stdVacuumCostDelay = VacuumCostDelay;
+		stdVacuumCostLimit = VacuumCostLimit;
 
-		/* Last fixups before actually starting to work */
+		/* Must hold AutovacuumLock while mucking with cost balance info */
 		LWLockAcquire(AutovacuumLock, LW_EXCLUSIVE);
 
 		/* advertise my cost delay parameters for the balancing algorithm */
@@ -2222,6 +2241,9 @@ do_autovacuum(void)
 
 		/* do a balance */
 		autovac_balance_cost();
+
+		/* set the active cost parameters from the result of that */
+		AutoVacuumUpdateDelay();
 
 		/* done */
 		LWLockRelease(AutovacuumLock);
@@ -2300,10 +2322,20 @@ deleted:
 			pfree(tab->at_relname);
 		pfree(tab);
 
-		/* remove my info from shared memory */
+		/*
+		 * Remove my info from shared memory.  We could, but intentionally
+		 * don't, clear wi_cost_limit and friends --- this is on the
+		 * assumption that we probably have more to do with similar cost
+		 * settings, so we don't want to give up our share of I/O for a very
+		 * short interval and thereby thrash the global balance.
+		 */
 		LWLockAcquire(AutovacuumLock, LW_EXCLUSIVE);
 		MyWorkerInfo->wi_tableoid = InvalidOid;
 		LWLockRelease(AutovacuumLock);
+
+		/* restore vacuum cost GUCs for the next iteration */
+		VacuumCostDelay = stdVacuumCostDelay;
+		VacuumCostLimit = stdVacuumCostLimit;
 	}
 
 	/*
@@ -2401,9 +2433,7 @@ table_recheck_autovac(Oid relid, HTAB *table_toast_map,
 	dbentry = pgstat_fetch_stat_dbentry(MyDatabaseId);
 
 	/* fetch the relation's relcache entry */
-	classTup = SearchSysCacheCopy(RELOID,
-								  ObjectIdGetDatum(relid),
-								  0, 0, 0);
+	classTup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(relid));
 	if (!HeapTupleIsValid(classTup))
 		return NULL;
 	classForm = (Form_pg_class) GETSTRUCT(classTup);
@@ -2454,15 +2484,15 @@ table_recheck_autovac(Oid relid, HTAB *table_toast_map,
 		vac_cost_delay = (avopts && avopts->vacuum_cost_delay >= 0)
 			? avopts->vacuum_cost_delay
 			: (autovacuum_vac_cost_delay >= 0)
-				? autovacuum_vac_cost_delay
-				: VacuumCostDelay;
+			? autovacuum_vac_cost_delay
+			: VacuumCostDelay;
 
 		/* 0 or -1 in autovac setting means use plain vacuum_cost_limit */
 		vac_cost_limit = (avopts && avopts->vacuum_cost_limit > 0)
 			? avopts->vacuum_cost_limit
 			: (autovacuum_vac_cost_limit > 0)
-				? autovacuum_vac_cost_limit
-				: VacuumCostLimit;
+			? autovacuum_vac_cost_limit
+			: VacuumCostLimit;
 
 		/* these do not have autovacuum-specific settings */
 		freeze_min_age = (avopts && avopts->freeze_min_age >= 0)
@@ -2613,8 +2643,7 @@ relation_needs_vacanalyze(Oid relid,
 	{
 		reltuples = classForm->reltuples;
 		vactuples = tabentry->n_dead_tuples;
-		anltuples = tabentry->n_live_tuples + tabentry->n_dead_tuples -
-			tabentry->last_anl_tuples;
+		anltuples = tabentry->changes_since_analyze;
 
 		vacthresh = (float4) vac_base_thresh + vac_scale_factor * reltuples;
 		anlthresh = (float4) anl_base_thresh + anl_scale_factor * reltuples;
@@ -2662,12 +2691,13 @@ autovacuum_do_vac_analyze(autovac_table *tab,
 	MemSet(&vacstmt, 0, sizeof(vacstmt));
 
 	vacstmt.type = T_VacuumStmt;
-	vacstmt.vacuum = tab->at_dovacuum;
-	vacstmt.full = false;
-	vacstmt.analyze = tab->at_doanalyze;
+	vacstmt.options = 0;
+	if (tab->at_dovacuum)
+		vacstmt.options |= VACOPT_VACUUM;
+	if (tab->at_doanalyze)
+		vacstmt.options |= VACOPT_ANALYZE;
 	vacstmt.freeze_min_age = tab->at_freeze_min_age;
 	vacstmt.freeze_table_age = tab->at_freeze_table_age;
-	vacstmt.verbose = false;
 	vacstmt.relation = NULL;	/* not used since we pass a relid */
 	vacstmt.va_cols = NIL;
 
@@ -2797,10 +2827,6 @@ AutoVacuumShmemInit(void)
 		ShmemInitStruct("AutoVacuum Data",
 						AutoVacuumShmemSize(),
 						&found);
-	if (AutoVacuumShmem == NULL)
-		ereport(FATAL,
-				(errcode(ERRCODE_OUT_OF_MEMORY),
-				 errmsg("not enough shared memory for autovacuum")));
 
 	if (!IsUnderPostmaster)
 	{

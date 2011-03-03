@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/pgcrypto/blf.h
 /*
  * PuTTY is copyright 1997-2007 Simon Tatham.
  *

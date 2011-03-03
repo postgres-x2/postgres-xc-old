@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/sources.sgml
 
  <chapter id="source">
   <title>PostgreSQL Coding Conventions</title>
@@ -125,7 +125,7 @@ ereport(ERROR,
         (errcode(ERRCODE_AMBIGUOUS_FUNCTION),
          errmsg("function %s is not unique",
                 func_signature_string(funcname, nargs,
-                                      actual_arg_types)),
+                                      NIL, actual_arg_types)),
          errhint("Unable to choose a best candidate function. "
                  "You might need to add explicit typecasts.")));
 </programlisting>
@@ -410,7 +410,7 @@ Hint:       the addendum
 
    <para>
     There are functions in the backend that will double-quote their own output
-    at need (for example, <function>format_type_be</>()).  Do not put
+    at need (for example, <function>format_type_be()</function>).  Do not put
     additional quotes around the output of such functions.
    </para>
 
@@ -442,6 +442,12 @@ Hint:       the addendum
     a period.  Capitalize the first word of sentences.  Put two spaces after
     the period if another sentence follows (for English text; might be
     inappropriate in other languages).
+   </para>
+
+   <para>
+    Error context strings: Do not capitalize the first letter and do
+    not end the string with a period.  Context strings should normally
+    not be complete sentences.
    </para>
 
    <para>

@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/btree_gin/Makefile
 
 MODULE_big = btree_gin
 OBJS = btree_gin.o 

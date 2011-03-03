@@ -1,11 +1,11 @@
 <!--
-$PostgreSQL$
+doc/src/sgml/ref/discard.sgml
 PostgreSQL documentation
 -->
 
 <refentry id="SQL-DISCARD">
  <refmeta>
-  <refentrytitle id="SQL-DISCARD-TITLE">DISCARD</refentrytitle>
+  <refentrytitle>DISCARD</refentrytitle>
   <manvolnum>7</manvolnum>
   <refmiscinfo>SQL - Language Statements</refmiscinfo>
  </refmeta>

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/pgtest
 
 # This runs a build/initdb/regression test suite
 #

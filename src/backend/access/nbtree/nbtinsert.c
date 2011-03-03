@@ -3,12 +3,12 @@
  * nbtinsert.c
  *	  Item insertion in Lehman and Yao btrees for Postgres.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/nbtree/nbtinsert.c
  *
  *-------------------------------------------------------------------------
  */
@@ -49,14 +49,16 @@ typedef struct
 static Buffer _bt_newroot(Relation rel, Buffer lbuf, Buffer rbuf);
 
 static TransactionId _bt_check_unique(Relation rel, IndexTuple itup,
-				 Relation heapRel, Buffer buf, OffsetNumber ioffset,
-				 ScanKey itup_scankey);
+				 Relation heapRel, Buffer buf, OffsetNumber offset,
+				 ScanKey itup_scankey,
+				 IndexUniqueCheck checkUnique, bool *is_unique);
 static void _bt_findinsertloc(Relation rel,
 				  Buffer *bufptr,
 				  OffsetNumber *offsetptr,
 				  int keysz,
 				  ScanKey scankey,
-				  IndexTuple newtup);
+				  IndexTuple newtup,
+				  Relation heapRel);
 static void _bt_insertonpg(Relation rel, Buffer buf,
 			   BTStack stack,
 			   IndexTuple itup,
@@ -72,12 +74,11 @@ static OffsetNumber _bt_findsplitloc(Relation rel, Page page,
 static void _bt_checksplitloc(FindSplitData *state,
 				  OffsetNumber firstoldonright, bool newitemonleft,
 				  int dataitemstoleft, Size firstoldonrightsz);
-static void _bt_pgaddtup(Relation rel, Page page,
-			 Size itemsize, IndexTuple itup,
-			 OffsetNumber itup_off, const char *where);
+static bool _bt_pgaddtup(Page page, Size itemsize, IndexTuple itup,
+			 OffsetNumber itup_off);
 static bool _bt_isequal(TupleDesc itupdesc, Page page, OffsetNumber offnum,
 			int keysz, ScanKey scankey);
-static void _bt_vacuum_one_page(Relation rel, Buffer buffer);
+static void _bt_vacuum_one_page(Relation rel, Buffer buffer, Relation heapRel);
 
 
 /*
@@ -85,11 +86,24 @@ static void _bt_vacuum_one_page(Relation rel, Buffer buffer);
  *
  *		This routine is called by the public interface routines, btbuild
  *		and btinsert.  By here, itup is filled in, including the TID.
+ *
+ *		If checkUnique is UNIQUE_CHECK_NO or UNIQUE_CHECK_PARTIAL, this
+ *		will allow duplicates.	Otherwise (UNIQUE_CHECK_YES or
+ *		UNIQUE_CHECK_EXISTING) it will throw error for a duplicate.
+ *		For UNIQUE_CHECK_EXISTING we merely run the duplicate check, and
+ *		don't actually insert.
+ *
+ *		The result value is only significant for UNIQUE_CHECK_PARTIAL:
+ *		it must be TRUE if the entry is known unique, else FALSE.
+ *		(In the current implementation we'll also return TRUE after a
+ *		successful UNIQUE_CHECK_YES or UNIQUE_CHECK_EXISTING call, but
+ *		that's just a coding artifact.)
  */
-void
+bool
 _bt_doinsert(Relation rel, IndexTuple itup,
-			 bool index_is_unique, Relation heapRel)
+			 IndexUniqueCheck checkUnique, Relation heapRel)
 {
+	bool		is_unique = false;
 	int			natts = rel->rd_rel->relnatts;
 	ScanKey		itup_scankey;
 	BTStack		stack;
@@ -134,13 +148,18 @@ top:
 	 *
 	 * If we must wait for another xact, we release the lock while waiting,
 	 * and then must start over completely.
+	 *
+	 * For a partial uniqueness check, we don't wait for the other xact. Just
+	 * let the tuple in and return false for possibly non-unique, or true for
+	 * definitely unique.
 	 */
-	if (index_is_unique)
+	if (checkUnique != UNIQUE_CHECK_NO)
 	{
 		TransactionId xwait;
 
 		offset = _bt_binsrch(rel, buf, natts, itup_scankey, false);
-		xwait = _bt_check_unique(rel, itup, heapRel, buf, offset, itup_scankey);
+		xwait = _bt_check_unique(rel, itup, heapRel, buf, offset, itup_scankey,
+								 checkUnique, &is_unique);
 
 		if (TransactionIdIsValid(xwait))
 		{
@@ -153,13 +172,23 @@ top:
 		}
 	}
 
-	/* do the insertion */
-	_bt_findinsertloc(rel, &buf, &offset, natts, itup_scankey, itup);
-	_bt_insertonpg(rel, buf, stack, itup, offset, false);
+	if (checkUnique != UNIQUE_CHECK_EXISTING)
+	{
+		/* do the insertion */
+		_bt_findinsertloc(rel, &buf, &offset, natts, itup_scankey, itup, heapRel);
+		_bt_insertonpg(rel, buf, stack, itup, offset, false);
+	}
+	else
+	{
+		/* just release the buffer */
+		_bt_relbuf(rel, buf);
+	}
 
 	/* be tidy */
 	_bt_freestack(stack);
 	_bt_freeskey(itup_scankey);
+
+	return is_unique;
 }
 
 /*
@@ -172,10 +201,16 @@ top:
  * Returns InvalidTransactionId if there is no conflict, else an xact ID
  * we must wait for to see if it commits a conflicting tuple.	If an actual
  * conflict is detected, no return --- just ereport().
+ *
+ * However, if checkUnique == UNIQUE_CHECK_PARTIAL, we always return
+ * InvalidTransactionId because we don't want to wait.  In this case we
+ * set *is_unique to false if there is a potential conflict, and the
+ * core code must redo the uniqueness check later.
  */
 static TransactionId
 _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
-				 Buffer buf, OffsetNumber offset, ScanKey itup_scankey)
+				 Buffer buf, OffsetNumber offset, ScanKey itup_scankey,
+				 IndexUniqueCheck checkUnique, bool *is_unique)
 {
 	TupleDesc	itupdesc = RelationGetDescr(rel);
 	int			natts = rel->rd_rel->relnatts;
@@ -184,6 +219,10 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 	Page		page;
 	BTPageOpaque opaque;
 	Buffer		nbuf = InvalidBuffer;
+	bool		found = false;
+
+	/* Assume unique until we find a duplicate */
+	*is_unique = true;
 
 	InitDirtySnapshot(SnapshotDirty);
 
@@ -241,21 +280,48 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 				htid = curitup->t_tid;
 
 				/*
+				 * If we are doing a recheck, we expect to find the tuple we
+				 * are rechecking.	It's not a duplicate, but we have to keep
+				 * scanning.
+				 */
+				if (checkUnique == UNIQUE_CHECK_EXISTING &&
+					ItemPointerCompare(&htid, &itup->t_tid) == 0)
+				{
+					found = true;
+				}
+
+				/*
 				 * We check the whole HOT-chain to see if there is any tuple
 				 * that satisfies SnapshotDirty.  This is necessary because we
 				 * have just a single index entry for the entire chain.
 				 */
-				if (heap_hot_search(&htid, heapRel, &SnapshotDirty, &all_dead))
+				else if (heap_hot_search(&htid, heapRel, &SnapshotDirty,
+										 &all_dead))
 				{
-					/* it is a duplicate */
-					TransactionId xwait =
-					(TransactionIdIsValid(SnapshotDirty.xmin)) ?
-					SnapshotDirty.xmin : SnapshotDirty.xmax;
+					TransactionId xwait;
+
+					/*
+					 * It is a duplicate. If we are only doing a partial
+					 * check, then don't bother checking if the tuple is being
+					 * updated in another transaction. Just return the fact
+					 * that it is a potential conflict and leave the full
+					 * check till later.
+					 */
+					if (checkUnique == UNIQUE_CHECK_PARTIAL)
+					{
+						if (nbuf != InvalidBuffer)
+							_bt_relbuf(rel, nbuf);
+						*is_unique = false;
+						return InvalidTransactionId;
+					}
 
 					/*
 					 * If this tuple is being updated by other transaction
 					 * then we have to wait for its commit/abort.
 					 */
+					xwait = (TransactionIdIsValid(SnapshotDirty.xmin)) ?
+						SnapshotDirty.xmin : SnapshotDirty.xmax;
+
 					if (TransactionIdIsValid(xwait))
 					{
 						if (nbuf != InvalidBuffer)
@@ -295,10 +361,32 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 						break;
 					}
 
-					ereport(ERROR,
-							(errcode(ERRCODE_UNIQUE_VIOLATION),
-							 errmsg("duplicate key value violates unique constraint \"%s\"",
-									RelationGetRelationName(rel))));
+					/*
+					 * This is a definite conflict.  Break the tuple down into
+					 * datums and report the error.  But first, make sure we
+					 * release the buffer locks we're holding ---
+					 * BuildIndexValueDescription could make catalog accesses,
+					 * which in the worst case might touch this same index and
+					 * cause deadlocks.
+					 */
+					if (nbuf != InvalidBuffer)
+						_bt_relbuf(rel, nbuf);
+					_bt_relbuf(rel, buf);
+
+					{
+						Datum		values[INDEX_MAX_KEYS];
+						bool		isnull[INDEX_MAX_KEYS];
+
+						index_deform_tuple(itup, RelationGetDescr(rel),
+										   values, isnull);
+						ereport(ERROR,
+								(errcode(ERRCODE_UNIQUE_VIOLATION),
+								 errmsg("duplicate key value violates unique constraint \"%s\"",
+										RelationGetRelationName(rel)),
+								 errdetail("Key %s already exists.",
+										   BuildIndexValueDescription(rel,
+														  values, isnull))));
+					}
 				}
 				else if (all_dead)
 				{
@@ -349,6 +437,18 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 		}
 	}
 
+	/*
+	 * If we are doing a recheck then we should have found the tuple we are
+	 * checking.  Otherwise there's something very wrong --- probably, the
+	 * index is on a non-immutable expression.
+	 */
+	if (checkUnique == UNIQUE_CHECK_EXISTING && !found)
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+				 errmsg("failed to re-find tuple within index \"%s\"",
+						RelationGetRelationName(rel)),
+		errhint("This may be because of a non-immutable index expression.")));
+
 	if (nbuf != InvalidBuffer)
 		_bt_relbuf(rel, nbuf);
 
@@ -391,7 +491,8 @@ _bt_findinsertloc(Relation rel,
 				  OffsetNumber *offsetptr,
 				  int keysz,
 				  ScanKey scankey,
-				  IndexTuple newtup)
+				  IndexTuple newtup,
+				  Relation heapRel)
 {
 	Buffer		buf = *bufptr;
 	Page		page = BufferGetPage(buf);
@@ -418,10 +519,10 @@ _bt_findinsertloc(Relation rel,
 	if (itemsz > BTMaxItemSize(page))
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-				 errmsg("index row size %lu exceeds maximum %lu for index \"%s\"",
-						(unsigned long) itemsz,
-						(unsigned long) BTMaxItemSize(page),
-						RelationGetRelationName(rel)),
+			errmsg("index row size %lu exceeds maximum %lu for index \"%s\"",
+				   (unsigned long) itemsz,
+				   (unsigned long) BTMaxItemSize(page),
+				   RelationGetRelationName(rel)),
 		errhint("Values larger than 1/3 of a buffer page cannot be indexed.\n"
 				"Consider a function index of an MD5 hash of the value, "
 				"or use full text indexing.")));
@@ -456,7 +557,7 @@ _bt_findinsertloc(Relation rel,
 		 */
 		if (P_ISLEAF(lpageop) && P_HAS_GARBAGE(lpageop))
 		{
-			_bt_vacuum_one_page(rel, buf);
+			_bt_vacuum_one_page(rel, buf, heapRel);
 
 			/*
 			 * remember that we vacuumed this page, because that makes the
@@ -651,7 +752,9 @@ _bt_insertonpg(Relation rel,
 		/* Do the update.  No ereport(ERROR) until changes are logged */
 		START_CRIT_SECTION();
 
-		_bt_pgaddtup(rel, page, itemsz, itup, newitemoff, "page");
+		if (!_bt_pgaddtup(page, itemsz, itup, newitemoff))
+			elog(PANIC, "failed to add new item to block %u in index \"%s\"",
+				 itup_blkno, RelationGetRelationName(rel));
 
 		MarkBufferDirty(buf);
 
@@ -777,6 +880,8 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	Page		origpage;
 	Page		leftpage,
 				rightpage;
+	BlockNumber origpagenumber,
+				rightpagenumber;
 	BTPageOpaque ropaque,
 				lopaque,
 				oopaque;
@@ -792,10 +897,26 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	OffsetNumber i;
 	bool		isroot;
 
+	/* Acquire a new page to split into */
 	rbuf = _bt_getbuf(rel, P_NEW, BT_WRITE);
+
+	/*
+	 * origpage is the original page to be split.  leftpage is a temporary
+	 * buffer that receives the left-sibling data, which will be copied back
+	 * into origpage on success.  rightpage is the new page that receives
+	 * the right-sibling data.  If we fail before reaching the critical
+	 * section, origpage hasn't been modified and leftpage is only workspace.
+	 * In principle we shouldn't need to worry about rightpage either,
+	 * because it hasn't been linked into the btree page structure; but to
+	 * avoid leaving possibly-confusing junk behind, we are careful to rewrite
+	 * rightpage as zeroes before throwing any error.
+	 */
 	origpage = BufferGetPage(buf);
 	leftpage = PageGetTempPage(origpage);
 	rightpage = BufferGetPage(rbuf);
+
+	origpagenumber = BufferGetBlockNumber(buf);
+	rightpagenumber = BufferGetBlockNumber(rbuf);
 
 	_bt_pageinit(leftpage, BufferGetPageSize(buf));
 	/* rightpage was already initialized by _bt_getbuf */
@@ -821,8 +942,8 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	lopaque->btpo_flags &= ~(BTP_ROOT | BTP_SPLIT_END | BTP_HAS_GARBAGE);
 	ropaque->btpo_flags = lopaque->btpo_flags;
 	lopaque->btpo_prev = oopaque->btpo_prev;
-	lopaque->btpo_next = BufferGetBlockNumber(rbuf);
-	ropaque->btpo_prev = BufferGetBlockNumber(buf);
+	lopaque->btpo_next = rightpagenumber;
+	ropaque->btpo_prev = origpagenumber;
 	ropaque->btpo_next = oopaque->btpo_next;
 	lopaque->btpo.level = ropaque->btpo.level = oopaque->btpo.level;
 	/* Since we already have write-lock on both pages, ok to read cycleid */
@@ -845,9 +966,12 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 		item = (IndexTuple) PageGetItem(origpage, itemid);
 		if (PageAddItem(rightpage, (Item) item, itemsz, rightoff,
 						false, false) == InvalidOffsetNumber)
-			elog(PANIC, "failed to add hikey to the right sibling"
+		{
+			memset(rightpage, 0, BufferGetPageSize(rbuf));
+			elog(ERROR, "failed to add hikey to the right sibling"
 				 " while splitting block %u of index \"%s\"",
-				 BufferGetBlockNumber(buf), RelationGetRelationName(rel));
+				 origpagenumber, RelationGetRelationName(rel));
+		}
 		rightoff = OffsetNumberNext(rightoff);
 	}
 
@@ -872,9 +996,12 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	}
 	if (PageAddItem(leftpage, (Item) item, itemsz, leftoff,
 					false, false) == InvalidOffsetNumber)
-		elog(PANIC, "failed to add hikey to the left sibling"
+	{
+		memset(rightpage, 0, BufferGetPageSize(rbuf));
+		elog(ERROR, "failed to add hikey to the left sibling"
 			 " while splitting block %u of index \"%s\"",
-			 BufferGetBlockNumber(buf), RelationGetRelationName(rel));
+			 origpagenumber, RelationGetRelationName(rel));
+	}
 	leftoff = OffsetNumberNext(leftoff);
 
 	/*
@@ -896,14 +1023,24 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 		{
 			if (newitemonleft)
 			{
-				_bt_pgaddtup(rel, leftpage, newitemsz, newitem, leftoff,
-							 "left sibling");
+				if (!_bt_pgaddtup(leftpage, newitemsz, newitem, leftoff))
+				{
+					memset(rightpage, 0, BufferGetPageSize(rbuf));
+					elog(ERROR, "failed to add new item to the left sibling"
+						 " while splitting block %u of index \"%s\"",
+						 origpagenumber, RelationGetRelationName(rel));
+				}
 				leftoff = OffsetNumberNext(leftoff);
 			}
 			else
 			{
-				_bt_pgaddtup(rel, rightpage, newitemsz, newitem, rightoff,
-							 "right sibling");
+				if (!_bt_pgaddtup(rightpage, newitemsz, newitem, rightoff))
+				{
+					memset(rightpage, 0, BufferGetPageSize(rbuf));
+					elog(ERROR, "failed to add new item to the right sibling"
+						 " while splitting block %u of index \"%s\"",
+						 origpagenumber, RelationGetRelationName(rel));
+				}
 				rightoff = OffsetNumberNext(rightoff);
 			}
 		}
@@ -911,14 +1048,24 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 		/* decide which page to put it on */
 		if (i < firstright)
 		{
-			_bt_pgaddtup(rel, leftpage, itemsz, item, leftoff,
-						 "left sibling");
+			if (!_bt_pgaddtup(leftpage, itemsz, item, leftoff))
+			{
+				memset(rightpage, 0, BufferGetPageSize(rbuf));
+				elog(ERROR, "failed to add old item to the left sibling"
+					 " while splitting block %u of index \"%s\"",
+					 origpagenumber, RelationGetRelationName(rel));
+			}
 			leftoff = OffsetNumberNext(leftoff);
 		}
 		else
 		{
-			_bt_pgaddtup(rel, rightpage, itemsz, item, rightoff,
-						 "right sibling");
+			if (!_bt_pgaddtup(rightpage, itemsz, item, rightoff))
+			{
+				memset(rightpage, 0, BufferGetPageSize(rbuf));
+				elog(ERROR, "failed to add old item to the right sibling"
+					 " while splitting block %u of index \"%s\"",
+					 origpagenumber, RelationGetRelationName(rel));
+			}
 			rightoff = OffsetNumberNext(rightoff);
 		}
 	}
@@ -932,8 +1079,13 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 		 * not be splitting the page).
 		 */
 		Assert(!newitemonleft);
-		_bt_pgaddtup(rel, rightpage, newitemsz, newitem, rightoff,
-					 "right sibling");
+		if (!_bt_pgaddtup(rightpage, newitemsz, newitem, rightoff))
+		{
+			memset(rightpage, 0, BufferGetPageSize(rbuf));
+			elog(ERROR, "failed to add new item to the right sibling"
+				 " while splitting block %u of index \"%s\"",
+				 origpagenumber, RelationGetRelationName(rel));
+		}
 		rightoff = OffsetNumberNext(rightoff);
 	}
 
@@ -945,16 +1097,19 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	 * neighbors.
 	 */
 
-	if (!P_RIGHTMOST(ropaque))
+	if (!P_RIGHTMOST(oopaque))
 	{
-		sbuf = _bt_getbuf(rel, ropaque->btpo_next, BT_WRITE);
+		sbuf = _bt_getbuf(rel, oopaque->btpo_next, BT_WRITE);
 		spage = BufferGetPage(sbuf);
 		sopaque = (BTPageOpaque) PageGetSpecialPointer(spage);
-		if (sopaque->btpo_prev != ropaque->btpo_prev)
-			elog(PANIC, "right sibling's left-link doesn't match: "
-			   "block %u links to %u instead of expected %u in index \"%s\"",
-				 ropaque->btpo_next, sopaque->btpo_prev, ropaque->btpo_prev,
+		if (sopaque->btpo_prev != origpagenumber)
+		{
+			memset(rightpage, 0, BufferGetPageSize(rbuf));
+			elog(ERROR, "right sibling's left-link doesn't match: "
+				 "block %u links to %u instead of expected %u in index \"%s\"",
+				 oopaque->btpo_next, sopaque->btpo_prev, origpagenumber,
 				 RelationGetRelationName(rel));
+		}
 
 		/*
 		 * Check to see if we can set the SPLIT_END flag in the right-hand
@@ -979,8 +1134,7 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	 *
 	 * NO EREPORT(ERROR) till right sibling is updated.  We can get away with
 	 * not starting the critical section till here because we haven't been
-	 * scribbling on the original page yet, and we don't care about the new
-	 * sibling until it's linked into the btree.
+	 * scribbling on the original page yet; see comments above.
 	 */
 	START_CRIT_SECTION();
 
@@ -992,19 +1146,21 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 	 * (in the page management code) that the center of a page always be
 	 * clean, and the most efficient way to guarantee this is just to compact
 	 * the data by reinserting it into a new left page.  (XXX the latter
-	 * comment is probably obsolete.)
+	 * comment is probably obsolete; but in any case it's good to not scribble
+	 * on the original page until we enter the critical section.)
 	 *
 	 * We need to do this before writing the WAL record, so that XLogInsert
 	 * can WAL log an image of the page if necessary.
 	 */
 	PageRestoreTempPage(leftpage, origpage);
+	/* leftpage, lopaque must not be used below here */
 
 	MarkBufferDirty(buf);
 	MarkBufferDirty(rbuf);
 
 	if (!P_RIGHTMOST(ropaque))
 	{
-		sopaque->btpo_prev = BufferGetBlockNumber(rbuf);
+		sopaque->btpo_prev = rightpagenumber;
 		MarkBufferDirty(sbuf);
 	}
 
@@ -1018,8 +1174,8 @@ _bt_split(Relation rel, Buffer buf, OffsetNumber firstright,
 		XLogRecData *lastrdata;
 
 		xlrec.node = rel->rd_node;
-		xlrec.leftsib = BufferGetBlockNumber(buf);
-		xlrec.rightsib = BufferGetBlockNumber(rbuf);
+		xlrec.leftsib = origpagenumber;
+		xlrec.rightsib = rightpagenumber;
 		xlrec.rnext = ropaque->btpo_next;
 		xlrec.level = ropaque->btpo.level;
 		xlrec.firstright = firstright;
@@ -1818,13 +1974,11 @@ _bt_newroot(Relation rel, Buffer lbuf, Buffer rbuf)
  *		we insert the tuples in order, so that the given itup_off does
  *		represent the final position of the tuple!
  */
-static void
-_bt_pgaddtup(Relation rel,
-			 Page page,
+static bool
+_bt_pgaddtup(Page page,
 			 Size itemsize,
 			 IndexTuple itup,
-			 OffsetNumber itup_off,
-			 const char *where)
+			 OffsetNumber itup_off)
 {
 	BTPageOpaque opaque = (BTPageOpaque) PageGetSpecialPointer(page);
 	IndexTupleData trunctuple;
@@ -1839,8 +1993,9 @@ _bt_pgaddtup(Relation rel,
 
 	if (PageAddItem(page, (Item) itup, itemsize, itup_off,
 					false, false) == InvalidOffsetNumber)
-		elog(PANIC, "failed to add item to the %s in index \"%s\"",
-			 where, RelationGetRelationName(rel));
+		return false;
+
+	return true;
 }
 
 /*
@@ -1898,7 +2053,7 @@ _bt_isequal(TupleDesc itupdesc, Page page, OffsetNumber offnum,
  * super-exclusive "cleanup" lock (see nbtree/README).
  */
 static void
-_bt_vacuum_one_page(Relation rel, Buffer buffer)
+_bt_vacuum_one_page(Relation rel, Buffer buffer, Relation heapRel)
 {
 	OffsetNumber deletable[MaxOffsetNumber];
 	int			ndeletable = 0;
@@ -1925,7 +2080,7 @@ _bt_vacuum_one_page(Relation rel, Buffer buffer)
 	}
 
 	if (ndeletable > 0)
-		_bt_delitems(rel, buffer, deletable, ndeletable);
+		_bt_delitems_delete(rel, buffer, deletable, ndeletable, heapRel);
 
 	/*
 	 * Note: if we didn't find any LP_DEAD items, then the page's

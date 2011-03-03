@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/interfaces/ecpg/test/Makefile
 
 subdir = src/interfaces/ecpg/test
 top_builddir = ../../../..
@@ -28,7 +28,7 @@ endif
 ifneq ($(build_os),mingw32)
 abs_builddir := $(shell pwd)
 else
-abs_builddir := $(shell pwd -W)
+abs_builddir := $(shell sh -c "pwd -W")
 endif
 
 all install installdirs uninstall distprep:
@@ -54,7 +54,7 @@ clean distclean maintainer-clean:
 all: pg_regress$(X)
 
 pg_regress$(X): pg_regress_ecpg.o $(top_builddir)/src/test/regress/pg_regress.o
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) $^ $(LIBS) -o $@
 
 $(top_builddir)/src/test/regress/pg_regress.o:
 	$(MAKE) -C $(dir $@) $(notdir $@)
@@ -73,7 +73,7 @@ $(top_builddir)/src/port/pg_config_paths.h: $(top_builddir)/src/Makefile.global
 # $(srcdir) to the build directory.
 
 ifdef VPATH
-remaining_files_src := $(wildcard $(srcdir)/*/*.pgc) $(wildcard $(srcdir)/expected/*.c) $(wildcard $(srcdir)/expected/*.stdout) $(wildcard $(srcdir)/expected/*.stderr)
+remaining_files_src := $(wildcard $(srcdir)/*/*.pgc) $(wildcard $(srcdir)/expected/*.c) $(wildcard $(srcdir)/expected/*.stdout) $(wildcard $(srcdir)/expected/*.stderr) $(srcdir)/resultmap
 remaining_files_build := $(patsubst $(srcdir)/%, $(abs_builddir)/%, $(remaining_files_src))
 
 all: $(remaining_files_build)
@@ -83,11 +83,11 @@ endif
 
 
 check: all
-	./pg_regress  --dbname=regress1,connectdb --top-builddir=$(top_builddir) --temp-install=./tmp_check --multibyte=$(MULTIBYTE) --load-language=plpgsql $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb
+	./pg_regress  --dbname=regress1,connectdb --top-builddir=$(top_builddir) --temp-install=./tmp_check --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb
 
 # the same options, but with --listen-on-tcp
 checktcp: all
-	./pg_regress  --dbname=regress1,connectdb --top-builddir=$(top_builddir) --temp-install=./tmp_check --multibyte=$(MULTIBYTE) --load-language=plpgsql $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule_tcp --create-role=connectuser,connectdb --host=localhost
+	./pg_regress  --dbname=regress1,connectdb --top-builddir=$(top_builddir) --temp-install=./tmp_check --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule_tcp --create-role=connectuser,connectdb --host=localhost
 
 installcheck: all
-	./pg_regress  --psqldir=$(PSQLDIR) --dbname=regress1,connectdb --top-builddir=$(top_builddir) --multibyte=$(MULTIBYTE) --load-language=plpgsql $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb
+	./pg_regress  --psqldir=$(PSQLDIR) --dbname=regress1,connectdb --top-builddir=$(top_builddir) --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb

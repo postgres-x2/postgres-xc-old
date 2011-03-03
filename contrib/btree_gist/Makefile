@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/btree_gist/Makefile
 
 MODULE_big  = btree_gist
 

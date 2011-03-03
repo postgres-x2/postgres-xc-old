@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/pg_trgm/Makefile
 
 MODULE_big = pg_trgm
 OBJS = trgm_op.o trgm_gist.o trgm_gin.o

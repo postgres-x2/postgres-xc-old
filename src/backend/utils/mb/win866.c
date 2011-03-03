@@ -4,7 +4,7 @@
  *
  * Tatsuo Ishii
  *
- * $PostgreSQL$
+ * src/backend/utils/mb/win866.c
  */
 
 #include <stdio.h>

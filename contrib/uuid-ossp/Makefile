@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/uuid-ossp/Makefile
 
 MODULE_big = uuid-ossp
 OBJS = uuid-ossp.o

@@ -4,7 +4,7 @@
  * Written by Victor B. Wagner <vitus@cryptocom.ru>, Cryptocom LTD
  * This file is distributed under BSD-style license.
  *
- * $PostgreSQL$
+ * contrib/sslinfo/sslinfo.c
  */
 
 #include "postgres.h"

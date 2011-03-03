@@ -2,11 +2,11 @@
  *
  *	  Cyrillic and MULE_INTERNAL
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/utils/mb/conversion_procs/cyrillic_and_mic/cyrillic_and_mic.c
  *
  *-------------------------------------------------------------------------
  */

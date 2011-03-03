@@ -4,18 +4,19 @@
  *	  local buffer manager. Fast buffer manager for temporary tables,
  *	  which never need to be WAL-logged or checkpointed, etc.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994-5, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/storage/buffer/localbuf.c
  *
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
 
 #include "catalog/catalog.h"
+#include "executor/instrument.h"
 #include "storage/buf_internals.h"
 #include "storage/bufmgr.h"
 #include "storage/smgr.h"
@@ -209,7 +210,7 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 		/* Mark not-dirty now in case we error out below */
 		bufHdr->flags &= ~BM_DIRTY;
 
-		LocalBufferFlushCount++;
+		pgBufferUsage.local_blks_written++;
 	}
 
 	/*
@@ -396,6 +397,7 @@ GetLocalBufferStorage(void)
 	static int	next_buf_in_block = 0;
 	static int	num_bufs_in_block = 0;
 	static int	total_bufs_allocated = 0;
+	static MemoryContext LocalBufferContext = NULL;
 
 	char	   *this_buf;
 
@@ -406,6 +408,19 @@ GetLocalBufferStorage(void)
 		/* Need to make a new request to memmgr */
 		int			num_bufs;
 
+		/*
+		 * We allocate local buffers in a context of their own, so that the
+		 * space eaten for them is easily recognizable in MemoryContextStats
+		 * output.  Create the context on first use.
+		 */
+		if (LocalBufferContext == NULL)
+			LocalBufferContext =
+				AllocSetContextCreate(TopMemoryContext,
+									  "LocalBufferContext",
+									  ALLOCSET_DEFAULT_MINSIZE,
+									  ALLOCSET_DEFAULT_INITSIZE,
+									  ALLOCSET_DEFAULT_MAXSIZE);
+
 		/* Start with a 16-buffer request; subsequent ones double each time */
 		num_bufs = Max(num_bufs_in_block * 2, 16);
 		/* But not more than what we need for all remaining local bufs */
@@ -413,8 +428,7 @@ GetLocalBufferStorage(void)
 		/* And don't overflow MaxAllocSize, either */
 		num_bufs = Min(num_bufs, MaxAllocSize / BLCKSZ);
 
-		/* Allocate space from TopMemoryContext so it never goes away */
-		cur_block = (char *) MemoryContextAlloc(TopMemoryContext,
+		cur_block = (char *) MemoryContextAlloc(LocalBufferContext,
 												num_bufs * BLCKSZ);
 		next_buf_in_block = 0;
 		num_bufs_in_block = num_bufs;

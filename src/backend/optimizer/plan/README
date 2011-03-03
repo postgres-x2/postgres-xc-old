@@ -1,4 +1,4 @@
-$PostgreSQL$
+src/backend/optimizer/plan/README
 
 Subselects
 ==========

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/port/univel.h
  *
  ***************************************
  * Define this if you are compiling with

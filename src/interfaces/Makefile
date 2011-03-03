@@ -4,7 +4,7 @@
 #
 # Copyright (c) 1994, Regents of the University of California
 #
-# $PostgreSQL$
+# src/interfaces/Makefile
 #
 #-------------------------------------------------------------------------
 
@@ -12,7 +12,7 @@ subdir = src/interfaces
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
-DIRS = libpq ecpg 
+SUBDIRS = libpq ecpg
 
 all install installdirs uninstall distprep clean distclean maintainer-clean:
-	@for dir in $(DIRS); do $(MAKE) -C $$dir $@ || exit; done
+	@for dir in $(SUBDIRS); do $(MAKE) -C $$dir $@ || exit; done

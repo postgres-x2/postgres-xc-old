@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# contrib/lo/Makefile
 
 MODULES = lo
 DATA_built = lo.sql

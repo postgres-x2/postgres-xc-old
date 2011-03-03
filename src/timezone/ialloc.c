@@ -3,7 +3,7 @@
  * 2006-07-17 by Arthur David Olson.
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/timezone/ialloc.c
  */
 
 #include "postgres_fe.h"

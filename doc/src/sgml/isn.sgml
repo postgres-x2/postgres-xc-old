@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/isn.sgml
 
 <sect1 id="isn">
  <title>isn</title>
@@ -17,7 +17,12 @@
  <sect2>
   <title>Data types</title>
 
-  <table>
+  <para>
+   <xref linkend="isn-datatypes"> shows the data types provided by
+   the <filename>isn</filename> module.
+  </para>
+
+  <table id="isn-datatypes">
    <title><filename>isn</filename> data types</title>
    <tgroup cols="2">
     <thead>
@@ -209,7 +214,7 @@
 
   <para>
    The <filename>isn</> module provides the standard comparison operators,
-   plus btree and hash indexing support for all these datatypes.  In
+   plus B-tree and hash indexing support for all these data types.  In
    addition there are several specialized functions; shown in <xref linkend="isn-functions">.
    In this table,
    <type>isn</> means any one of the module's data types.
@@ -295,7 +300,7 @@
  <sect2>
   <title>Examples</title>
 
-  <programlisting>
+<programlisting>
 --Using the types directly:
 SELECT isbn('978-0-393-04002-9');
 SELECT isbn13('0901690546');
@@ -333,7 +338,7 @@ UPDATE test SET id = make_valid(id) WHERE id = '2-205-00876-X!';
 SELECT * FROM test;
 
 SELECT isbn13(id) FROM test;
-  </programlisting>
+</programlisting>
  </sect2>
 
  <sect2>
@@ -342,24 +347,20 @@ SELECT isbn13(id) FROM test;
   <para>
    The information to implement this module was collected from
    several sites, including:
-  </para>
-  <programlisting>
-   http://www.isbn-international.org/
-   http://www.issn.org/
-   http://www.ismn-international.org/
-   http://www.wikipedia.org/
-  </programlisting>
+   <itemizedlist>
+    <listitem><para><ulink url="http://www.isbn-international.org/"></ulink></para></listitem>
+    <listitem><para><ulink url="http://www.issn.org/"></ulink></para></listitem>
+    <listitem><para><ulink url="http://www.ismn-international.org/"></ulink></para></listitem>
+    <listitem><para><ulink url="http://www.wikipedia.org/"></ulink></para></listitem>
+   </itemizedlist>
 
-  <para>
    The prefixes used for hyphenation were also compiled from:
-  </para>
-  <programlisting>
-   http://www.gs1.org/productssolutions/idkeys/support/prefix_list.html
-   http://www.isbn-international.org/en/identifiers.html
-   http://www.ismn-international.org/ranges.html
-  </programlisting>
+   <itemizedlist>
+    <listitem><para><ulink url="http://www.gs1.org/productssolutions/idkeys/support/prefix_list.html"></ulink></para></listitem>
+    <listitem><para><ulink url="http://www.isbn-international.org/en/identifiers.html"></ulink></para></listitem>
+    <listitem><para><ulink url="http://www.ismn-international.org/ranges.html"></ulink></para></listitem>
+   </itemizedlist>
 
-  <para>
    Care was taken during the creation of the algorithms and they
    were meticulously verified against the suggested algorithms
    in the official ISBN, ISMN, ISSN User Manuals.
@@ -374,7 +375,7 @@ SELECT isbn13(id) FROM test;
 
   <para>
    This module was inspired by Garrett A. Wollman's
-   isbn_issn code.
+   <filename>isbn_issn</> code.
   </para>
  </sect2>
 

@@ -4,7 +4,7 @@
  *	  Routines for maintaining "flat file" images of the shared catalogs.
  *
  *
- * $PostgreSQL$
+ * src/include/utils/flatfiles.h
  *
  *-------------------------------------------------------------------------
  */

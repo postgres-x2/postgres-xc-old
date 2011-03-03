@@ -1,11 +1,11 @@
 <!--
-$PostgreSQL $
+doc/src/sgml/ref/reindexdb.sgml
 PostgreSQL documentation
 -->
 
 <refentry id="APP-REINDEXDB">
  <refmeta>
-  <refentrytitle id="APP-REINDEXDB-TITLE"><application>reindexdb</application></refentrytitle>
+  <refentrytitle><application>reindexdb</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
@@ -26,11 +26,15 @@ PostgreSQL documentation
    <arg>--table | -t <replaceable>table</replaceable> </arg>
    <arg>--index | -i <replaceable>index</replaceable> </arg>
    <arg><replaceable>dbname</replaceable></arg>
-   <sbr>
+  </cmdsynopsis>
+
+  <cmdsynopsis>
    <command>reindexdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg>--all | -a</arg>
-   <sbr>
+  </cmdsynopsis>
+
+  <cmdsynopsis>
    <command>reindexdb</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg>--system | -s</arg>
@@ -49,7 +53,7 @@ PostgreSQL documentation
 
   <para>
    <application>reindexdb</application> is a wrapper around the SQL
-   command <xref linkend="SQL-REINDEX" endterm="sql-reindex-title">.
+   command <xref linkend="SQL-REINDEX">.
    There is no effective difference between reindexing databases via
    this utility and via other methods for accessing the server.
   </para>
@@ -139,7 +143,30 @@ PostgreSQL documentation
        </para>
       </listitem>
      </varlistentry>
-    </variablelist>
+
+    <varlistentry>
+      <term><option>-V</></term>
+      <term><option>--version</></term>
+      <listitem>
+       <para>
+       Print the <application>reindexdb</application> version and exit.
+       </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term><option>-?</></term>
+      <term><option>--help</></term>
+      <listitem>
+      <para>
+      Show help about <application>reindexdb</application> command line
+      arguments, and exit.
+      </para>
+      </listitem>
+    </varlistentry>
+
+   </variablelist>
+
    </para>
 
    <para>
@@ -252,8 +279,8 @@ PostgreSQL documentation
   <title>Diagnostics</title>
 
   <para>
-   In case of difficulty, see <xref linkend="SQL-REINDEX"
-   endterm="sql-reindex-title"> and <xref linkend="APP-PSQL"> for
+   In case of difficulty, see <xref linkend="SQL-REINDEX">
+   and <xref linkend="APP-PSQL"> for
    discussions of potential problems and error messages.
    The database server must be running at the
    targeted host.  Also, any default connection settings and environment
@@ -301,7 +328,7 @@ PostgreSQL documentation
   <title>See Also</title>
 
   <simplelist type="inline">
-   <member><xref linkend="sql-reindex" endterm="sql-reindex-title"></member>
+   <member><xref linkend="sql-reindex"></member>
   </simplelist>
  </refsect1>
 

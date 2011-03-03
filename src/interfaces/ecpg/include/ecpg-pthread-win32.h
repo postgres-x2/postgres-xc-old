@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/ecpg-pthread-win32.h */
 /*
  * pthread mapping macros for win32 native thread implementation
  */

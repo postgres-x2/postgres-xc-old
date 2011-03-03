@@ -4,7 +4,7 @@
  * If dlopen() is available (Darwin 10.3 and later), we just use it.
  * Otherwise we emulate it with the older, now deprecated, NSLinkModule API.
  *
- * $PostgreSQL$
+ * src/backend/port/dynloader/darwin.c
  */
 #include "postgres.h"
 

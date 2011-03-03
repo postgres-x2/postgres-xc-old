@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/include/pgtypes_date.h */
 
 #ifndef PGTYPES_DATETIME
 #define PGTYPES_DATETIME

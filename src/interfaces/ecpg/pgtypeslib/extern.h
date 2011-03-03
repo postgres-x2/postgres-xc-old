@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/interfaces/ecpg/pgtypeslib/extern.h */
 
 #ifndef __PGTYPES_COMMON_H__
 #define __PGTYPES_COMMON_H__

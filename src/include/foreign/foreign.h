@@ -4,9 +4,9 @@
  *	  support for foreign-data wrappers, servers and user mappings.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/include/foreign/foreign.h
  *
  *-------------------------------------------------------------------------
  */

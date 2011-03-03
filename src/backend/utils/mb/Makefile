@@ -4,7 +4,7 @@
 #    Makefile for utils/mb
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/mb/Makefile
 #
 #-------------------------------------------------------------------------
 

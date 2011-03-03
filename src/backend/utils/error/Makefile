@@ -4,7 +4,7 @@
 #    Makefile for utils/error
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/utils/error/Makefile
 #
 #-------------------------------------------------------------------------
 

@@ -1,0 +1,17 @@
+/exports.list
+/crypt.c
+/getaddrinfo.c
+/inet_aton.c
+/noblock.c
+/open.c
+/pgstrcasecmp.c
+/snprintf.c
+/strerror.c
+/strlcpy.c
+/thread.c
+/win32error.c
+/pgsleep.c
+/md5.c
+/ip.c
+/encnames.c
+/wchar.c

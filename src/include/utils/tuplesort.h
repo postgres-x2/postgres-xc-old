@@ -10,10 +10,10 @@
  * amounts are sorted using temporary files and a standard external sort
  * algorithm.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/utils/tuplesort.h
  *
  *-------------------------------------------------------------------------
  */
@@ -94,7 +94,10 @@ extern bool tuplesort_getdatum(Tuplesortstate *state, bool forward,
 
 extern void tuplesort_end(Tuplesortstate *state);
 
-extern char *tuplesort_explain(Tuplesortstate *state);
+extern void tuplesort_get_stats(Tuplesortstate *state,
+					const char **sortMethod,
+					const char **spaceType,
+					long *spaceUsed);
 
 extern int	tuplesort_merge_order(long allowedMem);
 

@@ -1,7 +1,7 @@
 :
 # create macro calls for all defines in the file
 
-# $PostgreSQL$
+# src/tools/pginclude/pgdefine
 
 trap "rm -f /tmp/$$" 0 1 2 3 15
 for FILE

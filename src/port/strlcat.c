@@ -1,7 +1,7 @@
 /*
- * $PostgreSQL$
+ * src/port/strlcat.c
  *
- *	$OpenBSD$	*/
+ *	$OpenBSD: strlcat.c,v 1.13 2005/08/08 08:05:37 espie Exp $	*/
 
 /*
  * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>

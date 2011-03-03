@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* src/backend/port/dynloader/nextstep.c
 
 #include "postgres.h"
 

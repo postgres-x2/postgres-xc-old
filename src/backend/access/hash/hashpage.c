@@ -3,12 +3,12 @@
  * hashpage.c
  *	  Hash table page management code for the Postgres hash access method
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/hash/hashpage.c
  *
  * NOTES
  *	  Postgres hash pages look like ordinary relation pages.  The opaque
@@ -799,8 +799,8 @@ _hash_splitbucket(Relation rel,
 	/*
 	 * Partition the tuples in the old bucket between the old bucket and the
 	 * new bucket, advancing along the old bucket's overflow bucket chain and
-	 * adding overflow pages to the new bucket as needed.  Outer loop
-	 * iterates once per page in old bucket.
+	 * adding overflow pages to the new bucket as needed.  Outer loop iterates
+	 * once per page in old bucket.
 	 */
 	for (;;)
 	{

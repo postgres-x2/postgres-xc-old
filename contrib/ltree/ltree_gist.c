@@ -1,7 +1,7 @@
 /*
  * GiST support for ltree
  * Teodor Sigaev <teodor@stack.net>
- * $PostgreSQL$
+ * contrib/ltree/ltree_gist.c
  */
 #include "postgres.h"
 

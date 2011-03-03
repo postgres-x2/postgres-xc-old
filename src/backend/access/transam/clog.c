@@ -23,11 +23,11 @@
  * for aborts (whether sync or async), since the post-crash assumption would
  * be that such transactions failed anyway.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
- * $PostgreSQL$
+ * src/backend/access/transam/clog.c
  *
  *-------------------------------------------------------------------------
  */
@@ -622,10 +622,11 @@ ExtendCLOG(TransactionId newestXact)
 #endif
 
 	/* Zero the page and make an XLOG entry about it */
-	ZeroCLOGPage(pageno, true);
+	ZeroCLOGPage(pageno, !InRecovery);
 
 	LWLockRelease(CLogControlLock);
 }
+
 
 /*
  * Remove all CLOG segments before the one holding the passed transaction ID

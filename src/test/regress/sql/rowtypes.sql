@@ -35,10 +35,7 @@ insert into quadtable values (2, ((null,4.4),(5.5,6.6)));
 
 select * from quadtable order by f1, q;
 
-begin;
-set local add_missing_from = false;
 select f1, q.c1 from quadtable;		-- fails, q is a table reference
-rollback;
 
 select f1, (q).c1, (qq.q).c1.i from quadtable qq order by 1;
 
@@ -120,3 +117,43 @@ select array[ row(1,2), row(3,4), row(5,6) ];
 -- Check ability to compare an anonymous row to elements of an array
 select row(1,1.1) = any (array[ row(7,7.7), row(1,1.1), row(0,0.0) ]);
 select row(1,1.1) = any (array[ row(7,7.7), row(1,1.0), row(0,0.0) ]);
+
+--
+-- Test case derived from bug #5716: check multiple uses of a rowtype result
+--
+
+BEGIN;
+
+CREATE TABLE price (
+    id SERIAL PRIMARY KEY,
+    active BOOLEAN NOT NULL,
+    price NUMERIC
+);
+
+CREATE TYPE price_input AS (
+    id INTEGER,
+    price NUMERIC
+);
+
+CREATE TYPE price_key AS (
+    id INTEGER
+);
+
+CREATE FUNCTION price_key_from_table(price) RETURNS price_key AS $$
+    SELECT $1.id
+$$ LANGUAGE SQL;
+
+CREATE FUNCTION price_key_from_input(price_input) RETURNS price_key AS $$
+    SELECT $1.id
+$$ LANGUAGE SQL;
+
+insert into price values (1,false,42), (10,false,100), (11,true,17.99);
+
+UPDATE price
+    SET active = true, price = input_prices.price
+    FROM unnest(ARRAY[(10, 123.00), (11, 99.99)]::price_input[]) input_prices
+    WHERE price_key_from_table(price.*) = price_key_from_input(input_prices.*);
+
+select * from price;
+
+rollback;

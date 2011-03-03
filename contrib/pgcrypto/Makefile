@@ -1,5 +1,5 @@
 #
-# $PostgreSQL$
+# contrib/pgcrypto/Makefile
 #
 
 INT_SRCS = md5.c sha1.c sha2.c internal.c internal-sha2.c blf.c rijndael.c \

@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * src/include/commands/comment.h
  *
  *-------------------------------------------------------------------------
  *
@@ -7,7 +7,7 @@
  *
  * Prototypes for functions in commands/comment.c
  *
- * Copyright (c) 1999-2009, PostgreSQL Global Development Group
+ * Copyright (c) 1999-2010, PostgreSQL Global Development Group
  *
  *-------------------------------------------------------------------------
  */
@@ -38,5 +38,7 @@ extern void CreateComments(Oid oid, Oid classoid, int32 subid, char *comment);
 extern void DeleteSharedComments(Oid oid, Oid classoid);
 
 extern void CreateSharedComments(Oid oid, Oid classoid, char *comment);
+
+extern char *GetComment(Oid oid, Oid classoid, int32 subid);
 
 #endif   /* COMMENT_H */

@@ -5,10 +5,10 @@
  *
  * Code originally contributed by Adriaan Joubert.
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/utils/varbit.h
  *
  *-------------------------------------------------------------------------
  */
@@ -88,6 +88,9 @@ extern Datum bitshiftleft(PG_FUNCTION_ARGS);
 extern Datum bitshiftright(PG_FUNCTION_ARGS);
 extern Datum bitcat(PG_FUNCTION_ARGS);
 extern Datum bitsubstr(PG_FUNCTION_ARGS);
+extern Datum bitsubstr_no_len(PG_FUNCTION_ARGS);
+extern Datum bitoverlay(PG_FUNCTION_ARGS);
+extern Datum bitoverlay_no_len(PG_FUNCTION_ARGS);
 extern Datum bitlength(PG_FUNCTION_ARGS);
 extern Datum bitoctetlength(PG_FUNCTION_ARGS);
 extern Datum bitfromint4(PG_FUNCTION_ARGS);
@@ -95,5 +98,7 @@ extern Datum bittoint4(PG_FUNCTION_ARGS);
 extern Datum bitfromint8(PG_FUNCTION_ARGS);
 extern Datum bittoint8(PG_FUNCTION_ARGS);
 extern Datum bitposition(PG_FUNCTION_ARGS);
+extern Datum bitsetbit(PG_FUNCTION_ARGS);
+extern Datum bitgetbit(PG_FUNCTION_ARGS);
 
 #endif

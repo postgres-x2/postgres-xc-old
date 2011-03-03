@@ -1,4 +1,4 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/postgres.sgml
 
 <!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V4.2//EN" [
 
@@ -16,6 +16,8 @@
 
  <bookinfo>
   <corpauthor>The PostgreSQL Global Development Group</corpauthor>
+  <productname>PostgreSQL</productname>
+  <productnumber>&version;</productnumber>
   &legal;
  </bookinfo>
 
@@ -153,6 +155,7 @@
   &maintenance;
   &backup;
   &high-availability;
+  &recovery-config;
   &monitoring;
   &diskusage;
   &wal;
@@ -255,13 +258,13 @@
   &release;
   &contrib;
   &external-projects;
-  &cvs;
+  &sourcerepo;
   &docguide;
   &acronyms;
 
  </part>
 
  &biblio;
- &bookindex;
+ <![%include-index;[&bookindex;]]>
 
 </book>

@@ -3,12 +3,12 @@
  * functions.c
  *	  Execution of SQL-language functions
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/executor/functions.c
  *
  *-------------------------------------------------------------------------
  */
@@ -74,6 +74,7 @@ typedef struct execution_state
  */
 typedef struct
 {
+	char	   *fname;			/* function name (for error msgs) */
 	char	   *src;			/* function body text (for error msgs) */
 
 	Oid		   *argtypes;		/* resolved types of arguments */
@@ -228,16 +229,20 @@ init_sql_fcache(FmgrInfo *finfo, bool lazyEvalOK)
 	bool		isNull;
 
 	fcache = (SQLFunctionCachePtr) palloc0(sizeof(SQLFunctionCache));
+	finfo->fn_extra = (void *) fcache;
 
 	/*
 	 * get the procedure tuple corresponding to the given function Oid
 	 */
-	procedureTuple = SearchSysCache(PROCOID,
-									ObjectIdGetDatum(foid),
-									0, 0, 0);
+	procedureTuple = SearchSysCache1(PROCOID, ObjectIdGetDatum(foid));
 	if (!HeapTupleIsValid(procedureTuple))
 		elog(ERROR, "cache lookup failed for function %u", foid);
 	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
+
+	/*
+	 * copy function name immediately for use by error reporting callback
+	 */
+	fcache->fname = pstrdup(NameStr(procedureStruct->proname));
 
 	/*
 	 * get the result type from the procedure tuple, and check for polymorphic
@@ -363,8 +368,6 @@ init_sql_fcache(FmgrInfo *finfo, bool lazyEvalOK)
 											  lazyEvalOK);
 
 	ReleaseSysCache(procedureTuple);
-
-	finfo->fn_extra = (void *) fcache;
 }
 
 /* Start up execution of one execution_state node */
@@ -414,7 +417,7 @@ postquel_start(execution_state *es, SQLFunctionCachePtr fcache)
 								 fcache->src,
 								 snapshot, InvalidSnapshot,
 								 dest,
-								 fcache->paramLI, false);
+								 fcache->paramLI, 0);
 	else
 		es->qd = CreateUtilityQueryDesc(es->stmt,
 										fcache->src,
@@ -526,6 +529,11 @@ postquel_sub_params(SQLFunctionCachePtr fcache,
 			/* sizeof(ParamListInfoData) includes the first array element */
 			paramLI = (ParamListInfo) palloc(sizeof(ParamListInfoData) +
 									   (nargs - 1) *sizeof(ParamExternData));
+			/* we have static list of params, so no hooks needed */
+			paramLI->paramFetch = NULL;
+			paramLI->paramFetchArg = NULL;
+			paramLI->parserSetup = NULL;
+			paramLI->parserSetupArg = NULL;
 			paramLI->numParams = nargs;
 			fcache->paramLI = paramLI;
 		}
@@ -633,8 +641,8 @@ fmgr_sql(PG_FUNCTION_ARGS)
 		/*
 		 * For simplicity, we require callers to support both set eval modes.
 		 * There are cases where we must use one or must use the other, and
-		 * it's not really worthwhile to postpone the check till we know.
-		 * But note we do not require caller to provide an expectedDesc.
+		 * it's not really worthwhile to postpone the check till we know. But
+		 * note we do not require caller to provide an expectedDesc.
 		 */
 		if (!rsi || !IsA(rsi, ReturnSetInfo) ||
 			(rsi->allowedModes & SFRM_ValuePerCall) == 0 ||
@@ -874,39 +882,24 @@ sql_exec_error_callback(void *arg)
 {
 	FmgrInfo   *flinfo = (FmgrInfo *) arg;
 	SQLFunctionCachePtr fcache = (SQLFunctionCachePtr) flinfo->fn_extra;
-	HeapTuple	func_tuple;
-	Form_pg_proc functup;
-	char	   *fn_name;
 	int			syntaxerrposition;
 
-	/* Need access to function's pg_proc tuple */
-	func_tuple = SearchSysCache(PROCOID,
-								ObjectIdGetDatum(flinfo->fn_oid),
-								0, 0, 0);
-	if (!HeapTupleIsValid(func_tuple))
-		return;					/* shouldn't happen */
-	functup = (Form_pg_proc) GETSTRUCT(func_tuple);
-	fn_name = NameStr(functup->proname);
+	/*
+	 * We can do nothing useful if init_sql_fcache() didn't get as far as
+	 * saving the function name
+	 */
+	if (fcache == NULL || fcache->fname == NULL)
+		return;
 
 	/*
 	 * If there is a syntax error position, convert to internal syntax error
 	 */
 	syntaxerrposition = geterrposition();
-	if (syntaxerrposition > 0)
+	if (syntaxerrposition > 0 && fcache->src != NULL)
 	{
-		bool		isnull;
-		Datum		tmp;
-		char	   *prosrc;
-
-		tmp = SysCacheGetAttr(PROCOID, func_tuple, Anum_pg_proc_prosrc,
-							  &isnull);
-		if (isnull)
-			elog(ERROR, "null prosrc");
-		prosrc = TextDatumGetCString(tmp);
 		errposition(0);
 		internalerrposition(syntaxerrposition);
-		internalerrquery(prosrc);
-		pfree(prosrc);
+		internalerrquery(fcache->src);
 	}
 
 	/*
@@ -916,7 +909,7 @@ sql_exec_error_callback(void *arg)
 	 * ExecutorEnd are blamed on the appropriate query; see postquel_start and
 	 * postquel_end.)
 	 */
-	if (fcache)
+	if (fcache->func_state)
 	{
 		execution_state *es;
 		int			query_num;
@@ -928,7 +921,7 @@ sql_exec_error_callback(void *arg)
 			if (es->qd)
 			{
 				errcontext("SQL function \"%s\" statement %d",
-						   fn_name, query_num);
+						   fcache->fname, query_num);
 				break;
 			}
 			es = es->next;
@@ -940,16 +933,18 @@ sql_exec_error_callback(void *arg)
 			 * couldn't identify a running query; might be function entry,
 			 * function exit, or between queries.
 			 */
-			errcontext("SQL function \"%s\"", fn_name);
+			errcontext("SQL function \"%s\"", fcache->fname);
 		}
 	}
 	else
 	{
-		/* must have failed during init_sql_fcache() */
-		errcontext("SQL function \"%s\" during startup", fn_name);
+		/*
+		 * Assume we failed during init_sql_fcache().  (It's possible that the
+		 * function actually has an empty body, but in that case we may as
+		 * well report all errors as being "during startup".)
+		 */
+		errcontext("SQL function \"%s\" during startup", fcache->fname);
 	}
-
-	ReleaseSysCache(func_tuple);
 }
 
 
@@ -1041,7 +1036,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 	AssertArg(!IsPolymorphicType(rettype));
 
 	if (modifyTargetList)
-		*modifyTargetList = false;	/* initialize for no change */
+		*modifyTargetList = false;		/* initialize for no change */
 	if (junkFilter)
 		*junkFilter = NULL;		/* initialize in case of VOID result */
 
@@ -1176,6 +1171,11 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 		 * This can happen, for example, where the body of the function is
 		 * 'SELECT func2()', where func2 has the same composite return type as
 		 * the function that's calling it.
+		 *
+		 * XXX Note that if rettype is RECORD, the IsBinaryCoercible check
+		 * will succeed for any composite restype.  For the moment we rely on
+		 * runtime type checking to catch any discrepancy, but it'd be nice to
+		 * do better at parse time.
 		 */
 		if (tlistlen == 1)
 		{
@@ -1218,7 +1218,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 		/*
 		 * Verify that the targetlist matches the return tuple type. We scan
 		 * the non-deleted attributes to ensure that they match the datatypes
-		 * of the non-resjunk columns.  For deleted attributes, insert NULL
+		 * of the non-resjunk columns.	For deleted attributes, insert NULL
 		 * result columns if the caller asked for that.
 		 */
 		tupnatts = tupdesc->natts;
@@ -1253,7 +1253,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 				attr = tupdesc->attrs[colindex - 1];
 				if (attr->attisdropped && modifyTargetList)
 				{
-					Expr   *null_expr;
+					Expr	   *null_expr;
 
 					/* The type of the null we insert isn't important */
 					null_expr = (Expr *) makeConst(INT4OID,
@@ -1310,17 +1310,17 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 						(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 						 errmsg("return type mismatch in function declared to return %s",
 								format_type_be(rettype)),
-						 errdetail("Final statement returns too few columns.")));
+					 errdetail("Final statement returns too few columns.")));
 			if (modifyTargetList)
 			{
-				Expr   *null_expr;
+				Expr	   *null_expr;
 
 				/* The type of the null we insert isn't important */
 				null_expr = (Expr *) makeConst(INT4OID,
 											   -1,
 											   sizeof(int32),
 											   (Datum) 0,
-											   true,		/* isnull */
+											   true,	/* isnull */
 											   true /* byval */ );
 				newtlist = lappend(newtlist,
 								   makeTargetEntry(null_expr,

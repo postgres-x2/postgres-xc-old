@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/test/locale/Makefile
 
 subdir = src/test/locale
 top_builddir = ../../..

@@ -4,7 +4,7 @@
 #    Makefile for backend/port/win32
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/port/win32/Makefile
 #
 #-------------------------------------------------------------------------
 

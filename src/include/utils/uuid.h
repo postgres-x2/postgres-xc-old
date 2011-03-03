@@ -5,9 +5,9 @@
  *	  to avoid conflicts with any uuid_t type that might be defined by
  *	  the system headers.
  *
- * Copyright (c) 2007-2009, PostgreSQL Global Development Group
+ * Copyright (c) 2007-2010, PostgreSQL Global Development Group
  *
- * $PostgreSQL$
+ * src/include/utils/uuid.h
  *
  *-------------------------------------------------------------------------
  */

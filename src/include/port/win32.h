@@ -1,10 +1,10 @@
-/* $PostgreSQL$ */
+/* src/include/port/win32.h
 
 #if defined(_MSC_VER) || defined(__BORLANDC__)
 #define WIN32_ONLY_COMPILER
 #endif
 
-#define _WIN32_WINNT 0x0500
+#define _WIN32_WINNT 0x0501
 /*
  * Always build with SSPI support. Keep it as a #define in case
  * we want a switch to disable it sometime in the future.
@@ -34,14 +34,18 @@
 /* Must be here to avoid conflicting with prototype in windows.h */
 #define mkdir(a,b)	mkdir(a)
 
-#define HAVE_FSYNC_WRITETHROUGH
-#define HAVE_FSYNC_WRITETHROUGH_ONLY
 #define ftruncate(a,b)	chsize(a,b)
-/*
- *	Even though we don't support 'fsync' as a wal_sync_method,
- *	we do fsync() a few other places where _commit() is just fine.
- */
+
+/* Windows doesn't have fsync() as such, use _commit() */
 #define fsync(fd) _commit(fd)
+
+/*
+ * For historical reasons, we allow setting wal_sync_method to
+ * fsync_writethrough on Windows, even though it's really identical to fsync
+ * (both code paths wind up at _commit()).
+ */
+#define HAVE_FSYNC_WRITETHROUGH
+#define FSYNC_WRITETHROUGH_IS_FSYNC
 
 #define USES_WINSOCK
 
@@ -57,9 +61,15 @@
 #else							/* not BUILDING_DLL */
 #define PGDLLIMPORT __declspec (dllimport)
 #endif
-#else							/* not CYGWIN, not MSVC, not MingW */
 
+#ifdef _MSC_VER
+#define PGDLLEXPORT __declspec (dllexport)
+#else
+#define PGDLLEXPORT
+#endif
+#else							/* not CYGWIN, not MSVC, not MingW */
 #define PGDLLIMPORT
+#define PGDLLEXPORT
 #endif
 
 
@@ -283,6 +293,8 @@ int			pgwin32_send(SOCKET s, char *buf, int len, int flags);
 const char *pgwin32_socket_strerror(int err);
 int			pgwin32_waitforsinglesocket(SOCKET s, int what, int timeout);
 
+extern int	pgwin32_noblock;
+
 /* in backend/port/win32/security.c */
 extern int	pgwin32_is_admin(void);
 extern int	pgwin32_is_service(void);
@@ -303,20 +315,15 @@ extern void pgwin32_unsetenv(const char *);
 
 /* Things that exist in MingW headers, but need to be added to MSVC & BCC */
 #ifdef WIN32_ONLY_COMPILER
+#ifndef _WIN64
 typedef long ssize_t;
+#else
+typedef __int64 ssize_t;
+#endif
 
 #ifndef __BORLANDC__
 typedef unsigned short mode_t;
 #endif
-
-/*
- *	Certain "standard edition" versions of MSVC throw a warning
- *	that later generates an error for "inline" statements, but
- *	__inline seems to work.  e.g.  Microsoft Visual C++ .NET
- *	Version 7.1.3088
- */
-#define inline __inline
-#define __inline__ __inline
 
 #ifndef __BORLANDC__
 #define _S_IRWXU	(_S_IREAD | _S_IWRITE | _S_IEXEC)

@@ -1,7 +1,7 @@
-<!-- $PostgreSQL$ -->
+<!-- doc/src/sgml/lobj.sgml
 
  <chapter id="largeObjects">
-  <title id="largeObjects-title">Large Objects</title>
+  <title>Large Objects</title>
 
   <indexterm zone="largeobjects"><primary>large object</></>
   <indexterm><primary>BLOB</><see>large object</></>
@@ -59,6 +59,21 @@
     searches for the correct chunk number when doing random
     access reads and writes.
    </para>
+
+   <para>
+    As of <productname>PostgreSQL</> 9.0, large objects have an owner
+    and a set of access permissions, which can be managed using
+    <xref linkend="sql-grant"> and
+    <xref linkend="sql-revoke">.  
+    For compatibility with prior releases, see
+    <xref linkend="guc-lo-compat-privileges">.
+    <literal>SELECT</literal> privileges are required to read a large
+    object, and 
+    <literal>UPDATE</literal> privileges are required to write to or
+    truncate it.
+    Only the large object owner (or the database superuser) can unlink, comment
+    on, or change the owner of a large object.
+   </para>
   </sect1>
 
   <sect1 id="lo-interfaces">
@@ -84,7 +99,7 @@
     <application>libpq</application> library.
    </para>
 
-   <sect2>
+   <sect2 id="lo-create">
     <title>Creating a Large Object</title>
 
     <para>
@@ -143,7 +158,7 @@ inv_oid = lo_create(conn, desired_oid);
     </para>
    </sect2>
 
-   <sect2>
+   <sect2 id="lo-import">
     <title>Importing a Large Object</title>
 
     <para>
@@ -185,7 +200,7 @@ Oid lo_import_with_oid(PGconn *conn, const char *filename, Oid lobjId);
     </para>
    </sect2>
 
-   <sect2>
+   <sect2 id="lo-export">
     <title>Exporting a Large Object</title>
 
     <para>
@@ -203,7 +218,7 @@ int lo_export(PGconn *conn, Oid lobjId, const char *filename);
     </para>
    </sect2>
 
-   <sect2>
+   <sect2 id="lo-open">
     <title>Opening an Existing Large Object</title>
 
     <para>
@@ -253,7 +268,7 @@ inv_fd = lo_open(conn, inv_oid, INV_READ|INV_WRITE);
     </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-write">
 <title>Writing Data to a Large Object</title>
 
 <para>
@@ -271,7 +286,7 @@ int lo_write(PGconn *conn, int fd, const char *buf, size_t len);
 </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-read">
 <title>Reading Data from a Large Object</title>
 
 <para>
@@ -289,7 +304,7 @@ int lo_read(PGconn *conn, int fd, char *buf, size_t len);
 </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-seek">
 <title>Seeking in a Large Object</title>
 
 <para>
@@ -309,7 +324,7 @@ int lo_lseek(PGconn *conn, int fd, int offset, int whence);
 </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-tell">
 <title>Obtaining the Seek Position of a Large Object</title>
 
 <para>
@@ -323,7 +338,7 @@ int lo_tell(PGconn *conn, int fd);
 </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-truncate">
 <title>Truncating a Large Object</title>
 
 <para>
@@ -355,7 +370,7 @@ int lo_truncate(PGcon *conn, int fd, size_t len);
 </para>
 </sect2>
 
-<sect2>
+<sect2 id="lo-close">
 <title>Closing a Large Object Descriptor</title>
 
 <para>
@@ -375,7 +390,7 @@ int lo_close(PGconn *conn, int fd);
 </para>
 </sect2>
 
-   <sect2>
+   <sect2 id="lo-unlink">
     <title>Removing a Large Object</title>
 
     <para>
@@ -438,9 +453,9 @@ SELECT lo_export(image.raster, '/tmp/motd') FROM image
     owning user.  Therefore, their use is restricted to superusers.  In
     contrast, the client-side import and export functions read and write files
     in the client's file system, using the permissions of the client program.
-    The client-side functions can be used by any
-    <productname>PostgreSQL</productname> user.
+    The client-side functions do not require superuser privilege.
   </para>
+
 </sect1>
 
 <sect1 id="lo-examplesect">

@@ -4,10 +4,10 @@
  *	  prototypes for clauses.c.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/optimizer/clauses.h
  *
  *-------------------------------------------------------------------------
  */
@@ -23,7 +23,7 @@
 typedef struct
 {
 	int			numAggs;		/* total number of aggregate calls */
-	int			numDistinctAggs;	/* number that use DISTINCT */
+	int			numOrderedAggs; /* number that use DISTINCT or ORDER BY */
 	Size		transitionSpace;	/* for pass-by-ref transition data */
 } AggClauseCounts;
 

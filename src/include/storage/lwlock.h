@@ -4,10 +4,10 @@
  *	  Lightweight lock manager
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL$
+ * src/include/storage/lwlock.h
  *
  *-------------------------------------------------------------------------
  */
@@ -67,6 +67,9 @@ typedef enum LWLockId
 	AutovacuumLock,
 	AutovacuumScheduleLock,
 	SyncScanLock,
+	RelationMappingLock,
+	AsyncCtlLock,
+	AsyncQueueLock,
 #ifdef PGXC
 	AnalyzeProcArrayLock,
 #endif

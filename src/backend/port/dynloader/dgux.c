@@ -2,5 +2,5 @@
  *
  * see dgux.h
  *
- * $PostgreSQL$
+ * src/backend/port/dynloader/dgux.c
  */

@@ -1,6 +1,6 @@
-/*	$OpenBSD$ */
+/*	$OpenBSD: rijndael.c,v 1.6 2000/12/09 18:51:34 markus Exp $ */
 
-/* $PostgreSQL$ */
+/* contrib/pgcrypto/rijndael.c
 
 /* This is an independent implementation of the encryption algorithm:	*/
 /*																		*/

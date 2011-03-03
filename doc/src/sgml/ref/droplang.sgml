@@ -1,11 +1,11 @@
 <!--
-$PostgreSQL$
+doc/src/sgml/ref/droplang.sgml
 PostgreSQL documentation
 -->
 
 <refentry id="APP-DROPLANG">
  <refmeta>
-  <refentrytitle id="APP-DROPLANG-TITLE"><application>droplang</application></refentrytitle>
+  <refentrytitle><application>droplang</application></refentrytitle>
   <manvolnum>1</manvolnum>
   <refmiscinfo>Application</refmiscinfo>
  </refmeta>
@@ -25,7 +25,9 @@ PostgreSQL documentation
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <arg choice="plain"><replaceable>langname</replaceable></arg>
    <arg><replaceable>dbname</replaceable></arg>
-   <sbr>
+  </cmdsynopsis>
+
+  <cmdsynopsis>
    <command>droplang</command>
    <arg rep="repeat"><replaceable>connection-option</replaceable></arg>
    <group choice="plain"><arg>--list</arg><arg>-l</arg></group>
@@ -50,7 +52,7 @@ PostgreSQL documentation
    several <acronym>SQL</acronym> commands, it is recommended to use
    <application>droplang</application> because it performs a number
    of checks and is much easier to use. See
-   <xref linkend="sql-droplanguage" endterm="sql-droplanguage-title">
+   <xref linkend="sql-droplanguage">
    for more.
   </para>
  </refsect1>
@@ -102,6 +104,27 @@ PostgreSQL documentation
         Show a list of already installed languages in the target database.
        </para>
       </listitem>
+     </varlistentry>
+
+     <varlistentry>
+       <term><option>-V</></term>
+       <term><option>--version</></term>
+       <listitem>
+       <para>
+       Print the <application>droplang</application> version and exit.
+       </para>
+       </listitem>
+     </varlistentry>
+
+     <varlistentry>
+       <term><option>-?</></term>
+       <term><option>--help</></term>
+       <listitem>
+       <para>
+       Show help about <application>droplang</application> command line
+       arguments, and exit.
+       </para>
+       </listitem>
      </varlistentry>
 
     </variablelist>
@@ -254,7 +277,7 @@ PostgreSQL documentation
 
   <simplelist type="inline">
    <member><xref linkend="app-createlang"></member>
-   <member><xref linkend="sql-droplanguage" endterm="sql-droplanguage-title"></member>
+   <member><xref linkend="sql-droplanguage"></member>
   </simplelist>
  </refsect1>
 

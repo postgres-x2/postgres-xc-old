@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $PostgreSQL$
+# src/tools/add_cvs_markers
 
 # Author: Andrew Dunstan
 
@@ -31,7 +31,7 @@ touch dummy
 
 find . \( \( -name 'libstemmer' -o -name 'expected' -o -name 'ppport.h' \
      -o -name 'regression.h' -o -name 'sql3types.h' -o -name 'sqlca.h' \) \
-     -prune \) -o  \( -name '*.[ch]' \) \( -exec grep -q '\$PostgreSQL' {} \; \
+     -prune \) -o  \( -name '*.[ch]' \) \( -exec grep -q '\src/tools/add_cvs_markers
      -o -print \) | \
   { while read file ; do 
       head -n 1 < $file | grep -q '^/\*' && echo $file 
@@ -42,7 +42,7 @@ find . \( \( -name 'libstemmer' -o -name 'expected' -o -name 'ppport.h' \
 
 { find . \( \( -name 'libstemmer' -o -name 'expected' -o -name 'ppport.h' \
      -o -name 'regression.h' -o -name 'sql3types.h' -o -name 'sqlca.h' \) \
-     -prune \) -o  \( -name '*.[ch]' \) \( -exec grep -q '\$PostgreSQL' {} \; \
+     -prune \) -o  \( -name '*.[ch]' \) \( -exec grep -q '\src/tools/add_cvs_markers
      -o -print \) ; echo dummy ;} | \
   xargs -l sed -i -e '1i/*\n * \x24PostgreSQL:$ \n */'
 

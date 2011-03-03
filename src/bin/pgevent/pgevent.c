@@ -6,7 +6,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/bin/pgevent/pgevent.c
  *
  *-------------------------------------------------------------------------
  */

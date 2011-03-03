@@ -30,11 +30,11 @@
  * should be killed by SIGQUIT and then a recovery cycle started.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/postmaster/walwriter.c
  *
  *-------------------------------------------------------------------------
  */
@@ -113,7 +113,7 @@ WalWriterMain(void)
 	pqsignal(SIGQUIT, wal_quickdie);	/* hard crash time */
 	pqsignal(SIGALRM, SIG_IGN);
 	pqsignal(SIGPIPE, SIG_IGN);
-	pqsignal(SIGUSR1, SIG_IGN); /* reserve for sinval */
+	pqsignal(SIGUSR1, SIG_IGN); /* reserve for ProcSignal */
 	pqsignal(SIGUSR2, SIG_IGN); /* not used */
 
 	/*
@@ -126,11 +126,7 @@ WalWriterMain(void)
 	pqsignal(SIGWINCH, SIG_DFL);
 
 	/* We allow SIGQUIT (quickdie) at all times */
-#ifdef HAVE_SIGPROCMASK
 	sigdelset(&BlockSig, SIGQUIT);
-#else
-	BlockSig &= ~(sigmask(SIGQUIT));
-#endif
 
 	/*
 	 * Create a resource owner to keep track of our resources (not clear that

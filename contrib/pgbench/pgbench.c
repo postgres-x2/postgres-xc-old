@@ -4,8 +4,8 @@
  * A simple benchmark program for PostgreSQL
  * Originally written by Tatsuo Ishii and enhanced by many contributors.
  *
- * $PostgreSQL$
- * Copyright (c) 2000-2009, PostgreSQL Global Development Group
+ * contrib/pgbench/pgbench.c
+ * Copyright (c) 2000-2010, PostgreSQL Global Development Group
  * ALL RIGHTS RESERVED;
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -28,20 +28,18 @@
  */
 
 #ifdef WIN32
-#define FD_SETSIZE 1024		/* set before winsock2.h is included */
+#define FD_SETSIZE 1024			/* set before winsock2.h is included */
 #endif   /* ! WIN32 */
 
 #include "postgres_fe.h"
 
 #include "libpq-fe.h"
-#include "pqsignal.h"
+#include "libpq/pqsignal.h"
+#include "portability/instr_time.h"
 
 #include <ctype.h>
 
-#ifdef WIN32
-#include <win32.h>
-#else
-#include <signal.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
 #endif   /* ! WIN32 */
@@ -56,6 +54,41 @@
 
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>		/* for getrlimit */
+#endif
+
+#ifndef INT64_MAX
+#define INT64_MAX	INT64CONST(0x7FFFFFFFFFFFFFFF)
+#endif
+
+/*
+ * Multi-platform pthread implementations
+ */
+
+#ifdef WIN32
+/* Use native win32 threads on Windows */
+typedef struct win32_pthread *pthread_t;
+typedef int pthread_attr_t;
+
+static int	pthread_create(pthread_t *thread, pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
+static int	pthread_join(pthread_t th, void **thread_return);
+#elif defined(ENABLE_THREAD_SAFETY)
+/* Use platform-dependent pthread capability */
+#include <pthread.h>
+#else
+/* Use emulation with fork. Rename pthread identifiers to avoid conflicts */
+
+#include <sys/wait.h>
+
+#define pthread_t				pg_pthread_t
+#define pthread_attr_t			pg_pthread_attr_t
+#define pthread_create			pg_pthread_create
+#define pthread_join			pg_pthread_join
+
+typedef struct fork_pthread *pthread_t;
+typedef int pthread_attr_t;
+
+static int	pthread_create(pthread_t *thread, pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);
+static int	pthread_join(pthread_t th, void **thread_return);
 #endif
 
 extern char *optarg;
@@ -74,7 +107,6 @@ extern int	optind;
 
 #define DEFAULT_NXACTS	10		/* default nxacts */
 
-int			nclients = 1;		/* default number of simulated clients */
 int			nxacts = 0;			/* number of transactions per client */
 int			duration = 0;		/* duration in seconds */
 
@@ -94,20 +126,17 @@ int			fillfactor = 100;
  * end of configurable parameters
  *********************************************************************/
 
-#define nbranches	1
+#define nbranches	1			/* Makes little sense to change this.  Change
+								 * -s instead */
 #define ntellers	10
 #define naccounts	100000
-
-FILE	   *LOGFILE = NULL;
 
 #ifdef PGXC
 bool		use_branch = true;	/* use branch id in DDL and DML */
 #endif
 bool		use_log;			/* log transaction latencies to a file */
-
-int			remains;			/* number of remaining clients */
-
-int			is_connect;			/* establish connection  for each transaction */
+bool		is_connect;			/* establish connection for each transaction */
+int			main_pid;			/* main process id used in log filename */
 
 char	   *pghost = "";
 char	   *pgport = "";
@@ -126,6 +155,7 @@ typedef struct
 } Variable;
 
 #define MAX_FILES		128		/* max number of SQL script files allowed */
+#define SHELL_COMMAND_SIZE	256 /* maximum size allowed for shell command */
 
 /*
  * structures used in custom query mode
@@ -141,13 +171,33 @@ typedef struct
 	int			listen;			/* 0 indicates that an async query has been
 								 * sent */
 	int			sleeping;		/* 1 indicates that the client is napping */
-	struct timeval until;		/* napping until */
+	int64		until;			/* napping until (usec) */
 	Variable   *variables;		/* array of variable definitions */
 	int			nvariables;
-	struct timeval txn_begin;	/* used for measuring latencies */
+	instr_time	txn_begin;		/* used for measuring latencies */
 	int			use_file;		/* index in sql_files for this client */
 	bool		prepared[MAX_FILES];
 } CState;
+
+/*
+ * Thread state and result
+ */
+typedef struct
+{
+	int			tid;			/* thread id */
+	pthread_t	thread;			/* thread handle */
+	CState	   *state;			/* array of CState */
+	int			nstate;			/* length of state[] */
+	instr_time	start_time;		/* thread start time */
+} TState;
+
+#define INVALID_THREAD		((pthread_t) 0)
+
+typedef struct
+{
+	instr_time	conn_time;
+	int			xacts;
+} TResult;
 
 /*
  * queries read from files
@@ -174,14 +224,15 @@ typedef struct
 	char	   *argv[MAX_ARGS]; /* command list */
 } Command;
 
-Command   **sql_files[MAX_FILES];		/* SQL script files */
-int			num_files;			/* number of script files */
+static Command **sql_files[MAX_FILES];	/* SQL script files */
+static int	num_files;			/* number of script files */
+static int	debug = 0;			/* debug flag */
 
 /* default scenario */
 static char *tpc_b = {
-	"\\set nbranches :scale\n"
-	"\\set ntellers 10 * :scale\n"
-	"\\set naccounts 100000 * :scale\n"
+	"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
+	"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
+	"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
 	"\\setrandom aid 1 :naccounts\n"
 	"\\setrandom bid 1 :nbranches\n"
 	"\\setrandom tid 1 :ntellers\n"
@@ -197,9 +248,9 @@ static char *tpc_b = {
 
 #ifdef PGXC
 static char *tpc_b_bid = {
-	"\\set nbranches :scale\n"
-	"\\set ntellers 10 * :scale\n"
-	"\\set naccounts 100000 * :scale\n"
+	"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
+	"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
+	"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
 	"\\setrandom aid 1 :naccounts\n"
 	"\\setrandom bid 1 :nbranches\n"
 	"\\setrandom tid 1 :ntellers\n"
@@ -217,9 +268,9 @@ static char *tpc_b_bid = {
 
 /* -N case */
 static char *simple_update = {
-	"\\set nbranches :scale\n"
-	"\\set ntellers 10 * :scale\n"
-	"\\set naccounts 100000 * :scale\n"
+	"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
+	"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
+	"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
 	"\\setrandom aid 1 :naccounts\n"
 	"\\setrandom bid 1 :nbranches\n"
 	"\\setrandom tid 1 :ntellers\n"
@@ -233,9 +284,9 @@ static char *simple_update = {
 
 #ifdef PGXC
 static char *simple_update_bid = {
-	"\\set nbranches :scale\n"
-	"\\set ntellers 10 * :scale\n"
-	"\\set naccounts 100000 * :scale\n"
+	"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
+	"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
+	"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
 	"\\setrandom aid 1 :naccounts\n"
 	"\\setrandom bid 1 :nbranches\n"
 	"\\setrandom tid 1 :ntellers\n"
@@ -250,49 +301,14 @@ static char *simple_update_bid = {
 
 /* -S case */
 static char *select_only = {
-	"\\set naccounts 100000 * :scale\n"
+	"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
 	"\\setrandom aid 1 :naccounts\n"
 	"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
 };
 
-/* Connection overhead time */
-static struct timeval conn_total_time = {0, 0};
-
 /* Function prototypes */
 static void setalarm(int seconds);
-
-
-/* Calculate total time */
-static void
-addTime(struct timeval * t1, struct timeval * t2, struct timeval * result)
-{
-	int			sec = t1->tv_sec + t2->tv_sec;
-	int			usec = t1->tv_usec + t2->tv_usec;
-
-	if (usec >= 1000000)
-	{
-		usec -= 1000000;
-		sec++;
-	}
-	result->tv_sec = sec;
-	result->tv_usec = usec;
-}
-
-/* Calculate time difference */
-static void
-diffTime(struct timeval * t1, struct timeval * t2, struct timeval * result)
-{
-	int			sec = t1->tv_sec - t2->tv_sec;
-	int			usec = t1->tv_usec - t2->tv_usec;
-
-	if (usec < 0)
-	{
-		usec += 1000000;
-		sec--;
-	}
-	result->tv_sec = sec;
-	result->tv_usec = usec;
-}
+static void *threadRun(void *arg);
 
 static void
 usage(const char *progname)
@@ -425,29 +441,6 @@ discard_response(CState *state)
 	} while (res);
 }
 
-/* check to see if the SQL result was good */
-static int
-check(CState *state, PGresult *res, int n)
-{
-	CState	   *st = &state[n];
-
-	switch (PQresultStatus(res))
-	{
-		case PGRES_COMMAND_OK:
-		case PGRES_TUPLES_OK:
-			/* OK */
-			break;
-		default:
-			fprintf(stderr, "Client %d aborted in state %d: %s",
-					n, st->state, PQerrorMessage(st->con));
-			remains--;			/* I've aborted */
-			PQfinish(st->con);
-			st->con = NULL;
-			return (-1);
-	}
-	return (0);					/* OK */
-}
-
 static int
 compareVariables(const void *v1, const void *v2)
 {
@@ -477,8 +470,23 @@ getVariable(CState *st, char *name)
 		return NULL;
 }
 
+/* check whether the name consists of alphabets, numerals and underscores. */
+static bool
+isLegalVariableName(const char *name)
+{
+	int			i;
+
+	for (i = 0; name[i] != '\0'; i++)
+	{
+		if (!isalnum((unsigned char) name[i]) && name[i] != '_')
+			return false;
+	}
+
+	return true;
+}
+
 static int
-putVariable(CState *st, char *name, char *value)
+putVariable(CState *st, const char *context, char *name, char *value)
 {
 	Variable	key,
 			   *var;
@@ -498,6 +506,16 @@ putVariable(CState *st, char *name, char *value)
 	{
 		Variable   *newvars;
 
+		/*
+		 * Check for the name only when declaring a new variable to avoid
+		 * overhead.
+		 */
+		if (!isLegalVariableName(name))
+		{
+			fprintf(stderr, "%s: invalid variable name '%s'\n", context, name);
+			return false;
+		}
+
 		if (st->variables)
 			newvars = (Variable *) realloc(st->variables,
 									(st->nvariables + 1) * sizeof(Variable));
@@ -505,7 +523,7 @@ putVariable(CState *st, char *name, char *value)
 			newvars = (Variable *) malloc(sizeof(Variable));
 
 		if (newvars == NULL)
-			return false;
+			goto out_of_memory;
 
 		st->variables = newvars;
 
@@ -514,8 +532,8 @@ putVariable(CState *st, char *name, char *value)
 		var->name = NULL;
 		var->value = NULL;
 
-		if ((var->name = strdup(name)) == NULL
-			|| (var->value = strdup(value)) == NULL)
+		if ((var->name = strdup(name)) == NULL ||
+			(var->value = strdup(value)) == NULL)
 		{
 			free(var->name);
 			free(var->value);
@@ -539,6 +557,10 @@ putVariable(CState *st, char *name, char *value)
 	}
 
 	return true;
+
+out_of_memory:
+	fprintf(stderr, "%s: out of memory for variable '%s'\n", context, name);
+	return false;
 }
 
 static char *
@@ -637,6 +659,110 @@ getQueryParams(CState *st, const Command *command, const char **params)
 		params[i] = getVariable(st, command->argv[i + 1]);
 }
 
+/*
+ * Run a shell command. The result is assigned to the variable if not NULL.
+ * Return true if succeeded, or false on error.
+ */
+static bool
+runShellCommand(CState *st, char *variable, char **argv, int argc)
+{
+	char		command[SHELL_COMMAND_SIZE];
+	int			i,
+				len = 0;
+	FILE	   *fp;
+	char		res[64];
+	char	   *endptr;
+	int			retval;
+
+	/*
+	 * Join arguments with whilespace separaters. Arguments starting with
+	 * exactly one colon are treated as variables: name - append a string
+	 * "name" :var - append a variable named 'var'. ::name - append a string
+	 * ":name"
+	 */
+	for (i = 0; i < argc; i++)
+	{
+		char	   *arg;
+		int			arglen;
+
+		if (argv[i][0] != ':')
+		{
+			arg = argv[i];		/* a string literal */
+		}
+		else if (argv[i][1] == ':')
+		{
+			arg = argv[i] + 1;	/* a string literal starting with colons */
+		}
+		else if ((arg = getVariable(st, argv[i] + 1)) == NULL)
+		{
+			fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[i]);
+			return false;
+		}
+
+		arglen = strlen(arg);
+		if (len + arglen + (i > 0 ? 1 : 0) >= SHELL_COMMAND_SIZE - 1)
+		{
+			fprintf(stderr, "%s: too long shell command\n", argv[0]);
+			return false;
+		}
+
+		if (i > 0)
+			command[len++] = ' ';
+		memcpy(command + len, arg, arglen);
+		len += arglen;
+	}
+
+	command[len] = '\0';
+
+	/* Fast path for non-assignment case */
+	if (variable == NULL)
+	{
+		if (system(command))
+		{
+			if (!timer_exceeded)
+				fprintf(stderr, "%s: cannot launch shell command\n", argv[0]);
+			return false;
+		}
+		return true;
+	}
+
+	/* Execute the command with pipe and read the standard output. */
+	if ((fp = popen(command, "r")) == NULL)
+	{
+		fprintf(stderr, "%s: cannot launch shell command\n", argv[0]);
+		return false;
+	}
+	if (fgets(res, sizeof(res), fp) == NULL)
+	{
+		if (!timer_exceeded)
+			fprintf(stderr, "%s: cannot read the result\n", argv[0]);
+		return false;
+	}
+	if (pclose(fp) < 0)
+	{
+		fprintf(stderr, "%s: cannot close shell command\n", argv[0]);
+		return false;
+	}
+
+	/* Check whether the result is an integer and assign it to the variable */
+	retval = (int) strtol(res, &endptr, 10);
+	while (*endptr != '\0' && isspace((unsigned char) *endptr))
+		endptr++;
+	if (*res == '\0' || *endptr != '\0')
+	{
+		fprintf(stderr, "%s: must return an integer ('%s' returned)\n", argv[0], res);
+		return false;
+	}
+	snprintf(res, sizeof(res), "%d", retval);
+	if (!putVariable(st, "setshell", variable, res))
+		return false;
+
+#ifdef DEBUG
+	printf("shell parameter name: %s, value: %s\n", argv[1], res);
+#endif
+	return true;
+}
+
 #define MAX_PREPARE_NAME		32
 static void
 preparedStatementName(char *buffer, int file, int state)
@@ -644,11 +770,24 @@ preparedStatementName(char *buffer, int file, int state)
 	sprintf(buffer, "P%d_%d", file, state);
 }
 
-static void
-doCustom(CState *state, int n, int debug)
+static bool
+clientDone(CState *st, bool ok)
+{
+	(void) ok;					/* unused */
+
+	if (st->con != NULL)
+	{
+		PQfinish(st->con);
+		st->con = NULL;
+	}
+	return false;				/* always false */
+}
+
+/* return false iff client should be disconnected */
+static bool
+doCustom(CState *st, instr_time *conn_time, FILE *logfile)
 {
 	PGresult   *res;
-	CState	   *st = &state[n];
 	Command   **commands;
 
 top:
@@ -656,16 +795,13 @@ top:
 
 	if (st->sleeping)
 	{							/* are we sleeping? */
-		int			usec;
-		struct timeval now;
+		instr_time	now;
 
-		gettimeofday(&now, NULL);
-		usec = (st->until.tv_sec - now.tv_sec) * 1000000 +
-			st->until.tv_usec - now.tv_usec;
-		if (usec <= 0)
+		INSTR_TIME_SET_CURRENT(now);
+		if (st->until <= INSTR_TIME_GET_MICROSEC(now))
 			st->sleeping = 0;	/* Done sleeping, go ahead with next command */
 		else
-			return;				/* Still sleeping, nothing to do here */
+			return true;		/* Still sleeping, nothing to do here */
 	}
 
 	if (st->listen)
@@ -673,43 +809,55 @@ top:
 		if (commands[st->state]->type == SQL_COMMAND)
 		{
 			if (debug)
-				fprintf(stderr, "client %d receiving\n", n);
+				fprintf(stderr, "client %d receiving\n", st->id);
 			if (!PQconsumeInput(st->con))
 			{					/* there's something wrong */
-				fprintf(stderr, "Client %d aborted in state %d. Probably the backend died while processing.\n", n, st->state);
-				remains--;		/* I've aborted */
-				PQfinish(st->con);
-				st->con = NULL;
-				return;
+				fprintf(stderr, "Client %d aborted in state %d. Probably the backend died while processing.\n", st->id, st->state);
+				return clientDone(st, false);
 			}
 			if (PQisBusy(st->con))
-				return;			/* don't have the whole result yet */
+				return true;	/* don't have the whole result yet */
 		}
 
 		/*
 		 * transaction finished: record the time it took in the log
 		 */
-		if (use_log && commands[st->state + 1] == NULL)
+		if (logfile && commands[st->state + 1] == NULL)
 		{
-			double		diff;
-			struct timeval now;
+			instr_time	now;
+			instr_time	diff;
+			double		usec;
 
-			gettimeofday(&now, NULL);
-			diff = (int) (now.tv_sec - st->txn_begin.tv_sec) * 1000000.0 +
-				(int) (now.tv_usec - st->txn_begin.tv_usec);
+			INSTR_TIME_SET_CURRENT(now);
+			diff = now;
+			INSTR_TIME_SUBTRACT(diff, st->txn_begin);
+			usec = (double) INSTR_TIME_GET_MICROSEC(diff);
 
-			fprintf(LOGFILE, "%d %d %.0f %d %ld %ld\n",
-					st->id, st->cnt, diff, st->use_file,
+#ifndef WIN32
+			/* This is more than we really ought to know about instr_time */
+			fprintf(logfile, "%d %d %.0f %d %ld %ld\n",
+					st->id, st->cnt, usec, st->use_file,
 					(long) now.tv_sec, (long) now.tv_usec);
+#else
+			/* On Windows, instr_time doesn't provide a timestamp anyway */
+			fprintf(logfile, "%d %d %.0f %d 0 0\n",
+					st->id, st->cnt, usec, st->use_file);
+#endif
 		}
 
 		if (commands[st->state]->type == SQL_COMMAND)
 		{
 			res = PQgetResult(st->con);
-			if (check(state, res, n))
+			switch (PQresultStatus(res))
 			{
-				PQclear(res);
-				return;
+				case PGRES_COMMAND_OK:
+				case PGRES_TUPLES_OK:
+					break;		/* OK */
+				default:
+					fprintf(stderr, "Client %d aborted in state %d: %s",
+							st->id, st->state, PQerrorMessage(st->con));
+					PQclear(res);
+					return clientDone(st, false);
 			}
 			PQclear(res);
 			discard_response(st);
@@ -725,15 +873,7 @@ top:
 
 			++st->cnt;
 			if ((st->cnt >= nxacts && duration <= 0) || timer_exceeded)
-			{
-				remains--;		/* I've done */
-				if (st->con != NULL)
-				{
-					PQfinish(st->con);
-					st->con = NULL;
-				}
-				return;
-			}
+				return clientDone(st, true);	/* exit success */
 		}
 
 		/* increment state counter */
@@ -748,27 +888,21 @@ top:
 
 	if (st->con == NULL)
 	{
-		struct timeval t1,
-					t2,
-					t3;
+		instr_time	start,
+					end;
 
-		gettimeofday(&t1, NULL);
+		INSTR_TIME_SET_CURRENT(start);
 		if ((st->con = doConnect()) == NULL)
 		{
-			fprintf(stderr, "Client %d aborted in establishing connection.\n",
-					n);
-			remains--;			/* I've aborted */
-			PQfinish(st->con);
-			st->con = NULL;
-			return;
+			fprintf(stderr, "Client %d aborted in establishing connection.\n", st->id);
+			return clientDone(st, false);
 		}
-		gettimeofday(&t2, NULL);
-		diffTime(&t2, &t1, &t3);
-		addTime(&conn_total_time, &t3, &conn_total_time);
+		INSTR_TIME_SET_CURRENT(end);
+		INSTR_TIME_ACCUM_DIFF(*conn_time, end, start);
 	}
 
-	if (use_log && st->state == 0)
-		gettimeofday(&(st->txn_begin), NULL);
+	if (logfile && st->state == 0)
+		INSTR_TIME_SET_CURRENT(st->txn_begin);
 
 	if (commands[st->state]->type == SQL_COMMAND)
 	{
@@ -784,11 +918,11 @@ top:
 			{
 				fprintf(stderr, "out of memory\n");
 				st->ecnt++;
-				return;
+				return true;
 			}
 
 			if (debug)
-				fprintf(stderr, "client %d sending %s\n", n, sql);
+				fprintf(stderr, "client %d sending %s\n", st->id, sql);
 			r = PQsendQuery(st->con, sql);
 			free(sql);
 		}
@@ -800,7 +934,7 @@ top:
 			getQueryParams(st, command, params);
 
 			if (debug)
-				fprintf(stderr, "client %d sending %s\n", n, sql);
+				fprintf(stderr, "client %d sending %s\n", st->id, sql);
 			r = PQsendQueryParams(st->con, sql, command->argc - 1,
 								  NULL, params, NULL, NULL, 0);
 		}
@@ -834,7 +968,7 @@ top:
 			preparedStatementName(name, st->use_file, st->state);
 
 			if (debug)
-				fprintf(stderr, "client %d sending %s\n", n, name);
+				fprintf(stderr, "client %d sending %s\n", st->id, name);
 			r = PQsendQueryPrepared(st->con, name, command->argc - 1,
 									params, NULL, NULL, 0);
 		}
@@ -844,7 +978,7 @@ top:
 		if (r == 0)
 		{
 			if (debug)
-				fprintf(stderr, "client %d cannot send %s\n", n, command->argv[0]);
+				fprintf(stderr, "client %d cannot send %s\n", st->id, command->argv[0]);
 			st->ecnt++;
 		}
 		else
@@ -858,7 +992,7 @@ top:
 
 		if (debug)
 		{
-			fprintf(stderr, "client %d executing \\%s", n, argv[0]);
+			fprintf(stderr, "client %d executing \\%s", st->id, argv[0]);
 			for (i = 1; i < argc; i++)
 				fprintf(stderr, " %s", argv[i]);
 			fprintf(stderr, "\n");
@@ -877,7 +1011,7 @@ top:
 				{
 					fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[2]);
 					st->ecnt++;
-					return;
+					return true;
 				}
 				min = atoi(var);
 			}
@@ -899,7 +1033,7 @@ top:
 				{
 					fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[3]);
 					st->ecnt++;
-					return;
+					return true;
 				}
 				max = atoi(var);
 			}
@@ -910,7 +1044,7 @@ top:
 			{
 				fprintf(stderr, "%s: invalid maximum number %d\n", argv[0], max);
 				st->ecnt++;
-				return;
+				return true;
 			}
 
 #ifdef DEBUG
@@ -918,11 +1052,10 @@ top:
 #endif
 			snprintf(res, sizeof(res), "%d", getrand(min, max));
 
-			if (putVariable(st, argv[1], res) == false)
+			if (!putVariable(st, argv[0], argv[1], res))
 			{
-				fprintf(stderr, "%s: out of memory\n", argv[0]);
 				st->ecnt++;
-				return;
+				return true;
 			}
 
 			st->listen = 1;
@@ -940,7 +1073,7 @@ top:
 				{
 					fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[2]);
 					st->ecnt++;
-					return;
+					return true;
 				}
 				ope1 = atoi(var);
 			}
@@ -957,7 +1090,7 @@ top:
 					{
 						fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[4]);
 						st->ecnt++;
-						return;
+						return true;
 					}
 					ope2 = atoi(var);
 				}
@@ -976,7 +1109,7 @@ top:
 					{
 						fprintf(stderr, "%s: division by zero\n", argv[0]);
 						st->ecnt++;
-						return;
+						return true;
 					}
 					snprintf(res, sizeof(res), "%d", ope1 / ope2);
 				}
@@ -984,15 +1117,14 @@ top:
 				{
 					fprintf(stderr, "%s: unsupported operator %s\n", argv[0], argv[3]);
 					st->ecnt++;
-					return;
+					return true;
 				}
 			}
 
-			if (putVariable(st, argv[1], res) == false)
+			if (!putVariable(st, argv[0], argv[1], res))
 			{
-				fprintf(stderr, "%s: out of memory\n", argv[0]);
 				st->ecnt++;
-				return;
+				return true;
 			}
 
 			st->listen = 1;
@@ -1001,7 +1133,7 @@ top:
 		{
 			char	   *var;
 			int			usec;
-			struct timeval now;
+			instr_time	now;
 
 			if (*argv[1] == ':')
 			{
@@ -1009,7 +1141,7 @@ top:
 				{
 					fprintf(stderr, "%s: undefined variable %s\n", argv[0], argv[1]);
 					st->ecnt++;
-					return;
+					return true;
 				}
 				usec = atoi(var);
 			}
@@ -1026,28 +1158,59 @@ top:
 			else
 				usec *= 1000000;
 
-			gettimeofday(&now, NULL);
-			st->until.tv_sec = now.tv_sec + (now.tv_usec + usec) / 1000000;
-			st->until.tv_usec = (now.tv_usec + usec) % 1000000;
+			INSTR_TIME_SET_CURRENT(now);
+			st->until = INSTR_TIME_GET_MICROSEC(now) + usec;
 			st->sleeping = 1;
 
 			st->listen = 1;
 		}
+		else if (pg_strcasecmp(argv[0], "setshell") == 0)
+		{
+			bool		ret = runShellCommand(st, argv[1], argv + 2, argc - 2);
 
+			if (timer_exceeded) /* timeout */
+				return clientDone(st, true);
+			else if (!ret)		/* on error */
+			{
+				st->ecnt++;
+				return true;
+			}
+			else	/* succeeded */
+				st->listen = 1;
+		}
+		else if (pg_strcasecmp(argv[0], "shell") == 0)
+		{
+			bool		ret = runShellCommand(st, NULL, argv + 1, argc - 1);
+
+			if (timer_exceeded) /* timeout */
+				return clientDone(st, true);
+			else if (!ret)		/* on error */
+			{
+				st->ecnt++;
+				return true;
+			}
+			else	/* succeeded */
+				st->listen = 1;
+		}
 		goto top;
 	}
+
+	return true;
 }
 
 /* discard connections */
 static void
-disconnect_all(CState *state)
+disconnect_all(CState *state, int length)
 {
 	int			i;
 
-	for (i = 0; i < nclients; i++)
+	for (i = 0; i < length; i++)
 	{
 		if (state[i].con)
+		{
 			PQfinish(state[i].con);
+			state[i].con = NULL;
+		}
 	}
 }
 
@@ -1179,8 +1342,8 @@ init(void)
 
 	for (i = 0; i < ntellers * scale; i++)
 	{
-		snprintf(sql, 256, "insert into pgbench_tellers(tid,bid,tbalance) values (%d,%d,0)"
-				 ,i + 1, i / ntellers + 1);
+		snprintf(sql, 256, "insert into pgbench_tellers(tid,bid,tbalance) values (%d,%d,0)",
+				 i + 1, i / ntellers + 1);
 		executeStatement(con, sql);
 	}
 
@@ -1389,6 +1552,26 @@ process_commands(char *buf)
 				return NULL;
 			}
 
+			/*
+			 * Split argument into number and unit to allow "sleep 1ms" etc.
+			 * We don't have to terminate the number argument with null
+			 * because it will be parsed with atoi, which ignores trailing
+			 * non-digit characters.
+			 */
+			if (my_commands->argv[1][0] != ':')
+			{
+				char	   *c = my_commands->argv[1];
+
+				while (isdigit((unsigned char) *c))
+					c++;
+				if (*c)
+				{
+					my_commands->argv[2] = c;
+					if (my_commands->argc < 3)
+						my_commands->argc = 3;
+				}
+			}
+
 			if (my_commands->argc >= 3)
 			{
 				if (pg_strcasecmp(my_commands->argv[2], "us") != 0 &&
@@ -1404,6 +1587,22 @@ process_commands(char *buf)
 			for (j = 3; j < my_commands->argc; j++)
 				fprintf(stderr, "%s: extra argument \"%s\" ignored\n",
 						my_commands->argv[0], my_commands->argv[j]);
+		}
+		else if (pg_strcasecmp(my_commands->argv[0], "setshell") == 0)
+		{
+			if (my_commands->argc < 3)
+			{
+				fprintf(stderr, "%s: missing argument\n", my_commands->argv[0]);
+				return NULL;
+			}
+		}
+		else if (pg_strcasecmp(my_commands->argv[0], "shell") == 0)
+		{
+			if (my_commands->argc < 1)
+			{
+				fprintf(stderr, "%s: missing command\n", my_commands->argv[0]);
+				return NULL;
+			}
 		}
 		else
 		{
@@ -1575,25 +1774,18 @@ process_builtin(char *tb)
 
 /* print out results */
 static void
-printResults(
-			 int ttype, CState *state,
-			 struct timeval * start_time, struct timeval * end_time)
+printResults(int ttype, int normal_xacts, int nclients, int nthreads,
+			 instr_time total_time, instr_time conn_total_time)
 {
-	double		t1,
-				t2;
-	int			i;
-	int			normal_xacts = 0;
+	double		time_include,
+				tps_include,
+				tps_exclude;
 	char	   *s;
 
-	for (i = 0; i < nclients; i++)
-		normal_xacts += state[i].cnt;
-
-	t1 = (end_time->tv_sec - start_time->tv_sec) * 1000000.0 + (end_time->tv_usec - start_time->tv_usec);
-	t1 = normal_xacts * 1000000.0 / t1;
-
-	t2 = (end_time->tv_sec - start_time->tv_sec - conn_total_time.tv_sec) * 1000000.0 +
-		(end_time->tv_usec - start_time->tv_usec - conn_total_time.tv_usec);
-	t2 = normal_xacts * 1000000.0 / t2;
+	time_include = INSTR_TIME_GET_DOUBLE(total_time);
+	tps_include = normal_xacts / time_include;
+	tps_exclude = normal_xacts / (time_include -
+						(INSTR_TIME_GET_DOUBLE(conn_total_time) / nthreads));
 
 	if (ttype == 0)
 		s = "TPC-B (sort of)";
@@ -1608,6 +1800,7 @@ printResults(
 	printf("scaling factor: %d\n", scale);
 	printf("query mode: %s\n", QUERYMODE[querymode]);
 	printf("number of clients: %d\n", nclients);
+	printf("number of threads: %d\n", nthreads);
 	if (duration <= 0)
 	{
 		printf("number of transactions per client: %d\n", nxacts);
@@ -1620,8 +1813,8 @@ printResults(
 		printf("number of transactions actually processed: %d\n",
 			   normal_xacts);
 	}
-	printf("tps = %f (including connections establishing)\n", t1);
-	printf("tps = %f (excluding connections establishing)\n", t2);
+	printf("tps = %f (including connections establishing)\n", tps_include);
+	printf("tps = %f (excluding connections establishing)\n", tps_exclude);
 }
 
 
@@ -1629,28 +1822,25 @@ int
 main(int argc, char **argv)
 {
 	int			c;
+	int			nclients = 1;	/* default number of simulated clients */
+	int			nthreads = 1;	/* default number of threads */
 	int			is_init_mode = 0;		/* initialize mode? */
 	int			is_no_vacuum = 0;		/* no vacuum at all before testing? */
 	int			do_vacuum_accounts = 0; /* do vacuum accounts before testing? */
-	int			debug = 0;		/* debug flag */
 	int			ttype = 0;		/* transaction type. 0: TPC-B, 1: SELECT only,
 								 * 2: skip update of branches and tellers */
 	char	   *filename = NULL;
 	bool		scale_given = false;
 
 	CState	   *state;			/* status of clients */
+	TState	   *threads;		/* array of thread */
 
-	struct timeval start_time;	/* start up time */
-	struct timeval end_time;	/* end time */
+	instr_time	start_time;		/* start up time */
+	instr_time	total_time;
+	instr_time	conn_total_time;
+	int			total_xacts;
 
 	int			i;
-
-	fd_set		input_mask;
-	int			nsocks;			/* return from select(2) */
-	int			maxsock;		/* max socket number to be waited */
-	struct timeval now;
-	struct timeval timeout;
-	int			min_usec;
 
 #ifdef HAVE_GETRLIMIT
 	struct rlimit rlim;
@@ -1702,9 +1892,9 @@ main(int argc, char **argv)
 	memset(state, 0, sizeof(*state));
 
 #ifdef PGXC
-	while ((c = getopt(argc, argv, "ih:knvp:dSNc:Cs:t:T:U:lf:D:F:M:")) != -1)
+	while ((c = getopt(argc, argv, "ih:knvp:dSNc:Cs:t:T:U:lf:D:F:M:j:")) != -1)
 #else
-	while ((c = getopt(argc, argv, "ih:nvp:dSNc:Cs:t:T:U:lf:D:F:M:")) != -1)
+	while ((c = getopt(argc, argv, "ih:nvp:dSNc:Cs:t:T:U:lf:D:F:M:j:")) != -1)
 #endif
 	{
 		switch (c)
@@ -1763,8 +1953,16 @@ main(int argc, char **argv)
 				}
 #endif   /* HAVE_GETRLIMIT */
 				break;
+			case 'j':			/* jobs */
+				nthreads = atoi(optarg);
+				if (nthreads <= 0)
+				{
+					fprintf(stderr, "invalid number of threads: %d\n", nthreads);
+					exit(1);
+				}
+				break;
 			case 'C':
-				is_connect = 1;
+				is_connect = true;
 				break;
 			case 's':
 				scale_given = true;
@@ -1824,11 +2022,8 @@ main(int argc, char **argv)
 					}
 
 					*p++ = '\0';
-					if (putVariable(&state[0], optarg, p) == false)
-					{
-						fprintf(stderr, "Couldn't allocate memory for variable\n");
+					if (!putVariable(&state[0], "option", optarg, p))
 						exit(1);
-					}
 				}
 				break;
 			case 'F':
@@ -1883,7 +2078,17 @@ main(int argc, char **argv)
 	if (nxacts <= 0 && duration <= 0)
 		nxacts = DEFAULT_NXACTS;
 
-	remains = nclients;
+	if (nclients % nthreads != 0)
+	{
+		fprintf(stderr, "number of clients (%d) must be a multiple of number of threads (%d)\n", nclients, nthreads);
+		exit(1);
+	}
+
+	/*
+	 * save main process id in the global variable because process id will be
+	 * changed after fork.
+	 */
+	main_pid = (int) getpid();
 
 	if (nclients > 1)
 	{
@@ -1901,28 +2106,12 @@ main(int argc, char **argv)
 		{
 			int			j;
 
+			state[i].id = i;
 			for (j = 0; j < state[0].nvariables; j++)
 			{
-				if (putVariable(&state[i], state[0].variables[j].name, state[0].variables[j].value) == false)
-				{
-					fprintf(stderr, "Couldn't allocate memory for variable\n");
+				if (!putVariable(&state[i], "startup", state[0].variables[j].name, state[0].variables[j].value))
 					exit(1);
-				}
 			}
-		}
-	}
-
-	if (use_log)
-	{
-		char		logpath[64];
-
-		snprintf(logpath, 64, "pgbench_log.%d", (int) getpid());
-		LOGFILE = fopen(logpath, "w");
-
-		if (LOGFILE == NULL)
-		{
-			fprintf(stderr, "Couldn't open logfile \"%s\": %s", logpath, strerror(errno));
-			exit(1);
 		}
 	}
 
@@ -1987,11 +2176,8 @@ main(int argc, char **argv)
 		snprintf(val, sizeof(val), "%d", scale);
 		for (i = 0; i < nclients; i++)
 		{
-			if (putVariable(&state[i], "scale", val) == false)
-			{
-				fprintf(stderr, "Couldn't allocate memory for variable\n");
+			if (!putVariable(&state[i], "startup", "scale", val))
 				exit(1);
-			}
 		}
 	}
 
@@ -2013,35 +2199,10 @@ main(int argc, char **argv)
 	PQfinish(con);
 
 	/* set random seed */
-	gettimeofday(&start_time, NULL);
-	srandom((unsigned int) start_time.tv_usec);
+	INSTR_TIME_SET_CURRENT(start_time);
+	srandom((unsigned int) INSTR_TIME_GET_MICROSEC(start_time));
 
-	/* get start up time */
-	gettimeofday(&start_time, NULL);
-
-	/* set alarm if duration is specified. */
-	if (duration > 0)
-		setalarm(duration);
-
-	if (is_connect == 0)
-	{
-		struct timeval t,
-					now;
-
-		/* make connections to the database */
-		for (i = 0; i < nclients; i++)
-		{
-			state[i].id = i;
-			if ((state[i].con = doConnect()) == NULL)
-				exit(1);
-		}
-		/* time after connections set up */
-		gettimeofday(&now, NULL);
-		diffTime(&now, &start_time, &t);
-		addTime(&conn_total_time, &t, &conn_total_time);
-	}
-
-	/* process bultin SQL scripts */
+	/* process builtin SQL scripts */
 	switch (ttype)
 	{
 		case 0:
@@ -2073,140 +2234,253 @@ main(int argc, char **argv)
 			break;
 	}
 
-	/* send start up queries in async manner */
-	for (i = 0; i < nclients; i++)
+	/* get start up time */
+	INSTR_TIME_SET_CURRENT(start_time);
+
+	/* set alarm if duration is specified. */
+	if (duration > 0)
+		setalarm(duration);
+
+	/* start threads */
+	threads = (TState *) malloc(sizeof(TState) * nthreads);
+	for (i = 0; i < nthreads; i++)
 	{
-		Command   **commands = sql_files[state[i].use_file];
-		int			prev_ecnt = state[i].ecnt;
+		threads[i].tid = i;
+		threads[i].state = &state[nclients / nthreads * i];
+		threads[i].nstate = nclients / nthreads;
+		INSTR_TIME_SET_CURRENT(threads[i].start_time);
 
-		state[i].use_file = getrand(0, num_files - 1);
-		doCustom(state, i, debug);
-
-		if (state[i].ecnt > prev_ecnt && commands[state[i].state]->type == META_COMMAND)
+		/* the first thread (i = 0) is executed by main thread */
+		if (i > 0)
 		{
-			fprintf(stderr, "Client %d aborted in state %d. Execution meta-command failed.\n", i, state[i].state);
-			remains--;			/* I've aborted */
-			PQfinish(state[i].con);
-			state[i].con = NULL;
+			int			err = pthread_create(&threads[i].thread, NULL, threadRun, &threads[i]);
+
+			if (err != 0 || threads[i].thread == INVALID_THREAD)
+			{
+				fprintf(stderr, "cannot create thread: %s\n", strerror(err));
+				exit(1);
+			}
+		}
+		else
+		{
+			threads[i].thread = INVALID_THREAD;
 		}
 	}
 
-	for (;;)
+	/* wait for threads and accumulate results */
+	total_xacts = 0;
+	INSTR_TIME_SET_ZERO(conn_total_time);
+	for (i = 0; i < nthreads; i++)
 	{
-		if (remains <= 0)
-		{						/* all done ? */
-			disconnect_all(state);
-			/* get end time */
-			gettimeofday(&end_time, NULL);
-			printResults(ttype, state, &start_time, &end_time);
-			if (LOGFILE)
-				fclose(LOGFILE);
-			exit(0);
+		void	   *ret = NULL;
+
+		if (threads[i].thread == INVALID_THREAD)
+			ret = threadRun(&threads[i]);
+		else
+			pthread_join(threads[i].thread, &ret);
+
+		if (ret != NULL)
+		{
+			TResult    *r = (TResult *) ret;
+
+			total_xacts += r->xacts;
+			INSTR_TIME_ADD(conn_total_time, r->conn_time);
+			free(ret);
 		}
+	}
+	disconnect_all(state, nclients);
+
+	/* get end time */
+	INSTR_TIME_SET_CURRENT(total_time);
+	INSTR_TIME_SUBTRACT(total_time, start_time);
+	printResults(ttype, total_xacts, nclients, nthreads, total_time, conn_total_time);
+
+	return 0;
+}
+
+static void *
+threadRun(void *arg)
+{
+	TState	   *thread = (TState *) arg;
+	CState	   *state = thread->state;
+	TResult    *result;
+	FILE	   *logfile = NULL; /* per-thread log file */
+	instr_time	start,
+				end;
+	int			nstate = thread->nstate;
+	int			remains = nstate;		/* number of remaining clients */
+	int			i;
+
+	result = malloc(sizeof(TResult));
+	INSTR_TIME_SET_ZERO(result->conn_time);
+
+	/* open log file if requested */
+	if (use_log)
+	{
+		char		logpath[64];
+
+		if (thread->tid == 0)
+			snprintf(logpath, sizeof(logpath), "pgbench_log.%d", main_pid);
+		else
+			snprintf(logpath, sizeof(logpath), "pgbench_log.%d.%d", main_pid, thread->tid);
+		logfile = fopen(logpath, "w");
+
+		if (logfile == NULL)
+		{
+			fprintf(stderr, "Couldn't open logfile \"%s\": %s", logpath, strerror(errno));
+			goto done;
+		}
+	}
+
+	if (!is_connect)
+	{
+		/* make connections to the database */
+		for (i = 0; i < nstate; i++)
+		{
+			if ((state[i].con = doConnect()) == NULL)
+				goto done;
+		}
+	}
+
+	/* time after thread and connections set up */
+	INSTR_TIME_SET_CURRENT(result->conn_time);
+	INSTR_TIME_SUBTRACT(result->conn_time, thread->start_time);
+
+	/* send start up queries in async manner */
+	for (i = 0; i < nstate; i++)
+	{
+		CState	   *st = &state[i];
+		Command   **commands = sql_files[st->use_file];
+		int			prev_ecnt = st->ecnt;
+
+		st->use_file = getrand(0, num_files - 1);
+		if (!doCustom(st, &result->conn_time, logfile))
+			remains--;			/* I've aborted */
+
+		if (st->ecnt > prev_ecnt && commands[st->state]->type == META_COMMAND)
+		{
+			fprintf(stderr, "Client %d aborted in state %d. Execution meta-command failed.\n", i, st->state);
+			remains--;			/* I've aborted */
+			PQfinish(st->con);
+			st->con = NULL;
+		}
+	}
+
+	while (remains > 0)
+	{
+		fd_set		input_mask;
+		int			maxsock;	/* max socket number to be waited */
+		int64		now_usec = 0;
+		int64		min_usec;
 
 		FD_ZERO(&input_mask);
 
 		maxsock = -1;
-		min_usec = -1;
-		for (i = 0; i < nclients; i++)
+		min_usec = INT64_MAX;
+		for (i = 0; i < nstate; i++)
 		{
-			Command   **commands = sql_files[state[i].use_file];
+			CState	   *st = &state[i];
+			Command   **commands = sql_files[st->use_file];
+			int			sock;
 
-			if (state[i].sleeping)
+			if (st->sleeping)
 			{
 				int			this_usec;
-				int			sock = PQsocket(state[i].con);
 
-				if (min_usec < 0)
+				if (min_usec == INT64_MAX)
 				{
-					gettimeofday(&now, NULL);
-					min_usec = 0;
+					instr_time	now;
+
+					INSTR_TIME_SET_CURRENT(now);
+					now_usec = INSTR_TIME_GET_MICROSEC(now);
 				}
 
-				this_usec = (state[i].until.tv_sec - now.tv_sec) * 1000000 +
-					state[i].until.tv_usec - now.tv_usec;
-
-				if (this_usec > 0 && (min_usec == 0 || this_usec < min_usec))
+				this_usec = st->until - now_usec;
+				if (min_usec > this_usec)
 					min_usec = this_usec;
-
-				FD_SET		(sock, &input_mask);
-
-				if (maxsock < sock)
-					maxsock = sock;
 			}
-			else if (state[i].con && commands[state[i].state]->type != META_COMMAND)
+			else if (st->con == NULL)
 			{
-				int			sock = PQsocket(state[i].con);
-
-				if (sock < 0)
-				{
-					disconnect_all(state);
-					exit(1);
-				}
-				FD_SET		(sock, &input_mask);
-
-				if (maxsock < sock)
-					maxsock = sock;
+				continue;
 			}
+			else if (commands[st->state]->type == META_COMMAND)
+			{
+				min_usec = 0;	/* the connection is ready to run */
+				break;
+			}
+
+			sock = PQsocket(st->con);
+			if (sock < 0)
+			{
+				fprintf(stderr, "bad socket: %s\n", strerror(errno));
+				goto done;
+			}
+
+			FD_SET(sock, &input_mask);
+
+			if (maxsock < sock)
+				maxsock = sock;
 		}
 
-		if (maxsock != -1)
+		if (min_usec > 0 && maxsock != -1)
 		{
-			if (min_usec >= 0)
+			int			nsocks; /* return from select(2) */
+
+			if (min_usec != INT64_MAX)
 			{
+				struct timeval timeout;
+
 				timeout.tv_sec = min_usec / 1000000;
 				timeout.tv_usec = min_usec % 1000000;
-
-				nsocks = select(maxsock + 1, &input_mask, (fd_set *) NULL,
-								(fd_set *) NULL, &timeout);
+				nsocks = select(maxsock + 1, &input_mask, NULL, NULL, &timeout);
 			}
 			else
-				nsocks = select(maxsock + 1, &input_mask, (fd_set *) NULL,
-								(fd_set *) NULL, (struct timeval *) NULL);
+				nsocks = select(maxsock + 1, &input_mask, NULL, NULL, NULL);
 			if (nsocks < 0)
 			{
 				if (errno == EINTR)
 					continue;
 				/* must be something wrong */
-				disconnect_all(state);
 				fprintf(stderr, "select failed: %s\n", strerror(errno));
-				exit(1);
+				goto done;
 			}
-#ifdef NOT_USED
-			else if (nsocks == 0)
-			{					/* timeout */
-				fprintf(stderr, "select timeout\n");
-				for (i = 0; i < nclients; i++)
-				{
-					fprintf(stderr, "client %d:state %d cnt %d ecnt %d listen %d\n",
-							i, state[i].state, state[i].cnt, state[i].ecnt, state[i].listen);
-				}
-				exit(0);
-			}
-#endif
 		}
 
 		/* ok, backend returns reply */
-		for (i = 0; i < nclients; i++)
+		for (i = 0; i < nstate; i++)
 		{
-			Command   **commands = sql_files[state[i].use_file];
-			int			prev_ecnt = state[i].ecnt;
+			CState	   *st = &state[i];
+			Command   **commands = sql_files[st->use_file];
+			int			prev_ecnt = st->ecnt;
 
-			if (state[i].con && (FD_ISSET(PQsocket(state[i].con), &input_mask)
-						  || commands[state[i].state]->type == META_COMMAND))
+			if (st->con && (FD_ISSET(PQsocket(st->con), &input_mask)
+							|| commands[st->state]->type == META_COMMAND))
 			{
-				doCustom(state, i, debug);
+				if (!doCustom(st, &result->conn_time, logfile))
+					remains--;	/* I've aborted */
 			}
 
-			if (state[i].ecnt > prev_ecnt && commands[state[i].state]->type == META_COMMAND)
+			if (st->ecnt > prev_ecnt && commands[st->state]->type == META_COMMAND)
 			{
-				fprintf(stderr, "Client %d aborted in state %d. Execution of meta-command failed.\n", i, state[i].state);
+				fprintf(stderr, "Client %d aborted in state %d. Execution of meta-command failed.\n", i, st->state);
 				remains--;		/* I've aborted */
-				PQfinish(state[i].con);
-				state[i].con = NULL;
+				PQfinish(st->con);
+				st->con = NULL;
 			}
 		}
 	}
+
+done:
+	INSTR_TIME_SET_CURRENT(start);
+	disconnect_all(state, nstate);
+	result->xacts = 0;
+	for (i = 0; i < nstate; i++)
+		result->xacts += state[i].cnt;
+	INSTR_TIME_SET_CURRENT(end);
+	INSTR_TIME_ACCUM_DIFF(result->conn_time, end, start);
+	if (logfile)
+		fclose(logfile);
+	return result;
 }
 
 
@@ -2228,6 +2502,97 @@ setalarm(int seconds)
 	pqsignal(SIGALRM, handle_sig_alarm);
 	alarm(seconds);
 }
+
+#ifndef ENABLE_THREAD_SAFETY
+
+/*
+ * implements pthread using fork.
+ */
+
+typedef struct fork_pthread
+{
+	pid_t		pid;
+	int			pipes[2];
+}	fork_pthread;
+
+static int
+pthread_create(pthread_t *thread,
+			   pthread_attr_t *attr,
+			   void *(*start_routine) (void *),
+			   void *arg)
+{
+	fork_pthread *th;
+	void	   *ret;
+	instr_time	start_time;
+
+	th = (fork_pthread *) malloc(sizeof(fork_pthread));
+	pipe(th->pipes);
+
+	th->pid = fork();
+	if (th->pid == -1)			/* error */
+	{
+		free(th);
+		return errno;
+	}
+	if (th->pid != 0)			/* in parent process */
+	{
+		close(th->pipes[1]);
+		*thread = th;
+		return 0;
+	}
+
+	/* in child process */
+	close(th->pipes[0]);
+
+	/* set alarm again because the child does not inherit timers */
+	if (duration > 0)
+		setalarm(duration);
+
+	/*
+	 * Set a different random seed in each child process.  Otherwise they all
+	 * inherit the parent's state and generate the same "random" sequence. (In
+	 * the threaded case, the different threads will obtain subsets of the
+	 * output of a single random() sequence, which should be okay for our
+	 * purposes.)
+	 */
+	INSTR_TIME_SET_CURRENT(start_time);
+	srandom(((unsigned int) INSTR_TIME_GET_MICROSEC(start_time)) +
+			((unsigned int) getpid()));
+
+	ret = start_routine(arg);
+	write(th->pipes[1], ret, sizeof(TResult));
+	close(th->pipes[1]);
+	free(th);
+	exit(0);
+}
+
+static int
+pthread_join(pthread_t th, void **thread_return)
+{
+	int			status;
+
+	while (waitpid(th->pid, &status, 0) != th->pid)
+	{
+		if (errno != EINTR)
+			return errno;
+	}
+
+	if (thread_return != NULL)
+	{
+		/* assume result is TResult */
+		*thread_return = malloc(sizeof(TResult));
+		if (read(th->pipes[0], *thread_return, sizeof(TResult)) != sizeof(TResult))
+		{
+			free(*thread_return);
+			*thread_return = NULL;
+		}
+	}
+	close(th->pipes[0]);
+
+	free(th);
+	return 0;
+}
+#endif
 #else							/* WIN32 */
 
 static VOID CALLBACK
@@ -2252,6 +2617,72 @@ setalarm(int seconds)
 		fprintf(stderr, "Failed to set timer\n");
 		exit(1);
 	}
+}
+
+/* partial pthread implementation for Windows */
+
+typedef struct win32_pthread
+{
+	HANDLE		handle;
+	void	   *(*routine) (void *);
+	void	   *arg;
+	void	   *result;
+}	win32_pthread;
+
+static unsigned __stdcall
+win32_pthread_run(void *arg)
+{
+	win32_pthread *th = (win32_pthread *) arg;
+
+	th->result = th->routine(th->arg);
+
+	return 0;
+}
+
+static int
+pthread_create(pthread_t *thread,
+			   pthread_attr_t *attr,
+			   void *(*start_routine) (void *),
+			   void *arg)
+{
+	int			save_errno;
+	win32_pthread *th;
+
+	th = (win32_pthread *) malloc(sizeof(win32_pthread));
+	th->routine = start_routine;
+	th->arg = arg;
+	th->result = NULL;
+
+	th->handle = (HANDLE) _beginthreadex(NULL, 0, win32_pthread_run, th, 0, NULL);
+	if (th->handle == NULL)
+	{
+		save_errno = errno;
+		free(th);
+		return save_errno;
+	}
+
+	*thread = th;
+	return 0;
+}
+
+static int
+pthread_join(pthread_t th, void **thread_return)
+{
+	if (th == NULL || th->handle == NULL)
+		return errno = EINVAL;
+
+	if (WaitForSingleObject(th->handle, INFINITE) != WAIT_OBJECT_0)
+	{
+		_dosmaperr(GetLastError());
+		return errno;
+	}
+
+	if (thread_return)
+		*thread_return = th->result;
+
+	CloseHandle(th->handle);
+	free(th);
+	return 0;
 }
 
 #endif   /* WIN32 */

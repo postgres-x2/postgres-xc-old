@@ -3,7 +3,7 @@
  * pg_buffercache_pages.c
  *	  display some contents of the buffer cache
  *
- *	  $PostgreSQL$
+ *	  contrib/pg_buffercache/pg_buffercache_pages.c
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"

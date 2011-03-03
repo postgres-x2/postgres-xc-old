@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# config/tcl.m4
 
 # Autoconf macros to check for Tcl related things
 

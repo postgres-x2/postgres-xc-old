@@ -1,4 +1,4 @@
-# $PostgreSQL$
+# src/template/nextstep
 
 AROPT=rc
 SHARED_LIB=

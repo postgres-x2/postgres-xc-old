@@ -3,12 +3,12 @@
  * parse_clause.c
  *	  handle clauses in parser
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/parser/parse_clause.c
  *
  *-------------------------------------------------------------------------
  */
@@ -21,6 +21,7 @@
 #include "commands/defrem.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
+#include "optimizer/clauses.h"
 #include "optimizer/tlist.h"
 #include "optimizer/var.h"
 #include "parser/analyze.h"
@@ -72,6 +73,8 @@ static Node *transformFromClauseItem(ParseState *pstate, Node *n,
 						Relids *containedRels);
 static Node *buildMergedJoinVar(ParseState *pstate, JoinType jointype,
 				   Var *l_colvar, Var *r_colvar);
+static void checkExprIsVarFree(ParseState *pstate, Node *n,
+				   const char *constructName);
 static TargetEntry *findTargetlistEntrySQL92(ParseState *pstate, Node *node,
 						 List **tlist, int clause);
 static TargetEntry *findTargetlistEntrySQL99(ParseState *pstate, Node *node,
@@ -85,6 +88,8 @@ static List *addTargetToGroupList(ParseState *pstate, TargetEntry *tle,
 					 List *grouplist, List *targetlist, int location,
 					 bool resolveUnknown);
 static WindowClause *findWindowClause(List *wclist, const char *name);
+static Node *transformFrameOffset(ParseState *pstate, int frameOptions,
+					 Node *clause);
 
 
 /*
@@ -609,7 +614,7 @@ transformRangeFunction(ParseState *pstate, RangeFunction *r)
 		tupdesc = BuildDescFromLists(rte->eref->colnames,
 									 rte->funccoltypes,
 									 rte->funccoltypmods);
-		CheckAttributeNamesTypes(tupdesc, RELKIND_COMPOSITE_TYPE);
+		CheckAttributeNamesTypes(tupdesc, RELKIND_COMPOSITE_TYPE, false);
 	}
 
 	return rte;
@@ -798,7 +803,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 			ListCell   *lx,
 					   *rx;
 
-			Assert(j->using == NIL);	/* shouldn't have USING() too */
+			Assert(j->usingClause == NIL);		/* shouldn't have USING() too */
 
 			foreach(lx, l_colnames)
 			{
@@ -821,7 +826,7 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 					rlist = lappend(rlist, m_name);
 			}
 
-			j->using = rlist;
+			j->usingClause = rlist;
 		}
 
 		/*
@@ -830,14 +835,14 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		res_colnames = NIL;
 		res_colvars = NIL;
 
-		if (j->using)
+		if (j->usingClause)
 		{
 			/*
 			 * JOIN/USING (or NATURAL JOIN, as transformed above). Transform
 			 * the list into an explicit ON-condition, and generate a list of
 			 * merged result columns.
 			 */
-			List	   *ucols = j->using;
+			List	   *ucols = j->usingClause;
 			List	   *l_usingvars = NIL;
 			List	   *r_usingvars = NIL;
 			ListCell   *ucol;
@@ -1177,10 +1182,28 @@ transformLimitClause(ParseState *pstate, Node *clause,
 
 	qual = coerce_to_specific_type(pstate, qual, INT8OID, constructName);
 
-	/*
-	 * LIMIT can't refer to any vars or aggregates of the current query
-	 */
-	if (contain_vars_of_level(qual, 0))
+	/* LIMIT can't refer to any vars or aggregates of the current query */
+	checkExprIsVarFree(pstate, qual, constructName);
+
+	return qual;
+}
+
+/*
+ * checkExprIsVarFree
+ *		Check that given expr has no Vars of the current query level
+ *		(and no aggregates or window functions, either).
+ *
+ * This is used to check expressions that have to have a consistent value
+ * across all rows of the query, such as a LIMIT.  Arguably it should reject
+ * volatile functions, too, but we don't do that --- whatever value the
+ * function gives on first execution is what you get.
+ *
+ * constructName does not affect the semantics, but is used in error messages
+ */
+static void
+checkExprIsVarFree(ParseState *pstate, Node *n, const char *constructName)
+{
+	if (contain_vars_of_level(n, 0))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
@@ -1188,10 +1211,10 @@ transformLimitClause(ParseState *pstate, Node *clause,
 				 errmsg("argument of %s must not contain variables",
 						constructName),
 				 parser_errposition(pstate,
-									locate_var_of_level(qual, 0))));
+									locate_var_of_level(n, 0))));
 	}
 	if (pstate->p_hasAggs &&
-		checkExprHasAggs(qual))
+		checkExprHasAggs(n))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
@@ -1199,10 +1222,10 @@ transformLimitClause(ParseState *pstate, Node *clause,
 				 errmsg("argument of %s must not contain aggregate functions",
 						constructName),
 				 parser_errposition(pstate,
-									locate_agg_of_level(qual, 0))));
+									locate_agg_of_level(n, 0))));
 	}
 	if (pstate->p_hasWindowFuncs &&
-		checkExprHasWindowFuncs(qual))
+		checkExprHasWindowFuncs(n))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_WINDOWING_ERROR),
@@ -1210,10 +1233,8 @@ transformLimitClause(ParseState *pstate, Node *clause,
 				 errmsg("argument of %s must not contain window functions",
 						constructName),
 				 parser_errposition(pstate,
-									locate_windowfunc(qual))));
+									locate_windowfunc(n))));
 	}
-
-	return qual;
 }
 
 
@@ -1225,9 +1246,9 @@ transformLimitClause(ParseState *pstate, Node *clause,
  *
  * This function supports the old SQL92 ORDER BY interpretation, where the
  * expression is an output column name or number.  If we fail to find a
- * match of that sort, we fall through to the SQL99 rules.  For historical
+ * match of that sort, we fall through to the SQL99 rules.	For historical
  * reasons, Postgres also allows this interpretation for GROUP BY, though
- * the standard never did.  However, for GROUP BY we prefer a SQL99 match.
+ * the standard never did.	However, for GROUP BY we prefer a SQL99 match.
  * This function is *not* used for WINDOW definitions.
  *
  * node		the ORDER BY, GROUP BY, or DISTINCT ON expression to be matched
@@ -1401,7 +1422,7 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist)
 	/*
 	 * Convert the untransformed node to a transformed expression, and search
 	 * for a match in the tlist.  NOTE: it doesn't really matter whether there
-	 * is more than one match.  Also, we are willing to match an existing
+	 * is more than one match.	Also, we are willing to match an existing
 	 * resjunk target here, though the SQL92 cases above must ignore resjunk
 	 * targets.
 	 */
@@ -1410,8 +1431,20 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist)
 	foreach(tl, *tlist)
 	{
 		TargetEntry *tle = (TargetEntry *) lfirst(tl);
+		Node	   *texpr;
 
-		if (equal(expr, tle->expr))
+		/*
+		 * Ignore any implicit cast on the existing tlist expression.
+		 *
+		 * This essentially allows the ORDER/GROUP/etc item to adopt the same
+		 * datatype previously selected for a textually-equivalent tlist item.
+		 * There can't be any implicit cast at top level in an ordinary SELECT
+		 * tlist at this stage, but the case does arise with ORDER BY in an
+		 * aggregate function.
+		 */
+		texpr = strip_implicit_coercions((Node *) tle->expr);
+
+		if (equal(expr, texpr))
 			return tle;
 	}
 
@@ -1440,7 +1473,7 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist)
 List *
 transformGroupClause(ParseState *pstate, List *grouplist,
 					 List **targetlist, List *sortClause,
-					 bool isWindowFunc)
+					 bool useSQL99)
 {
 	List	   *result = NIL;
 	ListCell   *gl;
@@ -1451,7 +1484,7 @@ transformGroupClause(ParseState *pstate, List *grouplist,
 		TargetEntry *tle;
 		bool		found = false;
 
-		if (isWindowFunc)
+		if (useSQL99)
 			tle = findTargetlistEntrySQL99(pstate, gexpr, targetlist);
 		else
 			tle = findTargetlistEntrySQL92(pstate, gexpr, targetlist,
@@ -1510,15 +1543,15 @@ transformGroupClause(ParseState *pstate, List *grouplist,
  * ORDER BY items will be added to the targetlist (as resjunk columns)
  * if not already present, so the targetlist must be passed by reference.
  *
- * This is also used for window ORDER BY clauses (which act almost the
- * same, but are always interpreted per SQL99 rules).
+ * This is also used for window and aggregate ORDER BY clauses (which act
+ * almost the same, but are always interpreted per SQL99 rules).
  */
 List *
 transformSortClause(ParseState *pstate,
 					List *orderlist,
 					List **targetlist,
 					bool resolveUnknown,
-					bool isWindowFunc)
+					bool useSQL99)
 {
 	List	   *sortlist = NIL;
 	ListCell   *olitem;
@@ -1528,7 +1561,7 @@ transformSortClause(ParseState *pstate,
 		SortBy	   *sortby = (SortBy *) lfirst(olitem);
 		TargetEntry *tle;
 
-		if (isWindowFunc)
+		if (useSQL99)
 			tle = findTargetlistEntrySQL99(pstate, sortby->node, targetlist);
 		else
 			tle = findTargetlistEntrySQL92(pstate, sortby->node, targetlist,
@@ -1597,13 +1630,13 @@ transformWindowDefinitions(ParseState *pstate,
 		orderClause = transformSortClause(pstate,
 										  windef->orderClause,
 										  targetlist,
-										  true /* fix unknowns */,
-										  true /* window function */);
+										  true /* fix unknowns */ ,
+										  true /* force SQL99 rules */ );
 		partitionClause = transformGroupClause(pstate,
 											   windef->partitionClause,
 											   targetlist,
 											   orderClause,
-											   true /* window function */);
+											   true /* force SQL99 rules */ );
 
 		/*
 		 * And prepare the new WindowClause.
@@ -1664,6 +1697,11 @@ transformWindowDefinitions(ParseState *pstate,
 							windef->refname),
 					 parser_errposition(pstate, windef->location)));
 		wc->frameOptions = windef->frameOptions;
+		/* Process frame offset expressions */
+		wc->startOffset = transformFrameOffset(pstate, wc->frameOptions,
+											   windef->startOffset);
+		wc->endOffset = transformFrameOffset(pstate, wc->frameOptions,
+											 windef->endOffset);
 		wc->winref = winref;
 
 		result = lappend(result, wc);
@@ -1684,10 +1722,14 @@ transformWindowDefinitions(ParseState *pstate,
  * and allows the user to choose the equality semantics used by DISTINCT,
  * should she be working with a datatype that has more than one equality
  * operator.
+ *
+ * is_agg is true if we are transforming an aggregate(DISTINCT ...)
+ * function call.  This does not affect any behavior, only the phrasing
+ * of error messages.
  */
 List *
 transformDistinctClause(ParseState *pstate,
-						List **targetlist, List *sortClause)
+						List **targetlist, List *sortClause, bool is_agg)
 {
 	List	   *result = NIL;
 	ListCell   *slitem;
@@ -1716,6 +1758,8 @@ transformDistinctClause(ParseState *pstate,
 		if (tle->resjunk)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
+					 is_agg ?
+					 errmsg("in an aggregate with DISTINCT, ORDER BY expressions must appear in argument list") :
 					 errmsg("for SELECT DISTINCT, ORDER BY expressions must appear in select list"),
 					 parser_errposition(pstate,
 										exprLocation((Node *) tle->expr))));
@@ -2159,4 +2203,48 @@ findWindowClause(List *wclist, const char *name)
 	}
 
 	return NULL;
+}
+
+/*
+ * transformFrameOffset
+ *		Process a window frame offset expression
+ */
+static Node *
+transformFrameOffset(ParseState *pstate, int frameOptions, Node *clause)
+{
+	const char *constructName = NULL;
+	Node	   *node;
+
+	/* Quick exit if no offset expression */
+	if (clause == NULL)
+		return NULL;
+
+	/* Transform the raw expression tree */
+	node = transformExpr(pstate, clause);
+
+	if (frameOptions & FRAMEOPTION_ROWS)
+	{
+		/*
+		 * Like LIMIT clause, simply coerce to int8
+		 */
+		constructName = "ROWS";
+		node = coerce_to_specific_type(pstate, node, INT8OID, constructName);
+	}
+	else if (frameOptions & FRAMEOPTION_RANGE)
+	{
+		/*
+		 * this needs a lot of thought to decide how to support in the context
+		 * of Postgres' extensible datatype framework
+		 */
+		constructName = "RANGE";
+		/* error was already thrown by gram.y, this is just a backstop */
+		elog(ERROR, "window frame with value offset is not implemented");
+	}
+	else
+		Assert(false);
+
+	/* Disallow variables and aggregates in frame offsets */
+	checkExprIsVarFree(pstate, node, constructName);
+
+	return node;
 }

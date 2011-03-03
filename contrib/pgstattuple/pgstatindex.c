@@ -1,5 +1,5 @@
 /*
- * $PostgreSQL$
+ * contrib/pgstattuple/pgstatindex.c
  *
  *
  * pgstatindex

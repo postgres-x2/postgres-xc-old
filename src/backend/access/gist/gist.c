@@ -4,11 +4,11 @@
  *	  interface routines for the postgres GiST index access method.
  *
  *
- * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/backend/access/gist/gist.c
  *
  *-------------------------------------------------------------------------
  */
@@ -21,8 +21,6 @@
 #include "storage/bufmgr.h"
 #include "storage/indexfsm.h"
 #include "utils/memutils.h"
-
-const XLogRecPtr XLogRecPtrForTemp = {1, 1};
 
 /* Working state for gistbuild and its callback */
 typedef struct
@@ -132,7 +130,7 @@ gistbuild(PG_FUNCTION_ARGS)
 		PageSetTLI(page, ThisTimeLineID);
 	}
 	else
-		PageSetLSN(page, XLogRecPtrForTemp);
+		PageSetLSN(page, GetXLogRecPtrForTemp());
 
 	UnlockReleaseBuffer(buffer);
 
@@ -225,7 +223,7 @@ gistinsert(PG_FUNCTION_ARGS)
 
 #ifdef NOT_USED
 	Relation	heapRel = (Relation) PG_GETARG_POINTER(4);
-	bool		checkUnique = PG_GETARG_BOOL(5);
+	IndexUniqueCheck checkUnique = (IndexUniqueCheck) PG_GETARG_INT32(5);
 #endif
 	IndexTuple	itup;
 	GISTSTATE	giststate;
@@ -248,7 +246,7 @@ gistinsert(PG_FUNCTION_ARGS)
 	MemoryContextSwitchTo(oldCtx);
 	MemoryContextDelete(insertCtx);
 
-	PG_RETURN_BOOL(true);
+	PG_RETURN_BOOL(false);
 }
 
 
@@ -423,7 +421,7 @@ gistplacetopage(GISTInsertState *state, GISTSTATE *giststate)
 		{
 			for (ptr = dist; ptr; ptr = ptr->next)
 			{
-				PageSetLSN(ptr->page, XLogRecPtrForTemp);
+				PageSetLSN(ptr->page, GetXLogRecPtrForTemp());
 			}
 		}
 
@@ -491,7 +489,7 @@ gistplacetopage(GISTInsertState *state, GISTSTATE *giststate)
 			PageSetTLI(state->stack->page, ThisTimeLineID);
 		}
 		else
-			PageSetLSN(state->stack->page, XLogRecPtrForTemp);
+			PageSetLSN(state->stack->page, GetXLogRecPtrForTemp());
 
 		if (state->stack->blkno == GIST_ROOT_BLKNO)
 			state->needInsertComplete = false;
@@ -1027,7 +1025,7 @@ gistnewroot(Relation r, Buffer buffer, IndexTuple *itup, int len, ItemPointer ke
 		PageSetTLI(page, ThisTimeLineID);
 	}
 	else
-		PageSetLSN(page, XLogRecPtrForTemp);
+		PageSetLSN(page, GetXLogRecPtrForTemp());
 
 	END_CRIT_SECTION();
 }

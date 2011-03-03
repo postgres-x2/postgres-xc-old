@@ -40,6 +40,7 @@ SELECT ' INFINITY    x'::float8;
 SELECT 'Infinity'::float8 + 100.0;
 SELECT 'Infinity'::float8 / 'Infinity'::float8;
 SELECT 'nan'::float8 / 'nan'::float8;
+SELECT 'nan'::numeric::float8;
 
 SELECT '' AS five, * FROM FLOAT8_TBL ORDER BY f1;
 
@@ -124,8 +125,8 @@ SELECT '' AS five, * FROM FLOAT8_TBL ORDER BY f1;
 UPDATE FLOAT8_TBL
    SET f1 = FLOAT8_TBL.f1 * '-1'
    WHERE FLOAT8_TBL.f1 > '0.0';
-   
-SELECT '' AS bad, f.f1 * '1e200' from FLOAT8_TBL f ORDER BY f1;
+
+SELECT '' AS bad, f.f1 ^ '1e200' from FLOAT8_TBL f ORDER BY f1;
 
 SELECT '' AS bad, f.f1 ^ '1e200' from FLOAT8_TBL f ORDER BY f1;
 

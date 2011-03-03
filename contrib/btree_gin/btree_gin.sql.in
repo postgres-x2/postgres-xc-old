@@ -1,4 +1,4 @@
-/* $PostgreSQL$ */
+/* contrib/btree_gin/btree_gin.sql.in
 
 -- Adjust this setting to control where the objects get created.
 SET search_path = public;

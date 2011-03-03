@@ -4,7 +4,7 @@
 #    Makefile for port/darwin
 #
 # IDENTIFICATION
-#    $PostgreSQL$
+#    src/backend/port/darwin/Makefile
 #
 #-------------------------------------------------------------------------
 
