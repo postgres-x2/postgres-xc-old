@@ -1057,6 +1057,16 @@ standard_ProcessUtility(Node *parsetree,
 			{
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 
+#ifdef PGXC
+				if (stmt->concurrent)
+				{
+					ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						errmsg("PGXC does not support concurrent indexes"),
+						errdetail("The feature is not currently supported")));
+				}
+#endif
+
 				if (stmt->concurrent)
 					PreventTransactionChain(isTopLevel,
 											"CREATE INDEX CONCURRENTLY");
@@ -1087,7 +1097,7 @@ standard_ProcessUtility(Node *parsetree,
 							false,		/* quiet */
 							stmt->concurrent);	/* concurrent */
 #ifdef PGXC
-				if (IS_PGXC_COORDINATOR && !stmt->isconstraint)
+				if (IS_PGXC_COORDINATOR && !stmt->isconstraint && !IsConnFromCoord())
 					ExecUtilityStmtOnNodes(queryString, NULL,
 										   stmt->concurrent, EXEC_ON_ALL_NODES);
 #endif
