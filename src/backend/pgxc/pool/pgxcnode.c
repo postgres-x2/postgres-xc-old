@@ -6,7 +6,7 @@
  *	  Datanodes and Coordinators
  *
  *
- * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  * IDENTIFICATION
@@ -607,7 +607,7 @@ release_handles(void)
 				dn_discard[dn_ndisc++] = handle->nodenum;
 			else if (handle->state != DN_CONNECTION_STATE_IDLE)
 			{
-				elog(WARNING, "Connection to Datanode %d has unexpected state %d and will be dropped", handle->nodenum, handle->state);
+				elog(DEBUG1, "Connection to Datanode %d has unexpected state %d and will be dropped", handle->nodenum, handle->state);
 				dn_discard[dn_ndisc++] = handle->nodenum;
 			}
 			pgxc_node_free(handle);
@@ -625,7 +625,7 @@ release_handles(void)
 				co_discard[co_ndisc++] = handle->nodenum;
 			else if (handle->state != DN_CONNECTION_STATE_IDLE)
 			{
-				elog(WARNING, "Connection to Coordinator %d has unexpected state %d and will be dropped", handle->nodenum, handle->state);
+				elog(DEBUG1, "Connection to Coordinator %d has unexpected state %d and will be dropped", handle->nodenum, handle->state);
 				co_discard[co_ndisc++] = handle->nodenum;
 			}
 			pgxc_node_free(handle);

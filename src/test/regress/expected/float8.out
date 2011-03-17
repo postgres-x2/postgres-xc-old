@@ -175,15 +175,6 @@ SELECT '' AS four, f.* FROM FLOAT8_TBL f WHERE '1004.3' >= f.f1 ORDER BY f1;
       |               1004.3
 (4 rows)
 
-SELECT '' AS four, f.* FROM FLOAT8_TBL f WHERE  f.f1 <= '1004.3' ORDER BY f1;
- four |          f1          
-------+----------------------
-      |               -34.84
-      |                    0
-      | 1.2345678901234e-200
-      |               1004.3
-(4 rows)
-
 SELECT '' AS four, f.* FROM FLOAT8_TBL f WHERE  f.f1 <= '1004.3';
  four |          f1          
 ------+----------------------
