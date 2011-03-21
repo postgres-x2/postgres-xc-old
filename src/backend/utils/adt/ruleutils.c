@@ -3010,6 +3010,9 @@ get_target_list(List *targetList, deparse_context *context,
 	char	   *sep;
 	int			colno;
 	ListCell   *l;
+#ifdef PGXC
+	bool no_targetlist = true;
+#endif
 
 	sep = " ";
 	colno = 0;
@@ -3021,6 +3024,12 @@ get_target_list(List *targetList, deparse_context *context,
 
 		if (tle->resjunk)
 			continue;			/* ignore junk entries */
+
+#ifdef PGXC
+		/* Found at least one element in the target list */
+		if (no_targetlist)
+			no_targetlist = false;
+#endif
 
 		appendStringInfoString(buf, sep);
 		sep = ", ";
@@ -3063,6 +3072,17 @@ get_target_list(List *targetList, deparse_context *context,
 				appendStringInfo(buf, " AS %s", quote_identifier(colname));
 		}
 	}
+
+#ifdef PGXC
+	/* 
+	 * Because the empty target list can generate invalid SQL
+	 * clause. Here, just fill a '*' to process a table without
+	 * any columns, this statement will be sent to data nodes
+	 * and treated correctly on remote nodes.
+	 */
+	if (no_targetlist)
+		appendStringInfo(buf, " *");
+#endif
 }
 
 static void
