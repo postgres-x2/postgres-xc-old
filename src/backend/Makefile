@@ -228,9 +228,6 @@ endif
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_hba.conf.sample '$(DESTDIR)$(datadir)/pg_hba.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/utils/misc/postgresql.conf.sample '$(DESTDIR)$(datadir)/postgresql.conf.sample'
-# PGXC BEGIN
-	$(INSTALL_DATA) $(srcdir)/utils/misc/pgxc.conf.sample '$(DESTDIR)$(datadir)/pgxc.conf.sample'
-# PGXC END
 	$(INSTALL_DATA) $(srcdir)/access/transam/recovery.conf.sample '$(DESTDIR)$(datadir)/recovery.conf.sample'
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
@@ -285,7 +282,6 @@ endif
 	$(MAKE) -C tsearch uninstall-data
 # PGXC BEGIN
 	rm -f '$(DESTDIR)$(datadir)/pg_hba.conf.sample' \
-	      '$(DESTDIR)$(datadir)/pgxc.conf.sample' \
 	      '$(DESTDIR)$(datadir)/pg_ident.conf.sample' \
               '$(DESTDIR)$(datadir)/postgresql.conf.sample' \
 	      '$(DESTDIR)$(datadir)/recovery.conf.sample'
