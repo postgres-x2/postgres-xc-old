@@ -1128,12 +1128,12 @@ insert into toasttest values(decode(repeat('1234567890',10000),'escape'));
 -- If the starting position is zero or less, then return from the start of the string
 -- adjusting the length to be consistent with the "negative start" per SQL92.
 SELECT substr(f1, -1, 5) from toasttest;
- substr 
---------
- 123
- 123
- 123
- 123
+  substr  
+----------
+ \x313233
+ \x313233
+ \x313233
+ \x313233
 (4 rows)
 
 -- If the length is less than zero, an ERROR is thrown.
@@ -1142,23 +1142,23 @@ ERROR:  negative substring length not allowed
 -- If no third argument (length) is provided, the length to the end of the
 -- string is assumed.
 SELECT substr(f1, 99995) from toasttest;
- substr 
---------
- 567890
- 567890
- 567890
- 567890
+     substr     
+----------------
+ \x353637383930
+ \x353637383930
+ \x353637383930
+ \x353637383930
 (4 rows)
 
 -- If start plus length is > string length, the result is truncated to
 -- string length
 SELECT substr(f1, 99995, 10) from toasttest;
- substr 
---------
- 567890
- 567890
- 567890
- 567890
+     substr     
+----------------
+ \x353637383930
+ \x353637383930
+ \x353637383930
+ \x353637383930
 (4 rows)
 
 DROP TABLE toasttest;

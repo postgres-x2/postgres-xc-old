@@ -2257,6 +2257,9 @@ reconstruct_step_query(List *rtable, bool has_order_by, List *extra_sort,
 			appendStringInfo(buf, ", ");
 
 		appendStringInfoString(buf, exprstr);
+
+		if (tle->resname != NULL)
+			appendStringInfo(buf, " AS %s", quote_identifier(tle->resname));
 	}
 
 	/*
