@@ -17,7 +17,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/parser/parse_param.c,v 2.4 2010/02/26 02:00:52 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/parser/parse_param.c,v 2.4.4.2 2010/08/19 16:54:48 heikki Exp $
  *
  *-------------------------------------------------------------------------
  */

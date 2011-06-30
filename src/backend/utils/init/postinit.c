@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/utils/init/postinit.c,v 1.213 2010/07/06 19:18:58 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/utils/init/postinit.c,v 1.213.2.1 2010/09/13 09:00:35 heikki Exp $
  *
  *
  *-------------------------------------------------------------------------
@@ -34,9 +34,6 @@
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
 #include "pgstat.h"
-#ifdef PGXC
-#include "pgxc/pgxc.h"
-#endif
 #include "postmaster/autovacuum.h"
 #include "postmaster/postmaster.h"
 #include "replication/walsender.h"
@@ -68,6 +65,7 @@ static void CheckMyDatabase(const char *name, bool am_superuser);
 static void InitCommunication(void);
 static void ShutdownPostgres(int code, Datum arg);
 static bool ThereIsAtLeastOneRole(void);
+static void process_startup_options(Port *port, bool am_superuser);
 static void process_settings(Oid databaseid, Oid roleid);
 
 
@@ -479,7 +477,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 {
 	bool		bootstrap = IsBootstrapProcessingMode();
 	bool		am_superuser;
-	GucContext	gucctx;
 	char	   *fullpath;
 	char		dbname[NAMEDATALEN];
 
@@ -571,17 +568,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 */
 	on_shmem_exit(ShutdownPostgres, 0);
 
-#ifdef PGXC
-	/*
-	 * The transaction below consumes a xid, and we should let GTM know about
-	 * that. Session being initializing now and value from the coordinator
-	 * is not available, so try and connect to GTM directly
-	 * The check for PostmasterPid is to detect --single mode as it runs
-	 * under initdb. PostmasterPid is not set in this case
-	 */
-	if (!bootstrap && IS_PGXC_DATANODE && PostmasterPid)
-		SetForceXidFromGTM(true);
-#endif
 	/* The autovacuum launcher is done here */
 	if (IsAutoVacuumLauncherProcess())
 		return;
@@ -664,21 +650,37 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 				 errmsg("remaining connection slots are reserved for non-replication superuser connections")));
 
 	/*
-	 * If walsender, we're done here --- we don't want to connect to any
-	 * particular database.
+	 * If walsender, we don't want to connect to any particular database.
+	 * Just finish the backend startup by processing any options from the
+	 * startup packet, and we're done.
 	 */
 	if (am_walsender)
 	{
 		Assert(!bootstrap);
+
 		/* must have authenticated as a superuser */
 		if (!am_superuser)
 			ereport(FATAL,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 					 errmsg("must be superuser to start walsender")));
+
+		/* process any options passed in the startup packet */
+		if (MyProcPort != NULL)
+			process_startup_options(MyProcPort, am_superuser);
+
+		/* Apply PostAuthDelay as soon as we've read all options */
+		if (PostAuthDelay > 0)
+			pg_usleep(PostAuthDelay * 1000000L);
+
+		/* initialize client encoding */
+		InitializeClientEncoding();
+
 		/* report this backend in the PgBackendStatus array */
 		pgstat_bestart();
+
 		/* close the transaction we started above */
 		CommitTransactionCommand();
+
 		return;
 	}
 
@@ -825,63 +827,12 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		CheckMyDatabase(dbname, am_superuser);
 
 	/*
-	 * Now process any command-line switches that were included in the startup
-	 * packet, if we are in a regular backend.	We couldn't do this before
+	 * Now process any command-line switches and any additional GUC variable
+	 * settings passed in the startup packet.	We couldn't do this before
 	 * because we didn't know if client is a superuser.
 	 */
-	gucctx = am_superuser ? PGC_SUSET : PGC_BACKEND;
-
-	if (MyProcPort != NULL &&
-		MyProcPort->cmdline_options != NULL)
-	{
-		/*
-		 * The maximum possible number of commandline arguments that could
-		 * come from MyProcPort->cmdline_options is (strlen + 1) / 2; see
-		 * pg_split_opts().
-		 */
-		char	  **av;
-		int			maxac;
-		int			ac;
-
-		maxac = 2 + (strlen(MyProcPort->cmdline_options) + 1) / 2;
-
-		av = (char **) palloc(maxac * sizeof(char *));
-		ac = 0;
-
-		av[ac++] = "postgres";
-
-		/* Note this mangles MyProcPort->cmdline_options */
-		pg_split_opts(av, &ac, MyProcPort->cmdline_options);
-
-		av[ac] = NULL;
-
-		Assert(ac < maxac);
-
-		(void) process_postgres_switches(ac, av, gucctx);
-	}
-
-	/*
-	 * Process any additional GUC variable settings passed in startup packet.
-	 * These are handled exactly like command-line variables.
-	 */
 	if (MyProcPort != NULL)
-	{
-		ListCell   *gucopts = list_head(MyProcPort->guc_options);
-
-		while (gucopts)
-		{
-			char	   *name;
-			char	   *value;
-
-			name = lfirst(gucopts);
-			gucopts = lnext(gucopts);
-
-			value = lfirst(gucopts);
-			gucopts = lnext(gucopts);
-
-			SetConfigOption(name, value, gucctx, PGC_S_CLIENT);
-		}
-	}
+		process_startup_options(MyProcPort, am_superuser);
 
 	/* Process pg_db_role_setting options */
 	process_settings(MyDatabaseId, GetSessionUserId());
@@ -908,14 +859,70 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	/* close the transaction we started above */
 	if (!bootstrap)
 		CommitTransactionCommand();
+}
 
-#ifdef PGXC
+/*
+ * Process any command-line switches and any additional GUC variable
+ * settings passed in the startup packet.
+ */
+static void
+process_startup_options(Port *port, bool am_superuser)
+{
+	GucContext	gucctx;
+	ListCell   *gucopts;
+
+	gucctx = am_superuser ? PGC_SUSET : PGC_BACKEND;
+
 	/*
-	 * We changed the flag, set it back to default
+	 * First process any command-line switches that were included in the
+	 * startup packet, if we are in a regular backend.
 	 */
-	if (!bootstrap && IS_PGXC_DATANODE && PostmasterPid)
-		SetForceXidFromGTM(false);
-#endif
+	if (port->cmdline_options != NULL)
+	{
+		/*
+		 * The maximum possible number of commandline arguments that could
+		 * come from port->cmdline_options is (strlen + 1) / 2; see
+		 * pg_split_opts().
+		 */
+		char	  **av;
+		int			maxac;
+		int			ac;
+
+		maxac = 2 + (strlen(port->cmdline_options) + 1) / 2;
+
+		av = (char **) palloc(maxac * sizeof(char *));
+		ac = 0;
+
+		av[ac++] = "postgres";
+
+		/* Note this mangles port->cmdline_options */
+		pg_split_opts(av, &ac, port->cmdline_options);
+
+		av[ac] = NULL;
+
+		Assert(ac < maxac);
+
+		(void) process_postgres_switches(ac, av, gucctx);
+	}
+
+	/*
+	 * Process any additional GUC variable settings passed in startup packet.
+	 * These are handled exactly like command-line variables.
+	 */
+	gucopts = list_head(port->guc_options);
+	while (gucopts)
+	{
+		char	   *name;
+		char	   *value;
+
+		name = lfirst(gucopts);
+		gucopts = lnext(gucopts);
+
+		value = lfirst(gucopts);
+		gucopts = lnext(gucopts);
+
+		SetConfigOption(name, value, gucctx, PGC_S_CLIENT);
+	}
 }
 
 /*

@@ -116,6 +116,7 @@ extern void CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
 						 bool allow_system_table_mods);
 
 extern void CheckAttributeType(const char *attname, Oid atttypid,
+				   List *containing_rowtypes,
 				   bool allow_system_table_mods);
 
 #ifdef PGXC

@@ -16,13 +16,14 @@
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/nodes/copyfuncs.c,v 1.464 2010/02/26 02:00:43 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/nodes/copyfuncs.c,v 1.464.4.2 2010/08/18 18:35:30 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
 
 #include "postgres.h"
 
+#include "miscadmin.h"
 #include "nodes/plannodes.h"
 #include "nodes/relation.h"
 #ifdef PGXC
@@ -84,6 +85,7 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(commandType);
 	COPY_SCALAR_FIELD(hasReturning);
 	COPY_SCALAR_FIELD(canSetTag);
+	COPY_SCALAR_FIELD(transientPlan);
 	COPY_NODE_FIELD(planTree);
 	COPY_NODE_FIELD(rtable);
 	COPY_NODE_FIELD(resultRelations);
@@ -859,12 +861,10 @@ _copyPlanRowMark(PlanRowMark *from)
 
 	COPY_SCALAR_FIELD(rti);
 	COPY_SCALAR_FIELD(prti);
+	COPY_SCALAR_FIELD(rowmarkId);
 	COPY_SCALAR_FIELD(markType);
 	COPY_SCALAR_FIELD(noWait);
 	COPY_SCALAR_FIELD(isParent);
-	COPY_SCALAR_FIELD(ctidAttNo);
-	COPY_SCALAR_FIELD(toidAttNo);
-	COPY_SCALAR_FIELD(wholeAttNo);
 
 	return newnode;
 }
@@ -1900,6 +1900,7 @@ _copyPlaceHolderInfo(PlaceHolderInfo *from)
 	COPY_NODE_FIELD(ph_var);
 	COPY_BITMAPSET_FIELD(ph_eval_at);
 	COPY_BITMAPSET_FIELD(ph_needed);
+	COPY_BITMAPSET_FIELD(ph_may_need);
 	COPY_SCALAR_FIELD(ph_width);
 
 	return newnode;
@@ -3140,6 +3141,7 @@ _copyCreateSeqStmt(CreateSeqStmt *from)
 
 	COPY_NODE_FIELD(sequence);
 	COPY_NODE_FIELD(options);
+	COPY_SCALAR_FIELD(ownerId);
 
 	return newnode;
 }
@@ -3717,6 +3719,9 @@ copyObject(void *from)
 
 	if (from == NULL)
 		return NULL;
+
+	/* Guard against stack overflow due to overly complex expressions */
+	check_stack_depth();
 
 	switch (nodeTag(from))
 	{

@@ -4,7 +4,7 @@
  *	options functions
  *
  *	Copyright (c) 2010, PostgreSQL Global Development Group
- *	$PostgreSQL: pgsql/contrib/pg_upgrade/option.c,v 1.12 2010/07/06 19:18:55 momjian Exp $
+ *	$PostgreSQL: pgsql/contrib/pg_upgrade/option.c,v 1.12.2.1 2010/07/13 20:15:51 momjian Exp $
  */
 
 #include "pg_upgrade.h"
@@ -259,10 +259,6 @@ or\n"), ctx->old.port, ctx->new.port, ctx->user);
   C:\\> set NEWBINDIR=newCluster/bin\n\
   C:\\> pg_upgrade\n"));
 #endif
-	printf(_("\n\
-You may find it useful to save the preceding 5 commands in a shell script\n\
-\n\
-Report bugs to <pg-migrator-general@lists.pgfoundry.org>\n"));
 }
 
 
@@ -312,7 +308,11 @@ validateDirectoryOption(migratorContext *ctx, char **dirpath,
 static void
 get_pkglibdirs(migratorContext *ctx)
 {
-	ctx->old.libpath = get_pkglibdir(ctx, ctx->old.bindir);
+	/*
+	 * we do not need to know the libpath in the old cluster, and might not
+	 * have a working pg_config to ask for it anyway.
+	 */
+	ctx->old.libpath = NULL;
 	ctx->new.libpath = get_pkglibdir(ctx, ctx->new.bindir);
 }
 

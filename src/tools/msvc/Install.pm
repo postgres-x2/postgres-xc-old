@@ -397,7 +397,7 @@ sub CopyIncludeFiles
     my $target = shift;
 
     EnsureDirectories($target, 'include', 'include/libpq','include/internal',
-        'include/internal/libpq','include/server');
+        'include/internal/libpq','include/server', 'include/server/parser');
 
     CopyFiles(
         'Public headers',
@@ -431,18 +431,23 @@ sub CopyIncludeFiles
         $target . '/include/server/',
         'src/include/', 'pg_config.h', 'pg_config_os.h'
     );
+    CopyFiles('Grammar header', $target . '/include/server/parser/',
+	      'src/backend/parser/', 'gram.h');
     CopySetOfFiles('',[ glob("src\\include\\*.h") ],$target . '/include/server/');
     my $D;
     opendir($D, 'src/include') || croak "Could not opendir on src/include!\n";
 
+	# some xcopy progs don't like mixed slash style paths
+	(my $ctarget = $target) =~ s!/!\\!g;
     while (my $d = readdir($D))
     {
         next if ($d =~ /^\./);
+        next if ($d eq '.git');
         next if ($d eq 'CVS');
-        next unless (-d 'src/include/' . $d);
+        next unless (-d "src/include/$d");
 
-        EnsureDirectories($target . '/include/server', $d);
-        system("xcopy /s /i /q /r /y src\\include\\$d\\*.h \"$target\\include\\server\\$d\\\"")
+        EnsureDirectories("$target/include/server/$d");
+        system(qq{xcopy /s /i /q /r /y src\\include\\$d\\*.h "$ctarget\\include\\server\\$d\\"})
           && croak("Failed to copy include directory $d\n");
     }
     closedir($D);

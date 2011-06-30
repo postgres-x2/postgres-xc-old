@@ -428,6 +428,7 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
 	{
 		CheckAttributeType(NameStr(tupdesc->attrs[i]->attname),
 						   tupdesc->attrs[i]->atttypid,
+						   NIL,	/* assume we're creating a new rowtype */
 						   allow_system_table_mods);
 	}
 }
@@ -436,15 +437,24 @@ CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind,
  *		CheckAttributeType
  *
  *		Verify that the proposed datatype of an attribute is legal.
- *		This is needed because there are types (and pseudo-types)
+ *		This is needed mainly because there are types (and pseudo-types)
  *		in the catalogs that we do not support as elements of real tuples.
+ *		We also check some other properties required of a table column.
+ *
+ * If the attribute is being proposed for addition to an existing table or
+ * composite type, pass a one-element list of the rowtype OID as
+ * containing_rowtypes.  When checking a to-be-created rowtype, it's
+ * sufficient to pass NIL, because there could not be any recursive reference
+ * to a not-yet-existing rowtype.
  * --------------------------------
  */
 void
 CheckAttributeType(const char *attname, Oid atttypid,
+				   List *containing_rowtypes,
 				   bool allow_system_table_mods)
 {
 	char		att_typtype = get_typtype(atttypid);
+	Oid			att_typelem;
 
 	if (atttypid == UNKNOWNOID)
 	{
@@ -482,6 +492,20 @@ CheckAttributeType(const char *attname, Oid atttypid,
 		TupleDesc	tupdesc;
 		int			i;
 
+		/*
+		 * Check for self-containment.  Eventually we might be able to allow
+		 * this (just return without complaint, if so) but it's not clear how
+		 * many other places would require anti-recursion defenses before it
+		 * would be safe to allow tables to contain their own rowtype.
+		 */
+		if (list_member_oid(containing_rowtypes, atttypid))
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+					 errmsg("composite type %s cannot be made a member of itself",
+							format_type_be(atttypid))));
+
+		containing_rowtypes = lcons_oid(atttypid, containing_rowtypes);
+
 		relation = relation_open(get_typ_typrelid(atttypid), AccessShareLock);
 
 		tupdesc = RelationGetDescr(relation);
@@ -493,10 +517,22 @@ CheckAttributeType(const char *attname, Oid atttypid,
 			if (attr->attisdropped)
 				continue;
 			CheckAttributeType(NameStr(attr->attname), attr->atttypid,
+							   containing_rowtypes,
 							   allow_system_table_mods);
 		}
 
 		relation_close(relation, AccessShareLock);
+
+		containing_rowtypes = list_delete_first(containing_rowtypes);
+	}
+	else if (OidIsValid((att_typelem = get_element_type(atttypid))))
+	{
+		/*
+		 * Must recurse into array types, too, in case they are composite.
+		 */
+		CheckAttributeType(attname, att_typelem,
+						   containing_rowtypes,
+						   allow_system_table_mods);
 	}
 }
 
@@ -1723,14 +1759,10 @@ heap_drop_with_catalog(Oid relid)
 
 	/*
 	 * There can no longer be anyone *else* touching the relation, but we
-	 * might still have open queries or cursors in our own session.
+	 * might still have open queries or cursors, or pending trigger events,
+	 * in our own session.
 	 */
-	if (rel->rd_refcnt != 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_OBJECT_IN_USE),
-				 errmsg("cannot drop \"%s\" because "
-						"it is being used by active queries in this session",
-						RelationGetRelationName(rel))));
+	CheckTableNotInUse(rel, "DROP TABLE");
 
 	/*
 	 * Schedule unlinking of the relation's physical files at commit.
@@ -2632,7 +2664,7 @@ RelationTruncateIndexes(Relation heapRelation)
 
 		/* Initialize the index and rebuild */
 		/* Note: we do not need to re-establish pkey setting */
-		index_build(heapRelation, currentIndex, indexInfo, false);
+		index_build(heapRelation, currentIndex, indexInfo, false, true);
 
 		/* We're done with this index */
 		index_close(currentIndex, NoLock);

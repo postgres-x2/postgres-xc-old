@@ -613,7 +613,7 @@ DefineIndex(RangeVar *heapRelation,
 	indexInfo->ii_BrokenHotChain = false;
 
 	/* Now build the index */
-	index_build(rel, indexRelation, indexInfo, primary);
+	index_build(rel, indexRelation, indexInfo, primary, false);
 
 	/* Close both the relations, but keep the locks */
 	heap_close(rel, NoLock);
@@ -1663,7 +1663,7 @@ ReindexTable(RangeVar *relation)
 
 	ReleaseSysCache(tuple);
 
-	if (!reindex_relation(heapOid, true, false))
+	if (!reindex_relation(heapOid, true, 0))
 		ereport(NOTICE,
 				(errmsg("table \"%s\" has no indexes",
 						relation->relname)));
@@ -1776,7 +1776,7 @@ ReindexDatabase(const char *databaseName, bool do_system, bool do_user)
 		StartTransactionCommand();
 		/* functions in indexes may want a snapshot set */
 		PushActiveSnapshot(GetTransactionSnapshot());
-		if (reindex_relation(relid, true, false))
+		if (reindex_relation(relid, true, 0))
 			ereport(NOTICE,
 					(errmsg("table \"%s.%s\" was reindexed",
 							get_namespace_name(get_rel_namespace(relid)),

@@ -13,6 +13,8 @@
  */
 #include "postgres.h"
 
+#include <math.h>
+
 #include "access/gist_private.h"
 #include "access/reloptions.h"
 #include "storage/freespace.h"
@@ -532,16 +534,22 @@ gistpenalty(GISTSTATE *giststate, int attno,
 {
 	float		penalty = 0.0;
 
-	if (giststate->penaltyFn[attno].fn_strict == FALSE || (isNullOrig == FALSE && isNullAdd == FALSE))
+	if (giststate->penaltyFn[attno].fn_strict == FALSE ||
+		(isNullOrig == FALSE && isNullAdd == FALSE))
+	{
 		FunctionCall3(&giststate->penaltyFn[attno],
 					  PointerGetDatum(orig),
 					  PointerGetDatum(add),
 					  PointerGetDatum(&penalty));
+		/* disallow negative or NaN penalty */
+		if (isnan(penalty) || penalty < 0.0)
+			penalty = 0.0;
+	}
 	else if (isNullOrig && isNullAdd)
 		penalty = 0.0;
 	else
-		penalty = 1e10;			/* try to prevent to mix null and non-null
-								 * value */
+		penalty = 1e10;			/* try to prevent mixing null and non-null
+								 * values */
 
 	return penalty;
 }
@@ -676,4 +684,25 @@ gistoptions(PG_FUNCTION_ARGS)
 	if (result)
 		PG_RETURN_BYTEA_P(result);
 	PG_RETURN_NULL();
+}
+
+/*
+ * Temporary GiST indexes are not WAL-logged, but we need LSNs to detect
+ * concurrent page splits anyway. GetXLogRecPtrForTemp() provides a fake
+ * sequence of LSNs for that purpose. Each call generates an LSN that is
+ * greater than any previous value returned by this function in the same
+ * session.
+ */
+XLogRecPtr
+GetXLogRecPtrForTemp(void)
+{
+	static XLogRecPtr counter = {0, 1};
+
+	counter.xrecoff++;
+	if (counter.xrecoff == 0)
+	{
+		counter.xlogid++;
+		counter.xrecoff++;
+	}
+	return counter;
 }

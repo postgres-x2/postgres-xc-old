@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/nodes/outfuncs.c,v 1.385 2010/03/30 21:58:10 tgl Exp $
+ *	  $PostgreSQL: pgsql/src/backend/nodes/outfuncs.c,v 1.385.4.1 2010/08/18 15:22:00 tgl Exp $
  *
  * NOTES
  *	  Every node type that can appear in stored rules' parsetrees *must*
@@ -244,6 +244,7 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 	WRITE_ENUM_FIELD(commandType, CmdType);
 	WRITE_BOOL_FIELD(hasReturning);
 	WRITE_BOOL_FIELD(canSetTag);
+	WRITE_BOOL_FIELD(transientPlan);
 	WRITE_NODE_FIELD(planTree);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(resultRelations);
@@ -755,12 +756,10 @@ _outPlanRowMark(StringInfo str, PlanRowMark *node)
 
 	WRITE_UINT_FIELD(rti);
 	WRITE_UINT_FIELD(prti);
+	WRITE_UINT_FIELD(rowmarkId);
 	WRITE_ENUM_FIELD(markType, RowMarkType);
 	WRITE_BOOL_FIELD(noWait);
 	WRITE_BOOL_FIELD(isParent);
-	WRITE_INT_FIELD(ctidAttNo);
-	WRITE_INT_FIELD(toidAttNo);
-	WRITE_INT_FIELD(wholeAttNo);
 }
 
 static void
@@ -1530,6 +1529,7 @@ _outPlannerGlobal(StringInfo str, PlannerGlobal *node)
 	WRITE_NODE_FIELD(relationOids);
 	WRITE_NODE_FIELD(invalItems);
 	WRITE_UINT_FIELD(lastPHId);
+	WRITE_UINT_FIELD(lastRowMarkId);
 	WRITE_BOOL_FIELD(transientPlan);
 }
 
@@ -1618,10 +1618,12 @@ _outIndexOptInfo(StringInfo str, IndexOptInfo *node)
 	WRITE_UINT_FIELD(pages);
 	WRITE_FLOAT_FIELD(tuples, "%.0f");
 	WRITE_INT_FIELD(ncolumns);
+	WRITE_OID_FIELD(relam);
 	WRITE_NODE_FIELD(indexprs);
 	WRITE_NODE_FIELD(indpred);
 	WRITE_BOOL_FIELD(predOK);
 	WRITE_BOOL_FIELD(unique);
+	WRITE_BOOL_FIELD(hypothetical);
 }
 
 static void
@@ -1758,6 +1760,7 @@ _outPlaceHolderInfo(StringInfo str, PlaceHolderInfo *node)
 	WRITE_NODE_FIELD(ph_var);
 	WRITE_BITMAPSET_FIELD(ph_eval_at);
 	WRITE_BITMAPSET_FIELD(ph_needed);
+	WRITE_BITMAPSET_FIELD(ph_may_need);
 	WRITE_INT_FIELD(ph_width);
 }
 
@@ -1880,6 +1883,15 @@ _outDefElem(StringInfo str, DefElem *node)
 	WRITE_STRING_FIELD(defname);
 	WRITE_NODE_FIELD(arg);
 	WRITE_ENUM_FIELD(defaction, DefElemAction);
+}
+
+static void
+_outInhRelation(StringInfo str, InhRelation *node)
+{
+	WRITE_NODE_TYPE("INHRELATION");
+
+	WRITE_NODE_FIELD(relation);
+	WRITE_UINT_FIELD(options);
 }
 
 static void
@@ -2911,6 +2923,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_DefElem:
 				_outDefElem(str, obj);
+				break;
+			case T_InhRelation:
+				_outInhRelation(str, obj);
 				break;
 			case T_LockingClause:
 				_outLockingClause(str, obj);

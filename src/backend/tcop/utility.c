@@ -10,7 +10,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/tcop/utility.c,v 1.335 2010/02/26 02:01:04 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/tcop/utility.c,v 1.335.4.1 2010/08/18 18:35:30 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -659,7 +659,8 @@ standard_ProcessUtility(Node *parsetree,
 
 						/* Create the table itself */
 						relOid = DefineRelation((CreateStmt *) stmt,
-												RELKIND_RELATION);
+												RELKIND_RELATION,
+												InvalidOid);
 
 						/*
 						 * Let AlterTableCreateToastTable decide if this one

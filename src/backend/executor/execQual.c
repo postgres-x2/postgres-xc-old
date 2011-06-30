@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/executor/execQual.c,v 1.263 2010/02/26 02:00:41 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/executor/execQual.c,v 1.263.4.1 2010/08/26 18:54:44 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -294,7 +294,7 @@ ExecEvalArrayRef(ArrayRefExprState *astate,
 			ereport(ERROR,
 					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 					 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
-							i, MAXDIM)));
+							i + 1, MAXDIM)));
 
 		upper.indx[i++] = DatumGetInt32(ExecEvalExpr(eltstate,
 													 econtext,
@@ -322,7 +322,7 @@ ExecEvalArrayRef(ArrayRefExprState *astate,
 				ereport(ERROR,
 						(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 						 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
-								i, MAXDIM)));
+								j + 1, MAXDIM)));
 
 			lower.indx[j++] = DatumGetInt32(ExecEvalExpr(eltstate,
 														 econtext,
@@ -2133,6 +2133,16 @@ ExecMakeTableFunctionResult(ExprState *funcexpr,
 				HeapTupleHeader td;
 
 				td = DatumGetHeapTupleHeader(result);
+
+				/*
+				 * Verify all returned rows have same subtype; necessary in
+				 * case the type is RECORD.
+				 */
+				if (HeapTupleHeaderGetTypeId(td) != tupdesc->tdtypeid ||
+					HeapTupleHeaderGetTypMod(td) != tupdesc->tdtypmod)
+					ereport(ERROR,
+							(errcode(ERRCODE_DATATYPE_MISMATCH),
+							 errmsg("rows returned by function are not all of the same row type")));
 
 				/*
 				 * tuplestore_puttuple needs a HeapTuple not a bare

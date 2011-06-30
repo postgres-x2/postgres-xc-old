@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/xfunc.sgml,v 1.149 2010/05/30 18:10:40 tgl Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/xfunc.sgml,v 1.149.2.4 2010/08/06 20:09:01 petere Exp $ -->
 
  <sect1 id="xfunc">
   <title>User-Defined Functions</title>
@@ -292,6 +292,8 @@ CREATE TABLE emp (
     age         integer,
     cubicle     point
 );
+
+INSERT INTO emp VALUES ('Bill', 4200, 45, '(2,1)');
 
 CREATE FUNCTION double_salary(emp) RETURNS numeric AS $$
     SELECT $1.salary * 2 AS salary;
@@ -859,10 +861,23 @@ SELECT * FROM getfoo(1) AS t1;
      output parameters, like this:
 
 <programlisting>
+CREATE TABLE tab (y int, z int);
+INSERT INTO tab VALUES (1, 2), (3, 4), (5, 6), (7, 8);
+
 CREATE FUNCTION sum_n_product_with_tab (x int, OUT sum int, OUT product int)
-RETURNS SETOF record AS $$
+RETURNS SETOF record
+AS $$
     SELECT $1 + tab.y, $1 * tab.y FROM tab;
 $$ LANGUAGE SQL;
+
+SELECT * FROM sum_n_product_with_tab(10);
+ sum | product
+-----+---------
+  11 |      10
+  13 |      30
+  15 |      50
+  17 |      70
+(4 rows)
 </programlisting>
 
      The key point here is that you must write <literal>RETURNS SETOF record</>
@@ -1665,6 +1680,15 @@ typedef struct
      itself.
     </para>
 
+    <para>
+     Another important point is to avoid leaving any uninitialized bits
+     within data type values; for example, take care to zero out any
+     alignment padding bytes that might be present in structs.  Without
+     this, logically-equivalent constants of your data type might be
+     seen as unequal by the planner, leading to inefficient (though not
+     incorrect) plans.
+    </para>
+
     <warning>
      <para>
       <emphasis>Never</> modify the contents of a pass-by-reference input
@@ -1708,7 +1732,7 @@ typedef struct {
 char buffer[40]; /* our source data */
 ...
 text *destination = (text *) palloc(VARHDRSZ + 40);
-destination->length = VARHDRSZ + 40;
+SET_VARSIZE(destination, VARHDRSZ + 40);
 memcpy(destination->data, buffer, 40);
 ...
 ]]>
@@ -1717,6 +1741,8 @@ memcpy(destination->data, buffer, 40);
      <literal>VARHDRSZ</> is the same as <literal>sizeof(int4)</>, but
      it's considered good style to use the macro <literal>VARHDRSZ</>
      to refer to the size of the overhead for a variable-length type.
+     Also, the length field <emphasis>must</> be set using the
+     <literal>SET_VARSIZE</> macro, not by simple assignment.
     </para>
 
     <para>
@@ -2330,13 +2356,16 @@ concat_text(PG_FUNCTION_ARGS)
 
       <listitem>
        <para>
-        Always zero the bytes of your structures using
-        <function>memset</function>.  Without this, it's difficult to
+        Always zero the bytes of your structures using <function>memset</>
+        (or allocate them with <function>palloc0</> in the first place).
+        Even if you assign to each field of your structure, there might be
+        alignment padding (holes in the structure) that contain
+        garbage values.  Without this, it's difficult to
         support hash indexes or hash joins, as you must pick out only
         the significant bits of your data structure to compute a hash.
-        Even if you initialize all fields of your structure, there might be
-        alignment padding (holes in the structure) that contain
-        garbage values.
+        The planner also sometimes relies on comparing constants via
+        bitwise equality, so you can get undesirable planning results if
+        logically-equivalent values aren't bitwise equal.
        </para>
       </listitem>
 
@@ -3325,7 +3354,7 @@ CREATE FUNCTION make_array(anyelement) RETURNS anyarray
      Add-ins can reserve LWLocks and an allocation of shared memory on server
      startup.  The add-in's shared library must be preloaded by specifying
      it in
-     <xref linkend="guc-shared-preload-libraries"><indexterm><primary>shared-preload-libraries</></>.
+     <xref linkend="guc-shared-preload-libraries"><indexterm><primary>shared_preload_libraries</></>.
      Shared memory is reserved by calling:
 <programlisting>
 void RequestAddinShmemSpace(int size)
@@ -3344,22 +3373,22 @@ void RequestAddinLWLocks(int n)
      <function>AddinShmemInitLock</> when connecting to and initializing
      its allocation of shared memory, as shown here:
 <programlisting>
-        static mystruct *ptr = NULL;
+static mystruct *ptr = NULL;
 
-        if (!ptr)
+if (!ptr)
+{
+        bool    found;
+
+        LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
+        ptr = ShmemInitStruct("my struct name", size, &amp;found);
+        if (!found)
         {
-                bool    found;
-
-                LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-                ptr = ShmemInitStruct("my struct name", size, &amp;found);
-                if (!found)
-                {
-                        initialize contents of shmem area;
-                        acquire any requested LWLocks using:
-                        ptr->mylockid = LWLockAssign();
-                }
-                LWLockRelease(AddinShmemInitLock);
+                initialize contents of shmem area;
+                acquire any requested LWLocks using:
+                ptr->mylockid = LWLockAssign();
         }
+        LWLockRelease(AddinShmemInitLock);
+}
 </programlisting>
     </para>
    </sect2>

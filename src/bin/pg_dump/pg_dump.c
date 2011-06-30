@@ -25,7 +25,7 @@
  *	http://archives.postgresql.org/pgsql-bugs/2010-02/msg00187.php
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/bin/pg_dump/pg_dump.c,v 1.581 2010/07/06 19:18:59 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/bin/pg_dump/pg_dump.c,v 1.581.2.2 2010/08/13 14:38:12 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -173,7 +173,7 @@ static void dumpTSTemplate(Archive *fout, TSTemplateInfo *tmplinfo);
 static void dumpTSConfig(Archive *fout, TSConfigInfo *cfginfo);
 static void dumpForeignDataWrapper(Archive *fout, FdwInfo *fdwinfo);
 static void dumpForeignServer(Archive *fout, ForeignServerInfo *srvinfo);
-static void dumpUserMappings(Archive *fout, const char *target,
+static void dumpUserMappings(Archive *fout,
 				 const char *servername, const char *namespace,
 				 const char *owner, CatalogId catalogId, DumpId dumpId);
 static void dumpDefaultACL(Archive *fout, DefaultACLInfo *daclinfo);
@@ -479,18 +479,19 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (optind < (argc - 1))
+	/* Get database name from command line */
+	if (optind < argc)
+		dbname = argv[optind++];
+
+	/* Complain if any arguments remain */
+	if (optind < argc)
 	{
 		fprintf(stderr, _("%s: too many command-line arguments (first is \"%s\")\n"),
-				progname, argv[optind + 1]);
+				progname, argv[optind]);
 		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
 				progname);
 		exit(1);
 	}
-
-	/* Get database name from command line */
-	if (optind < argc)
-		dbname = argv[optind];
 
 	/* --column-inserts implies --inserts */
 	if (column_inserts)
@@ -3408,6 +3409,8 @@ getTables(int *numTables)
 	int			i_relhasrules;
 	int			i_relhasoids;
 	int			i_relfrozenxid;
+	int			i_toastoid;
+	int			i_toastfrozenxid;
 	int			i_owning_tab;
 	int			i_owning_col;
 #ifdef PGXC
@@ -3454,7 +3457,8 @@ getTables(int *numTables)
 						  "(%s c.relowner) AS rolname, "
 						  "c.relchecks, c.relhastriggers, "
 						  "c.relhasindex, c.relhasrules, c.relhasoids, "
-						  "c.relfrozenxid, "
+						  "c.relfrozenxid, tc.oid AS toid, "
+						  "tc.relfrozenxid AS tfrozenxid, "
 						  "CASE WHEN c.reloftype <> 0 THEN c.reloftype::pg_catalog.regtype ELSE NULL END AS reloftype, "
 						  "d.refobjid AS owning_tab, "
 						  "d.refobjsubid AS owning_col, "
@@ -3489,7 +3493,8 @@ getTables(int *numTables)
 						  "(%s c.relowner) AS rolname, "
 						  "c.relchecks, c.relhastriggers, "
 						  "c.relhasindex, c.relhasrules, c.relhasoids, "
-						  "c.relfrozenxid, "
+						  "c.relfrozenxid, tc.oid AS toid, "
+						  "tc.relfrozenxid AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "d.refobjid AS owning_tab, "
 						  "d.refobjsubid AS owning_col, "
@@ -3527,6 +3532,8 @@ getTables(int *numTables)
 						  "relchecks, (reltriggers <> 0) AS relhastriggers, "
 						  "relhasindex, relhasrules, relhasoids, "
 						  "relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "d.refobjid AS owning_tab, "
 						  "d.refobjsubid AS owning_col, "
@@ -3559,6 +3566,8 @@ getTables(int *numTables)
 						  "relchecks, (reltriggers <> 0) AS relhastriggers, "
 						  "relhasindex, relhasrules, relhasoids, "
 						  "0 AS relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "d.refobjid AS owning_tab, "
 						  "d.refobjsubid AS owning_col, "
@@ -3591,6 +3600,8 @@ getTables(int *numTables)
 						  "relchecks, (reltriggers <> 0) AS relhastriggers, "
 						  "relhasindex, relhasrules, relhasoids, "
 						  "0 AS relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "d.refobjid AS owning_tab, "
 						  "d.refobjsubid AS owning_col, "
@@ -3619,6 +3630,8 @@ getTables(int *numTables)
 						  "relchecks, (reltriggers <> 0) AS relhastriggers, "
 						  "relhasindex, relhasrules, relhasoids, "
 						  "0 AS relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "NULL::oid AS owning_tab, "
 						  "NULL::int4 AS owning_col, "
@@ -3642,6 +3655,8 @@ getTables(int *numTables)
 						  "relhasindex, relhasrules, "
 						  "'t'::bool AS relhasoids, "
 						  "0 AS relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "NULL::oid AS owning_tab, "
 						  "NULL::int4 AS owning_col, "
@@ -3675,6 +3690,8 @@ getTables(int *numTables)
 						  "relhasindex, relhasrules, "
 						  "'t'::bool AS relhasoids, "
 						  "0 as relfrozenxid, "
+						  "0 AS toid, "
+						  "0 AS tfrozenxid, "
 						  "NULL AS reloftype, "
 						  "NULL::oid AS owning_tab, "
 						  "NULL::int4 AS owning_col, "
@@ -3720,6 +3737,8 @@ getTables(int *numTables)
 	i_relhasrules = PQfnumber(res, "relhasrules");
 	i_relhasoids = PQfnumber(res, "relhasoids");
 	i_relfrozenxid = PQfnumber(res, "relfrozenxid");
+	i_toastoid = PQfnumber(res, "toid");
+	i_toastfrozenxid = PQfnumber(res, "tfrozenxid");
 	i_owning_tab = PQfnumber(res, "owning_tab");
 	i_owning_col = PQfnumber(res, "owning_col");
 #ifdef PGXC
@@ -3763,6 +3782,8 @@ getTables(int *numTables)
 		tblinfo[i].hastriggers = (strcmp(PQgetvalue(res, i, i_relhastriggers), "t") == 0);
 		tblinfo[i].hasoids = (strcmp(PQgetvalue(res, i, i_relhasoids), "t") == 0);
 		tblinfo[i].frozenxid = atooid(PQgetvalue(res, i, i_relfrozenxid));
+		tblinfo[i].toast_oid = atooid(PQgetvalue(res, i, i_toastoid));
+		tblinfo[i].toast_frozenxid = atooid(PQgetvalue(res, i, i_toastfrozenxid));
 		if (PQgetisnull(res, i, i_reloftype))
 			tblinfo[i].reloftype = NULL;
 		else
@@ -5869,6 +5890,7 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 	int			i;
 	PQExpBuffer query = createPQExpBuffer();
 	FdwInfo    *fdwinfo;
+	int			i_tableoid;
 	int			i_oid;
 	int			i_fdwname;
 	int			i_rolname;
@@ -5886,7 +5908,7 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 	/* Make sure we are in proper schema */
 	selectSourceSchema("pg_catalog");
 
-	appendPQExpBuffer(query, "SELECT oid, fdwname, "
+	appendPQExpBuffer(query, "SELECT tableoid, oid, fdwname, "
 		"(%s fdwowner) AS rolname, fdwvalidator::pg_catalog.regproc, fdwacl,"
 					  "array_to_string(ARRAY("
 		 "		SELECT option_name || ' ' || quote_literal(option_value) "
@@ -5902,6 +5924,7 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 
 	fdwinfo = (FdwInfo *) malloc(ntups * sizeof(FdwInfo));
 
+	i_tableoid = PQfnumber(res, "tableoid");
 	i_oid = PQfnumber(res, "oid");
 	i_fdwname = PQfnumber(res, "fdwname");
 	i_rolname = PQfnumber(res, "rolname");
@@ -5912,6 +5935,7 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 	for (i = 0; i < ntups; i++)
 	{
 		fdwinfo[i].dobj.objType = DO_FDW;
+		fdwinfo[i].dobj.catId.tableoid = atooid(PQgetvalue(res, i, i_tableoid));
 		fdwinfo[i].dobj.catId.oid = atooid(PQgetvalue(res, i, i_oid));
 		AssignDumpId(&fdwinfo[i].dobj);
 		fdwinfo[i].dobj.name = strdup(PQgetvalue(res, i, i_fdwname));
@@ -5948,6 +5972,7 @@ getForeignServers(int *numForeignServers)
 	int			i;
 	PQExpBuffer query = createPQExpBuffer();
 	ForeignServerInfo *srvinfo;
+	int			i_tableoid;
 	int			i_oid;
 	int			i_srvname;
 	int			i_rolname;
@@ -5967,7 +5992,7 @@ getForeignServers(int *numForeignServers)
 	/* Make sure we are in proper schema */
 	selectSourceSchema("pg_catalog");
 
-	appendPQExpBuffer(query, "SELECT oid, srvname, "
+	appendPQExpBuffer(query, "SELECT tableoid, oid, srvname, "
 					  "(%s srvowner) AS rolname, "
 					  "srvfdw, srvtype, srvversion, srvacl,"
 					  "array_to_string(ARRAY("
@@ -5984,6 +6009,7 @@ getForeignServers(int *numForeignServers)
 
 	srvinfo = (ForeignServerInfo *) malloc(ntups * sizeof(ForeignServerInfo));
 
+	i_tableoid = PQfnumber(res, "tableoid");
 	i_oid = PQfnumber(res, "oid");
 	i_srvname = PQfnumber(res, "srvname");
 	i_rolname = PQfnumber(res, "rolname");
@@ -5996,6 +6022,7 @@ getForeignServers(int *numForeignServers)
 	for (i = 0; i < ntups; i++)
 	{
 		srvinfo[i].dobj.objType = DO_FOREIGN_SERVER;
+		srvinfo[i].dobj.catId.tableoid = atooid(PQgetvalue(res, i, i_tableoid));
 		srvinfo[i].dobj.catId.oid = atooid(PQgetvalue(res, i, i_oid));
 		AssignDumpId(&srvinfo[i].dobj);
 		srvinfo[i].dobj.name = strdup(PQgetvalue(res, i, i_srvname));
@@ -10165,6 +10192,7 @@ dumpForeignServer(Archive *fout, ForeignServerInfo *srvinfo)
 	query = createPQExpBuffer();
 
 	/* look up the foreign-data wrapper */
+	selectSourceSchema("pg_catalog");
 	appendPQExpBuffer(query, "SELECT fdwname "
 					  "FROM pg_foreign_data_wrapper w "
 					  "WHERE w.oid = '%u'",
@@ -10225,9 +10253,7 @@ dumpForeignServer(Archive *fout, ForeignServerInfo *srvinfo)
 	free(namecopy);
 
 	/* Dump user mappings */
-	resetPQExpBuffer(q);
-	appendPQExpBuffer(q, "SERVER %s", fmtId(srvinfo->dobj.name));
-	dumpUserMappings(fout, q->data,
+	dumpUserMappings(fout,
 					 srvinfo->dobj.name, NULL,
 					 srvinfo->rolname,
 					 srvinfo->dobj.catId, srvinfo->dobj.dumpId);
@@ -10244,7 +10270,7 @@ dumpForeignServer(Archive *fout, ForeignServerInfo *srvinfo)
  * for the server.
  */
 static void
-dumpUserMappings(Archive *fout, const char *target,
+dumpUserMappings(Archive *fout,
 				 const char *servername, const char *namespace,
 				 const char *owner,
 				 CatalogId catalogId, DumpId dumpId)
@@ -10255,7 +10281,7 @@ dumpUserMappings(Archive *fout, const char *target,
 	PQExpBuffer tag;
 	PGresult   *res;
 	int			ntups;
-	int			i_umuser;
+	int			i_usename;
 	int			i_umoptions;
 	int			i;
 
@@ -10264,31 +10290,40 @@ dumpUserMappings(Archive *fout, const char *target,
 	delq = createPQExpBuffer();
 	query = createPQExpBuffer();
 
+	/*
+	 * We read from the publicly accessible view pg_user_mappings, so as not
+	 * to fail if run by a non-superuser.  Note that the view will show
+	 * umoptions as null if the user hasn't got privileges for the associated
+	 * server; this means that pg_dump will dump such a mapping, but with no
+	 * OPTIONS clause.  A possible alternative is to skip such mappings
+	 * altogether, but it's not clear that that's an improvement.
+	 */
+	selectSourceSchema("pg_catalog");
+
 	appendPQExpBuffer(query,
-					  "SELECT (%s umuser) AS umuser, "
+					  "SELECT usename, "
 					  "array_to_string(ARRAY(SELECT option_name || ' ' || quote_literal(option_value) FROM pg_options_to_table(umoptions)), ', ') AS umoptions\n"
-					  "FROM pg_user_mapping "
-					  "WHERE umserver=%u",
-					  username_subquery,
+					  "FROM pg_user_mappings "
+					  "WHERE srvid = %u",
 					  catalogId.oid);
 
 	res = PQexec(g_conn, query->data);
 	check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
 
 	ntups = PQntuples(res);
-	i_umuser = PQfnumber(res, "umuser");
+	i_usename = PQfnumber(res, "usename");
 	i_umoptions = PQfnumber(res, "umoptions");
 
 	for (i = 0; i < ntups; i++)
 	{
-		char	   *umuser;
+		char	   *usename;
 		char	   *umoptions;
 
-		umuser = PQgetvalue(res, i, i_umuser);
+		usename = PQgetvalue(res, i, i_usename);
 		umoptions = PQgetvalue(res, i, i_umoptions);
 
 		resetPQExpBuffer(q);
-		appendPQExpBuffer(q, "CREATE USER MAPPING FOR %s", fmtId(umuser));
+		appendPQExpBuffer(q, "CREATE USER MAPPING FOR %s", fmtId(usename));
 		appendPQExpBuffer(q, " SERVER %s", fmtId(servername));
 
 		if (umoptions && strlen(umoptions) > 0)
@@ -10297,10 +10332,12 @@ dumpUserMappings(Archive *fout, const char *target,
 		appendPQExpBuffer(q, ";\n");
 
 		resetPQExpBuffer(delq);
-		appendPQExpBuffer(delq, "DROP USER MAPPING FOR %s SERVER %s;\n", fmtId(umuser), fmtId(servername));
+		appendPQExpBuffer(delq, "DROP USER MAPPING FOR %s", fmtId(usename));
+		appendPQExpBuffer(delq, " SERVER %s;\n", fmtId(servername));
 
 		resetPQExpBuffer(tag);
-		appendPQExpBuffer(tag, "USER MAPPING %s %s", fmtId(umuser), target);
+		appendPQExpBuffer(tag, "USER MAPPING %s SERVER %s",
+						  usename, servername);
 
 		ArchiveEntry(fout, nilCatalogId, createDumpId(),
 					 tag->data,
@@ -10892,13 +10929,23 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 				}
 			}
 
-			appendPQExpBuffer(q, "\n-- For binary upgrade, set relfrozenxid.\n");
+			appendPQExpBuffer(q, "\n-- For binary upgrade, set heap's relfrozenxid\n");
 			appendPQExpBuffer(q, "UPDATE pg_catalog.pg_class\n"
 							  "SET relfrozenxid = '%u'\n"
 							  "WHERE oid = ",
 							  tbinfo->frozenxid);
 			appendStringLiteralAH(q, fmtId(tbinfo->dobj.name), fout);
 			appendPQExpBuffer(q, "::pg_catalog.regclass;\n");
+
+			if (tbinfo->toast_oid)
+			{
+				/* We preserve the toast oids, so we can use it during restore */
+				appendPQExpBuffer(q, "\n-- For binary upgrade, set toast's relfrozenxid\n");
+				appendPQExpBuffer(q, "UPDATE pg_catalog.pg_class\n"
+								  "SET relfrozenxid = '%u'\n"
+								  "WHERE oid = '%u';\n",
+								  tbinfo->toast_frozenxid, tbinfo->toast_oid);
+			}
 		}
 
 		/* Loop dumping statistics and storage statements */

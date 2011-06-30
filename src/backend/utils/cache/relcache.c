@@ -9,7 +9,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/utils/cache/relcache.c,v 1.311 2010/07/06 19:18:58 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/utils/cache/relcache.c,v 1.311.2.1 2010/09/02 03:16:52 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -81,7 +81,6 @@
 #include "utils/resowner.h"
 #include "utils/syscache.h"
 #include "utils/tqual.h"
-#include "utils/typcache.h"
 
 
 /*
@@ -1699,6 +1698,12 @@ RelationClose(Relation relation)
  *	We assume that at the time we are called, we have at least AccessShareLock
  *	on the target index.  (Note: in the calls from RelationClearRelation,
  *	this is legitimate because we know the rel has positive refcount.)
+ *
+ *	If the target index is an index on pg_class or pg_index, we'd better have
+ *	previously gotten at least AccessShareLock on its underlying catalog,
+ *	else we are at risk of deadlock against someone trying to exclusive-lock
+ *	the heap and index in that order.  This is ensured in current usage by
+ *	only applying this to indexes being opened or having positive refcount.
  */
 static void
 RelationReloadIndexInfo(Relation relation)
@@ -1852,8 +1857,6 @@ RelationDestroyRelation(Relation relation)
 static void
 RelationClearRelation(Relation relation, bool rebuild)
 {
-	Oid			old_reltype = relation->rd_rel->reltype;
-
 	/*
 	 * As per notes above, a rel to be rebuilt MUST have refcnt > 0; while of
 	 * course it would be a bad idea to blow away one with nonzero refcnt.
@@ -1923,9 +1926,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 	 */
 	if (!rebuild)
 	{
-		/* Flush any rowtype cache entry */
-		flush_rowtype_cache(old_reltype);
-
 		/* Remove it from the hash table */
 		RelationCacheDelete(relation);
 
@@ -1973,7 +1973,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 		if (newrel == NULL)
 		{
 			/* Should only get here if relation was deleted */
-			flush_rowtype_cache(old_reltype);
 			RelationCacheDelete(relation);
 			RelationDestroyRelation(relation);
 			elog(ERROR, "relation %u deleted while still in use", save_relid);
@@ -1981,8 +1980,6 @@ RelationClearRelation(Relation relation, bool rebuild)
 
 		keep_tupdesc = equalTupleDescs(relation->rd_att, newrel->rd_att);
 		keep_rules = equalRuleLocks(relation->rd_rules, newrel->rd_rules);
-		if (!keep_tupdesc)
-			flush_rowtype_cache(old_reltype);
 
 		/*
 		 * Perform swapping of the relcache entry contents.  Within this
@@ -3652,6 +3649,10 @@ RelationGetIndexPredicate(Relation relation)
  *
  * Attribute numbers are offset by FirstLowInvalidHeapAttributeNumber so that
  * we can include system attributes (e.g., OID) in the bitmap representation.
+ *
+ * Caller had better hold at least RowExclusiveLock on the target relation
+ * to ensure that it has a stable set of indexes.  This also makes it safe
+ * (deadlock-free) for us to take locks on the relation's indexes.
  *
  * The returned result is palloc'd in the caller's memory context and should
  * be bms_free'd when not needed anymore.

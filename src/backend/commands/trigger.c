@@ -7,7 +7,7 @@
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/commands/trigger.c,v 1.262 2010/02/26 02:00:39 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/commands/trigger.c,v 1.262.4.1 2010/08/19 15:46:24 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -2172,18 +2172,19 @@ ExecASUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 							  GetModifiedColumns(relinfo, estate));
 }
 
-HeapTuple
+TupleTableSlot *
 ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 					 ResultRelInfo *relinfo,
-					 ItemPointer tupleid, HeapTuple newtuple)
+					 ItemPointer tupleid, TupleTableSlot *slot)
 {
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
 	int			ntrigs = trigdesc->n_before_row[TRIGGER_EVENT_UPDATE];
 	int		   *tgindx = trigdesc->tg_before_row[TRIGGER_EVENT_UPDATE];
+	HeapTuple	slottuple = ExecMaterializeSlot(slot);
+	HeapTuple	newtuple = slottuple;
 	TriggerData LocTriggerData;
 	HeapTuple	trigtuple;
 	HeapTuple	oldtuple;
-	HeapTuple	intuple = newtuple;
 	TupleTableSlot *newSlot;
 	int			i;
 	Bitmapset  *modifiedCols;
@@ -2194,12 +2195,22 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 		return NULL;
 
 	/*
-	 * In READ COMMITTED isolation level it's possible that newtuple was
+	 * In READ COMMITTED isolation level it's possible that target tuple was
 	 * changed due to concurrent update.  In that case we have a raw subplan
-	 * output tuple and need to run it through the junk filter.
+	 * output tuple in newSlot, and need to run it through the junk filter to
+	 * produce an insertable tuple.
+	 *
+	 * Caution: more than likely, the passed-in slot is the same as the
+	 * junkfilter's output slot, so we are clobbering the original value of
+	 * slottuple by doing the filtering.  This is OK since neither we nor our
+	 * caller have any more interest in the prior contents of that slot.
 	 */
 	if (newSlot != NULL)
-		intuple = newtuple = ExecRemoveJunk(relinfo->ri_junkFilter, newSlot);
+	{
+		slot = ExecFilterJunk(relinfo->ri_junkFilter, newSlot);
+		slottuple = ExecMaterializeSlot(slot);
+		newtuple = slottuple;
+	}
 
 	modifiedCols = GetModifiedColumns(relinfo, estate);
 
@@ -2226,13 +2237,33 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 									   relinfo->ri_TrigFunctions,
 									   relinfo->ri_TrigInstrument,
 									   GetPerTupleMemoryContext(estate));
-		if (oldtuple != newtuple && oldtuple != intuple)
+		if (oldtuple != newtuple && oldtuple != slottuple)
 			heap_freetuple(oldtuple);
 		if (newtuple == NULL)
-			break;
+		{
+			heap_freetuple(trigtuple);
+			return NULL;		/* "do nothing" */
+		}
 	}
 	heap_freetuple(trigtuple);
-	return newtuple;
+
+	if (newtuple != slottuple)
+	{
+		/*
+		 * Return the modified tuple using the es_trig_tuple_slot.  We assume
+		 * the tuple was allocated in per-tuple memory context, and therefore
+		 * will go away by itself. The tuple table slot should not try to
+		 * clear it.
+		 */
+		TupleTableSlot *newslot = estate->es_trig_tuple_slot;
+		TupleDesc	tupdesc = RelationGetDescr(relinfo->ri_RelationDesc);
+
+		if (newslot->tts_tupleDescriptor != tupdesc)
+			ExecSetSlotDescriptor(newslot, tupdesc);
+		ExecStoreTuple(newtuple, newslot, InvalidBuffer, false);
+		slot = newslot;
+	}
+	return slot;
 }
 
 void
@@ -2928,6 +2959,7 @@ afterTriggerAddEvent(AfterTriggerEventList *events,
 		else
 			events->tail->next = chunk;
 		events->tail = chunk;
+		/* events->tailfree is now out of sync, but we'll fix it below */
 	}
 
 	/*
@@ -3329,6 +3361,15 @@ afterTriggerInvokeEvents(AfterTriggerEventList *events,
 		{
 			chunk->freeptr = CHUNK_DATA_START(chunk);
 			chunk->endfree = chunk->endptr;
+
+			/*
+			 * If it's last chunk, must sync event list's tailfree too.  Note
+			 * that delete_ok must NOT be passed as true if there could be
+			 * stacked AfterTriggerEventList values pointing at this event
+			 * list, since we'd fail to fix their copies of tailfree.
+			 */
+			if (chunk == events->tail)
+				events->tailfree = chunk->freeptr;
 		}
 	}
 

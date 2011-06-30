@@ -885,6 +885,14 @@ SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NUL
 ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
                              ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
+                             ^
 DROP INDEX onek_nulltest;
 ERROR:  index "onek_nulltest" does not exist
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2 desc,unique1);
@@ -902,6 +910,14 @@ ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
                              ^
 SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
                              ^
@@ -925,6 +941,14 @@ SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NUL
 ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
                              ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
+                             ^
 DROP INDEX onek_nulltest;
 ERROR:  index "onek_nulltest" does not exist
 CREATE UNIQUE INDEX onek_nulltest ON onek_with_null (unique2  nulls first,unique1);
@@ -942,6 +966,14 @@ ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
                              ^
 SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique2 IS NOT NULL;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NULL AND unique1 > 500;
+ERROR:  relation "onek_with_null" does not exist
+LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NOT NUL...
+                             ^
+SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AND unique1 > 500;
 ERROR:  relation "onek_with_null" does not exist
 LINE 1: SELECT count(*) FROM onek_with_null WHERE unique1 IS NULL AN...
                              ^

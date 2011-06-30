@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/utils/adt/arrayfuncs.c,v 1.164 2010/02/26 02:01:07 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/utils/adt/arrayfuncs.c,v 1.164.4.2 2010/08/21 16:55:58 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -50,6 +50,7 @@ typedef enum
 	ARRAY_LEVEL_DELIMITED
 } ArrayParseState;
 
+static bool array_isspace(char ch);
 static int	ArrayCount(const char *str, int *dim, char typdelim);
 static void ReadArrayStr(char *arrayStr, const char *origStr,
 			 int nitems, int ndim, int *dim,
@@ -192,7 +193,7 @@ array_in(PG_FUNCTION_ARGS)
 		 * Note: we currently allow whitespace between, but not within,
 		 * dimension items.
 		 */
-		while (isspace((unsigned char) *p))
+		while (array_isspace(*p))
 			p++;
 		if (*p != '[')
 			break;				/* no more dimension items */
@@ -201,7 +202,7 @@ array_in(PG_FUNCTION_ARGS)
 			ereport(ERROR,
 					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 					 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
-							ndim, MAXDIM)));
+							ndim + 1, MAXDIM)));
 
 		for (q = p; isdigit((unsigned char) *q) || (*q == '-') || (*q == '+'); q++);
 		if (q == p)				/* no digits? */
@@ -265,7 +266,7 @@ array_in(PG_FUNCTION_ARGS)
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("missing assignment operator")));
 		p += strlen(ASSGN);
-		while (isspace((unsigned char) *p))
+		while (array_isspace(*p))
 			p++;
 
 		/*
@@ -348,6 +349,27 @@ array_in(PG_FUNCTION_ARGS)
 	pfree(string_save);
 
 	PG_RETURN_ARRAYTYPE_P(retval);
+}
+
+/*
+ * array_isspace() --- a non-locale-dependent isspace()
+ *
+ * We used to use isspace() for parsing array values, but that has
+ * undesirable results: an array value might be silently interpreted
+ * differently depending on the locale setting.  Now we just hard-wire
+ * the traditional ASCII definition of isspace().
+ */
+static bool
+array_isspace(char ch)
+{
+	if (ch == ' ' ||
+		ch == '\t' ||
+		ch == '\n' ||
+		ch == '\r' ||
+		ch == '\v' ||
+		ch == '\f')
+		return true;
+	return false;
 }
 
 /*
@@ -459,7 +481,7 @@ ArrayCount(const char *str, int *dim, char typdelim)
 							ereport(ERROR,
 									(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 									 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
-											nest_level, MAXDIM)));
+											nest_level + 1, MAXDIM)));
 						temp[nest_level] = 0;
 						nest_level++;
 						if (ndim < nest_level)
@@ -534,7 +556,7 @@ ArrayCount(const char *str, int *dim, char typdelim)
 							itemdone = true;
 							nelems[nest_level - 1]++;
 						}
-						else if (!isspace((unsigned char) *ptr))
+						else if (!array_isspace(*ptr))
 						{
 							/*
 							 * Other non-space characters must be after a
@@ -563,7 +585,7 @@ ArrayCount(const char *str, int *dim, char typdelim)
 	/* only whitespace is allowed after the closing brace */
 	while (*ptr)
 	{
-		if (!isspace((unsigned char) *ptr++))
+		if (!array_isspace(*ptr++))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 					 errmsg("malformed array literal: \"%s\"", str)));
@@ -756,7 +778,7 @@ ReadArrayStr(char *arrayStr,
 						indx[ndim - 1]++;
 						srcptr++;
 					}
-					else if (isspace((unsigned char) *srcptr))
+					else if (array_isspace(*srcptr))
 					{
 						/*
 						 * If leading space, drop it immediately.  Else, copy
@@ -1044,7 +1066,7 @@ array_out(PG_FUNCTION_ARGS)
 					overall_length += 1;
 				}
 				else if (ch == '{' || ch == '}' || ch == typdelim ||
-						 isspace((unsigned char) ch))
+						 array_isspace(ch))
 					needquote = true;
 			}
 		}
@@ -1213,17 +1235,21 @@ array_recv(PG_FUNCTION_ARGS)
 
 	for (i = 0; i < ndim; i++)
 	{
-		int			ub;
-
 		dim[i] = pq_getmsgint(buf, 4);
 		lBound[i] = pq_getmsgint(buf, 4);
 
-		ub = lBound[i] + dim[i] - 1;
-		/* overflow? */
-		if (lBound[i] > ub)
-			ereport(ERROR,
-					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-					 errmsg("integer out of range")));
+		/*
+		 * Check overflow of upper bound. (ArrayNItems() below checks that
+		 * dim[i] >= 0)
+		 */
+		if (dim[i] != 0)
+		{
+			int ub = lBound[i] + dim[i] - 1;
+			if (lBound[i] > ub)
+				ereport(ERROR,
+						(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+						 errmsg("integer out of range")));
+		}
 	}
 
 	/* This checks for overflow of array dimensions */
@@ -1288,7 +1314,7 @@ array_recv(PG_FUNCTION_ARGS)
 		dataoffset = 0;			/* marker for no null bitmap */
 		nbytes += ARR_OVERHEAD_NONULLS(ndim);
 	}
-	retval = (ArrayType *) palloc(nbytes);
+	retval = (ArrayType *) palloc0(nbytes);
 	SET_VARSIZE(retval, nbytes);
 	retval->ndim = ndim;
 	retval->dataoffset = dataoffset;
@@ -1926,7 +1952,7 @@ array_get_slice(ArrayType *array,
 		bytes += ARR_OVERHEAD_NONULLS(ndim);
 	}
 
-	newarray = (ArrayType *) palloc(bytes);
+	newarray = (ArrayType *) palloc0(bytes);
 	SET_VARSIZE(newarray, bytes);
 	newarray->ndim = ndim;
 	newarray->dataoffset = dataoffset;
@@ -2179,7 +2205,7 @@ array_set(ArrayType *array,
 	/*
 	 * OK, create the new array and fill in header/dimensions
 	 */
-	newarray = (ArrayType *) palloc(newsize);
+	newarray = (ArrayType *) palloc0(newsize);
 	SET_VARSIZE(newarray, newsize);
 	newarray->ndim = ndim;
 	newarray->dataoffset = newhasnulls ? overheadlen : 0;
@@ -2474,6 +2500,7 @@ array_set_slice(ArrayType *array,
 	{
 		/*
 		 * here we must allow for possibility of slice larger than orig array
+		 * and/or not adjacent to orig array subscripts
 		 */
 		int			oldlb = ARR_LBOUND(array)[0];
 		int			oldub = oldlb + ARR_DIMS(array)[0] - 1;
@@ -2482,10 +2509,12 @@ array_set_slice(ArrayType *array,
 		char	   *oldarraydata = ARR_DATA_PTR(array);
 		bits8	   *oldarraybitmap = ARR_NULLBITMAP(array);
 
+		/* count/size of old array entries that will go before the slice */
 		itemsbefore = Min(slicelb, oldub + 1) - oldlb;
 		lenbefore = array_nelems_size(oldarraydata, 0, oldarraybitmap,
 									  itemsbefore,
 									  elmlen, elmbyval, elmalign);
+		/* count/size of old array entries that will be replaced by slice */
 		if (slicelb > sliceub)
 		{
 			nolditems = 0;
@@ -2499,13 +2528,14 @@ array_set_slice(ArrayType *array,
 											nolditems,
 											elmlen, elmbyval, elmalign);
 		}
-		itemsafter = oldub - sliceub;
+		/* count/size of old array entries that will go after the slice */
+		itemsafter = oldub + 1 - Max(sliceub + 1, oldlb);
 		lenafter = olddatasize - lenbefore - olditemsize;
 	}
 
 	newsize = overheadlen + olddatasize - olditemsize + newitemsize;
 
-	newarray = (ArrayType *) palloc(newsize);
+	newarray = (ArrayType *) palloc0(newsize);
 	SET_VARSIZE(newarray, newsize);
 	newarray->ndim = ndim;
 	newarray->dataoffset = newhasnulls ? overheadlen : 0;
@@ -2764,7 +2794,7 @@ array_map(FunctionCallInfo fcinfo, Oid inpType, Oid retType,
 		dataoffset = 0;			/* marker for no null bitmap */
 		nbytes += ARR_OVERHEAD_NONULLS(ndim);
 	}
-	result = (ArrayType *) palloc(nbytes);
+	result = (ArrayType *) palloc0(nbytes);
 	SET_VARSIZE(result, nbytes);
 	result->ndim = ndim;
 	result->dataoffset = dataoffset;
@@ -2900,7 +2930,7 @@ construct_md_array(Datum *elems,
 		dataoffset = 0;			/* marker for no null bitmap */
 		nbytes += ARR_OVERHEAD_NONULLS(ndims);
 	}
-	result = (ArrayType *) palloc(nbytes);
+	result = (ArrayType *) palloc0(nbytes);
 	SET_VARSIZE(result, nbytes);
 	result->ndim = ndims;
 	result->dataoffset = dataoffset;
@@ -2924,7 +2954,7 @@ construct_empty_array(Oid elmtype)
 {
 	ArrayType  *result;
 
-	result = (ArrayType *) palloc(sizeof(ArrayType));
+	result = (ArrayType *) palloc0(sizeof(ArrayType));
 	SET_VARSIZE(result, sizeof(ArrayType));
 	result->ndim = 0;
 	result->dataoffset = 0;

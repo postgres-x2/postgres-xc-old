@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/monitoring.sgml,v 1.80 2010/04/26 19:56:55 tgl Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/monitoring.sgml,v 1.80.2.3 2010/09/09 00:48:29 momjian Exp $ -->
 
 <chapter id="monitoring">
  <title>Monitoring Database Activity</title>
@@ -682,7 +682,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
 
      <row>
        <!-- See also the entry for this in func.sgml -->
-      <entry><literal><function>pg_backend_pid</function>()</literal></entry>
+      <entry><literal><function>pg_backend_pid()</function></literal></entry>
       <entry><type>integer</type></entry>
       <entry>
        Process ID of the server process attached to the current session
@@ -693,7 +693,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
       <entry><literal><function>pg_stat_get_activity</function>(<type>integer</type>)</literal></entry>
       <entry><type>setof record</type></entry>
       <entry>
-       Returns a record of information about the backend with the specified pid, or
+       Returns a record of information about the backend with the specified PID, or
        one record for each active backend in the system if <symbol>NULL</symbol> is
        specified. The fields returned are a subset of those in the
        <structname>pg_stat_activity</structname> view.
@@ -727,7 +727,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_backend_idset</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_backend_idset()</function></literal></entry>
       <entry><type>setof integer</type></entry>
       <entry>
        Set of currently active server process numbers (from 1 to the
@@ -838,7 +838,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_bgwriter_timed_checkpoints</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_bgwriter_timed_checkpoints()</function></literal></entry>
        <entry><type>bigint</type></entry>
        <entry>
         Number of times the background writer has started timed checkpoints
@@ -847,7 +847,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_bgwriter_requested_checkpoints</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_bgwriter_requested_checkpoints()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Number of times the background writer has started checkpoints based
@@ -858,7 +858,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_bgwriter_buf_written_checkpoints</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_bgwriter_buf_written_checkpoints()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Number of buffers written by the background writer during checkpoints
@@ -866,7 +866,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_bgwriter_buf_written_clean</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_bgwriter_buf_written_clean()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Number of buffers written by the background writer for routine cleaning of
@@ -875,7 +875,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_bgwriter_maxwritten_clean</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_bgwriter_maxwritten_clean()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Number of times the background writer has stopped its cleaning scan because
@@ -885,7 +885,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_buf_written_backend</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_buf_written_backend()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Number of buffers written by backends because they needed
@@ -894,7 +894,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_get_buf_alloc</function>()</literal></entry>
+      <entry><literal><function>pg_stat_get_buf_alloc()</function></literal></entry>
       <entry><type>bigint</type></entry>
       <entry>
        Total number of buffer allocations
@@ -902,7 +902,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_clear_snapshot</function>()</literal></entry>
+      <entry><literal><function>pg_stat_clear_snapshot()</function></literal></entry>
       <entry><type>void</type></entry>
       <entry>
        Discard the current statistics snapshot
@@ -910,7 +910,7 @@ postgres: <replaceable>user</> <replaceable>database</> <replaceable>host</> <re
      </row>
 
      <row>
-      <entry><literal><function>pg_stat_reset</function>()</literal></entry>
+      <entry><literal><function>pg_stat_reset()</function></literal></entry>
       <entry><type>void</type></entry>
       <entry>
        Reset all statistics counters for the current database to zero
@@ -1680,7 +1680,7 @@ Total time (ns)                        2312105013
     <para>
      Add the probe definition to <filename>src/backend/utils/probes.d</>:
 <programlisting>
-      probe transaction__start(LocalTransactionId);
+probe transaction__start(LocalTransactionId);
 </programlisting>
      Note the use of the double underline in the probe name. In a DTrace
      script using the probe, the double underline needs to be replaced with a
@@ -1698,7 +1698,7 @@ Total time (ns)                        2312105013
      in the source code.  In this case, it looks like the following:
 
 <programlisting>
-    TRACE_POSTGRESQL_TRANSACTION_START(vxid.localTransactionId);
+TRACE_POSTGRESQL_TRANSACTION_START(vxid.localTransactionId);
 </programlisting>
     </para>
    </step>
@@ -1748,8 +1748,8 @@ Total time (ns)                        2312105013
       is actually enabled:
 
 <programlisting>
-    if (TRACE_POSTGRESQL_TRANSACTION_START_ENABLED())
-        TRACE_POSTGRESQL_TRANSACTION_START(some_function(...));
+if (TRACE_POSTGRESQL_TRANSACTION_START_ENABLED())
+    TRACE_POSTGRESQL_TRANSACTION_START(some_function(...));
 </programlisting>
 
       Each trace macro has a corresponding <literal>ENABLED</> macro.

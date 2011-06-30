@@ -59,7 +59,8 @@ extern void FormIndexDatum(IndexInfo *indexInfo,
 extern void index_build(Relation heapRelation,
 			Relation indexRelation,
 			IndexInfo *indexInfo,
-			bool isprimary);
+			bool isprimary,
+			bool isreindex);
 
 extern double IndexBuildHeapScan(Relation heapRelation,
 				   Relation indexRelation,
@@ -71,7 +72,10 @@ extern double IndexBuildHeapScan(Relation heapRelation,
 extern void validate_index(Oid heapId, Oid indexId, Snapshot snapshot);
 
 extern void reindex_index(Oid indexId, bool skip_constraint_checks);
-extern bool reindex_relation(Oid relid, bool toast_too, bool heap_rebuilt);
+
+#define REINDEX_CHECK_CONSTRAINTS	0x1
+#define REINDEX_SUPPRESS_INDEX_USE	0x2
+extern bool reindex_relation(Oid relid, bool toast_too, int flags);
 
 extern bool ReindexIsProcessingHeap(Oid heapOid);
 extern bool ReindexIsProcessingIndex(Oid indexOid);

@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/syntax.sgml,v 1.147 2010/07/03 02:57:46 rhaas Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/syntax.sgml,v 1.147.2.7 2010/09/07 18:54:08 petere Exp $ -->
 
 <chapter id="sql-syntax">
  <title>SQL Syntax</title>
@@ -47,12 +47,6 @@
    special character is adjacent to some other token type).
   </para>
 
-  <para>
-   Additionally, <firstterm>comments</firstterm> can occur in SQL
-   input.  They are not tokens, they are effectively equivalent to
-   whitespace.
-  </para>
-
    <para>
     For example, the following is (syntactically) valid SQL input:
 <programlisting>
@@ -64,6 +58,12 @@ INSERT INTO MY_TABLE VALUES (3, 'hi there');
     is not required; more than one command can be on a line, and
     commands can usefully be split across lines).
    </para>
+
+  <para>
+   Additionally, <firstterm>comments</firstterm> can occur in SQL
+   input.  They are not tokens, they are effectively equivalent to
+   whitespace.
+  </para>
 
   <para>
    The SQL syntax is not very consistent regarding what tokens
@@ -236,12 +236,15 @@ U&amp;"d!0061t!+000061" UESCAPE '!'
 
    <para>
     The Unicode escape syntax works only when the server encoding is
-    UTF8.  When other server encodings are used, only code points in
-    the ASCII range (up to <literal>\007F</literal>) can be specified.
-    Both the 4-digit and the 6-digit form can be used to specify
-    UTF-16 surrogate pairs to compose characters with code points
-    larger than U+FFFF (although the availability of
-    the 6-digit form technically makes this unnecessary).
+    <literal>UTF8</>.  When other server encodings are used, only code
+    points in the ASCII range (up to <literal>\007F</literal>) can be
+    specified.  Both the 4-digit and the 6-digit form can be used to
+    specify UTF-16 surrogate pairs to compose characters with code
+    points larger than U+FFFF, although the availability of the
+    6-digit form technically makes this unnecessary.  (When surrogate
+    pairs are used when the server encoding is <literal>UTF8</>, they
+    are first combined into a single code point that is then encoded
+    in UTF-8.)
    </para>
 
    <para>
@@ -431,13 +434,15 @@ SELECT 'foo'      'bar';
 
     <para>
      The Unicode escape syntax works fully only when the server
-     encoding is UTF-8.  When other server encodings are used, only
-     code points in the ASCII range (up to <literal>\u007F</>) can be
-     specified.  Both the 4-digit and the 8-digit form can be used to
-     specify UTF-16 surrogate pairs to compose characters with code
-     points larger than U+FFFF (although the
-     availability of the 8-digit form technically makes this
-     unnecessary).
+     encoding is <literal>UTF8</>.  When other server encodings are
+     used, only code points in the ASCII range (up
+     to <literal>\u007F</>) can be specified.  Both the 4-digit and
+     the 8-digit form can be used to specify UTF-16 surrogate pairs to
+     compose characters with code points larger than U+FFFF, although
+     the availability of the 8-digit form technically makes this
+     unnecessary.  (When surrogate pairs are used when the server
+     encoding is <literal>UTF8</>, they are first combined into a
+     single code point that is then encoded in UTF-8.)
     </para>
 
     <caution>
@@ -518,13 +523,15 @@ U&amp;'d!0061t!+000061' UESCAPE '!'
 
     <para>
      The Unicode escape syntax works only when the server encoding is
-     UTF8.  When other server encodings are used, only code points in
-     the ASCII range (up to <literal>\007F</literal>) can be
-     specified.
-     Both the 4-digit and the 6-digit form can be used to specify
-     UTF-16 surrogate pairs to compose characters with code points
-     larger than U+FFFF (although the availability
-     of the 6-digit form technically makes this unnecessary).
+     <literal>UTF8</>.  When other server encodings are used, only
+     code points in the ASCII range (up to <literal>\007F</literal>)
+     can be specified.  Both the 4-digit and the 6-digit form can be
+     used to specify UTF-16 surrogate pairs to compose characters with
+     code points larger than U+FFFF, although the availability of the
+     6-digit form technically makes this unnecessary.  (When surrogate
+     pairs are used when the server encoding is <literal>UTF8</>, they
+     are first combined into a single code point that is then encoded
+     in UTF-8.)
     </para>
 
     <para>
@@ -1542,23 +1549,29 @@ sqrt(2)
 
    <para>
     The first form of aggregate expression invokes the aggregate
-    across all input rows for which the given expression(s) yield
-    non-null values.  (Actually, it is up to the aggregate function
-    whether to ignore null values or not &mdash; but all the standard ones do.)
+    once for each input row.
     The second form is the same as the first, since
-    <literal>ALL</literal> is the default.  The third form invokes the
-    aggregate for all distinct values of the expressions found
-    in the input rows (ignoring nulls if the function chooses to do so).
-    The last form invokes the aggregate once for
-    each input row regardless of null or non-null values; since no
+    <literal>ALL</literal> is the default.
+    The third form invokes the aggregate once for each distinct value
+    of the expression (or distinct set of values, for multiple expressions)
+    found in the input rows.
+    The last form invokes the aggregate once for each input row; since no
     particular input value is specified, it is generally only useful
     for the <function>count(*)</function> aggregate function.
    </para>
 
    <para>
+    Most aggregate functions ignore null inputs, so that rows in which
+    one or more of the expression(s) yield null are discarded.  This
+    can be assumed to be true, unless otherwise specified, for all
+    built-in aggregates.
+   </para>
+
+   <para>
     For example, <literal>count(*)</literal> yields the total number
     of input rows; <literal>count(f1)</literal> yields the number of
-    input rows in which <literal>f1</literal> is non-null;
+    input rows in which <literal>f1</literal> is non-null, since
+    <function>count</> ignores nulls; and
     <literal>count(distinct f1)</literal> yields the number of
     distinct non-null values of <literal>f1</literal>.
    </para>
@@ -1568,7 +1581,7 @@ sqrt(2)
     unspecified order.  In many cases this does not matter; for example,
     <function>min</> produces the same result no matter what order it
     receives the inputs in.  However, some aggregate functions
-    (such as <function>array_agg</> and <function>xmlagg</>) produce
+    (such as <function>array_agg</> and <function>string_agg</>) produce
     results that depend on the ordering of the input rows.  When using
     such an aggregate, the optional <replaceable>order_by_clause</> can be
     used to specify the desired ordering.  The <replaceable>order_by_clause</>
@@ -1576,10 +1589,25 @@ sqrt(2)
     described in <xref linkend="queries-order">, except that its expressions
     are always just expressions and cannot be output-column names or numbers.
     For example:
-
 <programlisting>
 SELECT array_agg(a ORDER BY b DESC) FROM table;
 </programlisting>
+   </para>
+
+   <para>
+    When dealing with multiple-argument aggregate functions, note that the
+    <literal>ORDER BY</> clause goes after all the aggregate arguments.
+    For example, write this:
+<programlisting>
+SELECT string_agg(a, ',' ORDER BY a) FROM table;
+</programlisting>
+    not this:
+<programlisting>
+SELECT string_agg(a ORDER BY a, ',') FROM table;  -- incorrect
+</programlisting>
+    The latter is syntactically valid, but it represents a call of a
+    single-argument aggregate function with two <literal>ORDER BY</> keys
+    (the second one being rather useless since it's a constant).
    </para>
 
    <para>

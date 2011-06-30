@@ -176,6 +176,15 @@ extern unsigned char pg_tolower(unsigned char ch);
 #ifdef printf
 #undef printf
 #endif
+/*
+ * Versions of libintl >= 0.18? try to replace setlocale() with a macro
+ * to their own versions.  Remove the macro, if it exists, because it
+ * ends up calling the wrong version when the backend and libintl use
+ * different versions of msvcrt.
+ */
+#if defined(setlocale) && defined(WIN32)
+#undef setlocale
+#endif
 
 extern int	pg_vsnprintf(char *str, size_t count, const char *fmt, va_list args);
 extern int
@@ -324,8 +333,12 @@ extern FILE *pgwin32_fopen(const char *, const char *);
 #define		fopen(a,b) pgwin32_fopen(a,b)
 #endif
 
+#ifndef popen
 #define popen(a,b) _popen(a,b)
+#endif
+#ifndef pclose
 #define pclose(a) _pclose(a)
+#endif
 
 /* New versions of MingW have gettimeofday, old mingw and msvc don't */
 #ifndef HAVE_GETTIMEOFDAY

@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/pl/plpgsql/src/pl_exec.c,v 1.261 2010/07/06 19:19:01 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/pl/plpgsql/src/pl_exec.c,v 1.261.2.4 2010/08/19 18:10:56 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -1105,6 +1105,9 @@ exec_stmt_block(PLpgSQL_execstate *estate, PLpgSQL_stmt_block *block)
 			 * to return to connected state.
 			 */
 			SPI_restore_connection();
+
+			/* Must clean up the econtext too */
+			exec_eval_cleanup(estate);
 
 			/* Look for a matching exception handler */
 			foreach(e, block->exceptions->exc_list)
@@ -2693,6 +2696,9 @@ plpgsql_estate_setup(PLpgSQL_execstate *estate,
  *
  * NB: the result of the evaluation is no longer valid after this is done,
  * unless it is a pass-by-value datatype.
+ *
+ * NB: if you change this code, see also the hacks in exec_assign_value's
+ * PLPGSQL_DTYPE_ARRAYELEM case.
  * ----------
  */
 static void
@@ -3456,6 +3462,10 @@ exec_assign_expr(PLpgSQL_execstate *estate, PLpgSQL_datum *target,
 
 /* ----------
  * exec_assign_value			Put a value into a target field
+ *
+ * Note: in some code paths, this may leak memory in the eval_econtext;
+ * we assume that will be cleaned up later by exec_eval_cleanup.  We cannot
+ * call exec_eval_cleanup here for fear of destroying the input Datum value.
  * ----------
  */
 static void
@@ -3706,6 +3716,9 @@ exec_assign_value(PLpgSQL_execstate *estate,
 
 		case PLPGSQL_DTYPE_ARRAYELEM:
 			{
+				/*
+				 * Target is an element of an array
+				 */
 				int			nsubscripts;
 				int			i;
 				PLpgSQL_expr *subscripts[MAXDIM];
@@ -3721,10 +3734,19 @@ exec_assign_value(PLpgSQL_execstate *estate,
 							coerced_value;
 				ArrayType  *oldarrayval;
 				ArrayType  *newarrayval;
+				SPITupleTable *save_eval_tuptable;
 
 				/*
-				 * Target is an element of an array
-				 *
+				 * We need to do subscript evaluation, which might require
+				 * evaluating general expressions; and the caller might have
+				 * done that too in order to prepare the input Datum.  We
+				 * have to save and restore the caller's SPI_execute result,
+				 * if any.
+				 */
+				save_eval_tuptable = estate->eval_tuptable;
+				estate->eval_tuptable = NULL;
+
+				/*
 				 * To handle constructs like x[1][2] := something, we have to
 				 * be prepared to deal with a chain of arrayelem datums. Chase
 				 * back to find the base array datum, and save the subscript
@@ -3741,7 +3763,7 @@ exec_assign_value(PLpgSQL_execstate *estate,
 						ereport(ERROR,
 								(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
 								 errmsg("number of array dimensions (%d) exceeds the maximum allowed (%d)",
-										nsubscripts, MAXDIM)));
+										nsubscripts + 1, MAXDIM)));
 					subscripts[nsubscripts++] = arrayelem->subscript;
 					target = estate->datums[arrayelem->arrayparentno];
 				} while (target->dtype == PLPGSQL_DTYPE_ARRAYELEM);
@@ -3778,7 +3800,22 @@ exec_assign_value(PLpgSQL_execstate *estate,
 						ereport(ERROR,
 								(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 								 errmsg("array subscript in assignment must not be null")));
+
+					/*
+					 * Clean up in case the subscript expression wasn't simple.
+					 * We can't do exec_eval_cleanup, but we can do this much
+					 * (which is safe because the integer subscript value is
+					 * surely pass-by-value), and we must do it in case the
+					 * next subscript expression isn't simple either.
+					 */
+					if (estate->eval_tuptable != NULL)
+						SPI_freetuptable(estate->eval_tuptable);
+					estate->eval_tuptable = NULL;
 				}
+
+				/* Now we can restore caller's SPI_execute result if any. */
+				Assert(estate->eval_tuptable == NULL);
+				estate->eval_tuptable = save_eval_tuptable;
 
 				/* Coerce source value to match array element type. */
 				coerced_value = exec_simple_cast_value(value,
@@ -4426,7 +4463,18 @@ loop_exit:
  *								a Datum by directly calling ExecEvalExpr().
  *
  * If successful, store results into *result, *isNull, *rettype and return
- * TRUE.  If the expression is not simple (any more), return FALSE.
+ * TRUE.  If the expression cannot be handled by simple evaluation,
+ * return FALSE.
+ *
+ * Because we only store one execution tree for a simple expression, we
+ * can't handle recursion cases.  So, if we see the tree is already busy
+ * with an evaluation in the current xact, we just return FALSE and let the
+ * caller run the expression the hard way.  (Other alternatives such as
+ * creating a new tree for a recursive call either introduce memory leaks,
+ * or add enough bookkeeping to be doubtful wins anyway.)  Another case that
+ * is covered by the expr_simple_in_use test is where a previous execution
+ * of the tree was aborted by an error: the tree may contain bogus state
+ * so we dare not re-use it.
  *
  * It is possible though unlikely for a simple expression to become non-simple
  * (consider for example redefining a trivial view).  We must handle that for
@@ -4460,6 +4508,12 @@ exec_eval_simple_expr(PLpgSQL_execstate *estate,
 	 * Forget it if expression wasn't simple before.
 	 */
 	if (expr->expr_simple_expr == NULL)
+		return false;
+
+	/*
+	 * If expression is in use in current xact, don't touch it.
+	 */
+	if (expr->expr_simple_in_use && expr->expr_simple_lxid == curlxid)
 		return false;
 
 	/*
@@ -4497,6 +4551,7 @@ exec_eval_simple_expr(PLpgSQL_execstate *estate,
 	{
 		expr->expr_simple_state = ExecPrepareExpr(expr->expr_simple_expr,
 												  simple_eval_estate);
+		expr->expr_simple_in_use = false;
 		expr->expr_simple_lxid = curlxid;
 	}
 
@@ -4532,6 +4587,11 @@ exec_eval_simple_expr(PLpgSQL_execstate *estate,
 	econtext->ecxt_param_list_info = paramLI;
 
 	/*
+	 * Mark expression as busy for the duration of the ExecEvalExpr call.
+	 */
+	expr->expr_simple_in_use = true;
+
+	/*
 	 * Finally we can call the executor to evaluate the expression
 	 */
 	*result = ExecEvalExpr(expr->expr_simple_state,
@@ -4540,6 +4600,8 @@ exec_eval_simple_expr(PLpgSQL_execstate *estate,
 						   NULL);
 
 	/* Assorted cleanup */
+	expr->expr_simple_in_use = false;
+
 	estate->cur_expr = save_cur_expr;
 
 	if (!estate->readonly_func)
@@ -5235,6 +5297,8 @@ exec_simple_check_plan(PLpgSQL_expr *expr)
 	 */
 	if (!IsA(stmt, PlannedStmt))
 		return;
+	if (stmt->commandType != CMD_SELECT || stmt->intoClause)
+		return;
 	plan = stmt->planTree;
 	if (!IsA(plan, Result))
 		return;
@@ -5269,6 +5333,7 @@ exec_simple_check_plan(PLpgSQL_expr *expr)
 	 */
 	expr->expr_simple_expr = tle->expr;
 	expr->expr_simple_state = NULL;
+	expr->expr_simple_in_use = false;
 	expr->expr_simple_lxid = InvalidLocalTransactionId;
 	/* Also stash away the expression result type */
 	expr->expr_simple_type = exprType((Node *) tle->expr);
@@ -5476,8 +5541,24 @@ exec_eval_using_params(PLpgSQL_execstate *estate, List *params)
 		ppd->nulls[i] = isnull ? 'n' : ' ';
 		ppd->freevals[i] = false;
 
+		if (ppd->types[i] == UNKNOWNOID)
+		{
+			/*
+			 * Treat 'unknown' parameters as text, since that's what most
+			 * people would expect. SPI_execute_with_args can coerce unknown
+			 * constants in a more intelligent way, but not unknown Params.
+			 * This code also takes care of copying into the right context.
+			 * Note we assume 'unknown' has the representation of C-string.
+			 */
+			ppd->types[i] = TEXTOID;
+			if (!isnull)
+			{
+				ppd->values[i] = CStringGetTextDatum(DatumGetCString(ppd->values[i]));
+				ppd->freevals[i] = true;
+			}
+		}
 		/* pass-by-ref non null values must be copied into plpgsql context */
-		if (!isnull)
+		else if (!isnull)
 		{
 			int16		typLen;
 			bool		typByVal;

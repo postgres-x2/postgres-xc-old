@@ -38,7 +38,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/postmaster/postmaster.c,v 1.614 2010/07/06 19:18:57 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/postmaster/postmaster.c,v 1.614.2.1 2010/09/16 20:37:18 mha Exp $
  *
  * NOTES
  *
@@ -360,7 +360,7 @@ static int	ProcessStartupPacket(Port *port, bool SSLdone);
 static void processCancelRequest(Port *port, void *pkt);
 static int	initMasks(fd_set *rmask);
 static void report_fork_failure_to_client(Port *port, int errnum);
-static enum CAC_state canAcceptConnections(void);
+static CAC_state canAcceptConnections(void);
 static long PostmasterRandom(void);
 static void RandomSalt(char *md5Salt);
 static void signal_child(pid_t pid, int signal);
@@ -2008,9 +2008,11 @@ processCancelRequest(Port *port, void *pkt)
 /*
  * canAcceptConnections --- check to see if database state allows connections.
  */
-static enum CAC_state
+static CAC_state
 canAcceptConnections(void)
 {
+	CAC_state	result = CAC_OK;
+
 	/*
 	 * Can't start backends when in startup/shutdown/inconsistent recovery
 	 * state.
@@ -2018,21 +2020,24 @@ canAcceptConnections(void)
 	 * In state PM_WAIT_BACKUP only superusers can connect (this must be
 	 * allowed so that a superuser can end online backup mode); we return
 	 * CAC_WAITBACKUP code to indicate that this must be checked later.
+	 * Note that neither CAC_OK nor CAC_WAITBACKUP can safely be returned
+	 * until we have checked for too many children.
 	 */
 	if (pmState != PM_RUN)
 	{
 		if (pmState == PM_WAIT_BACKUP)
-			return CAC_WAITBACKUP;		/* allow superusers only */
-		if (Shutdown > NoShutdown)
+			result = CAC_WAITBACKUP;	/* allow superusers only */
+		else if (Shutdown > NoShutdown)
 			return CAC_SHUTDOWN;	/* shutdown is pending */
-		if (!FatalError &&
-			(pmState == PM_STARTUP ||
-			 pmState == PM_RECOVERY))
-			return CAC_STARTUP; /* normal startup */
-		if (!FatalError &&
-			pmState == PM_HOT_STANDBY)
-			return CAC_OK;		/* connection OK during hot standby */
-		return CAC_RECOVERY;	/* else must be crash recovery */
+		else if (!FatalError &&
+				 (pmState == PM_STARTUP ||
+				  pmState == PM_RECOVERY))
+			return CAC_STARTUP;		/* normal startup */
+		else if (!FatalError &&
+				 pmState == PM_HOT_STANDBY)
+			result = CAC_OK;		/* connection OK during hot standby */
+		else
+			return CAC_RECOVERY;	/* else must be crash recovery */
 	}
 
 	/*
@@ -2048,9 +2053,9 @@ canAcceptConnections(void)
 	 * see comments for MaxLivePostmasterChildren().
 	 */
 	if (CountChildren(BACKEND_TYPE_ALL) >= MaxLivePostmasterChildren())
-		return CAC_TOOMANY;
+		result = CAC_TOOMANY;
 
-	return CAC_OK;
+	return result;
 }
 
 
@@ -2075,7 +2080,7 @@ ConnCreate(int serverFd)
 		if (port->sock >= 0)
 			StreamClose(port->sock);
 		ConnFree(port);
-		port = NULL;
+		return NULL;
 	}
 	else
 	{
@@ -2738,6 +2743,19 @@ CleanupBackend(int pid,
 	 * assume everything is all right and proceed to remove the backend from
 	 * the active backend list.
 	 */
+#ifdef WIN32
+	/*
+	 * On win32, also treat ERROR_WAIT_NO_CHILDREN (128) as nonfatal
+	 * case, since that sometimes happens under load when the process fails
+	 * to start properly (long before it starts using shared memory).
+	 */
+	if (exitstatus == ERROR_WAIT_NO_CHILDREN)
+	{
+		LogChildExit(LOG, _("server process"), pid, exitstatus);
+		exitstatus = 0;
+	}
+#endif
+
 	if (!EXIT_STATUS_0(exitstatus) && !EXIT_STATUS_1(exitstatus))
 	{
 		HandleChildCrash(pid, exitstatus, _("server process"));
@@ -3937,7 +3955,11 @@ internal_forkexec(int argc, char *argv[], Port *port)
 	}
 
 	/* Insert temp file name after --fork argument */
+#ifdef _WIN64
+	sprintf(paramHandleStr, "%llu", (LONG_PTR) paramHandle);
+#else
 	sprintf(paramHandleStr, "%lu", (DWORD) paramHandle);
+#endif
 	argv[2] = paramHandleStr;
 
 	/* Format the cmd line */
@@ -5013,7 +5035,11 @@ read_backend_variables(char *id, Port *port)
 	HANDLE		paramHandle;
 	BackendParameters *paramp;
 
+#ifdef _WIN64
+	paramHandle = (HANDLE) _atoi64(id);
+#else
 	paramHandle = (HANDLE) atol(id);
+#endif
 	paramp = MapViewOfFile(paramHandle, FILE_MAP_READ, 0, 0, 0);
 	if (!paramp)
 	{

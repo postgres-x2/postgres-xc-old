@@ -4,7 +4,7 @@
  *
  *	Copyright (c) 2006-2010, PostgreSQL Global Development Group
  *
- *	$PostgreSQL: pgsql/src/include/access/gin.h,v 1.38 2010/02/26 02:01:20 momjian Exp $
+ *	$PostgreSQL: pgsql/src/include/access/gin.h,v 1.38.4.3 2010/08/01 19:16:47 tgl Exp $
  *--------------------------------------------------------------------------
  */
 #ifndef GIN_H
@@ -107,13 +107,22 @@ typedef struct GinMetaPageData
  * We use our own ItemPointerGet(BlockNumber|GetOffsetNumber)
  * to avoid Asserts, since sometimes the ip_posid isn't "valid"
  */
-
 #define GinItemPointerGetBlockNumber(pointer) \
 	BlockIdGetBlockNumber(&(pointer)->ip_blkid)
 
 #define GinItemPointerGetOffsetNumber(pointer) \
 	((pointer)->ip_posid)
 
+/*
+ * Special-case item pointer values needed by the GIN search logic.
+ *	MIN: sorts less than any valid item pointer
+ *	MAX: sorts greater than any valid item pointer
+ *	LOSSY PAGE: indicates a whole heap page, sorts after normal item
+ *				pointers for that page
+ * Note that these are all distinguishable from an "invalid" item pointer
+ * (which is InvalidBlockNumber/0) as well as from all normal item
+ * pointers (which have item numbers in the range 1..MaxHeapTuplesPerPage).
+ */
 #define ItemPointerSetMin(p)  \
 	ItemPointerSet((p), (BlockNumber)0, (OffsetNumber)0)
 #define ItemPointerIsMin(p)  \
@@ -520,6 +529,8 @@ typedef struct GinScanKeyData
 	OffsetNumber attnum;
 
 	ItemPointerData curItem;
+	bool		recheckCurItem;
+
 	bool		firstCall;
 	bool		isFinished;
 } GinScanKeyData;
@@ -563,6 +574,7 @@ extern Datum ginarrayconsistent(PG_FUNCTION_ARGS);
 /* ginbulk.c */
 typedef struct EntryAccumulator
 {
+	RBNode		rbnode;
 	Datum		value;
 	uint32		length;
 	uint32		number;
@@ -577,15 +589,14 @@ typedef struct
 	long		allocatedMemory;
 	uint32		length;
 	EntryAccumulator *entryallocator;
-	ItemPointerData *tmpList;
 	RBTree	   *tree;
-	RBTreeIterator *iterator;
 } BuildAccumulator;
 
 extern void ginInitBA(BuildAccumulator *accum);
 extern void ginInsertRecordBA(BuildAccumulator *accum,
 				  ItemPointer heapptr,
 				  OffsetNumber attnum, Datum *entries, int32 nentry);
+extern void ginBeginBAScan(BuildAccumulator *accum);
 extern ItemPointerData *ginGetEntry(BuildAccumulator *accum, OffsetNumber *attnum, Datum *entry, uint32 *n);
 
 /* ginfast.c */

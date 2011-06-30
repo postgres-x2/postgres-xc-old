@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/datatype.sgml,v 1.250 2010/07/03 04:03:06 tgl Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/datatype.sgml,v 1.250.2.7 2010/09/09 00:48:29 momjian Exp $ -->
 
  <chapter id="datatype">
   <title>Data Types</title>
@@ -1248,7 +1248,7 @@ SELECT E'\\xDEADBEEF';
     represented as an ASCII character into special escape sequences.
     If, from the point of view of the application, representing bytes
     as characters makes sense, then this representation can be
-    convenient.  But in practice it is usually confusing becauses it
+    convenient.  But in practice it is usually confusing because it
     fuzzes up the distinction between binary strings and character
     strings, and also the particular escape mechanism that was chosen is
     somewhat unwieldy.  So this format should probably be avoided
@@ -1576,21 +1576,21 @@ SELECT E'\\xDEADBEEF';
    <para>
     The <type>interval</type> type has an additional option, which is
     to restrict the set of stored fields by writing one of these phrases:
-<programlisting>
-    YEAR
-    MONTH
-    DAY
-    HOUR
-    MINUTE
-    SECOND
-    YEAR TO MONTH
-    DAY TO HOUR
-    DAY TO MINUTE
-    DAY TO SECOND
-    HOUR TO MINUTE
-    HOUR TO SECOND
-    MINUTE TO SECOND
-</programlisting>
+<literallayout class="monospaced">
+YEAR
+MONTH
+DAY
+HOUR
+MINUTE
+SECOND
+YEAR TO MONTH
+DAY TO HOUR
+DAY TO MINUTE
+DAY TO SECOND
+HOUR TO MINUTE
+HOUR TO SECOND
+MINUTE TO SECOND
+</literallayout>
     Note that if both <replaceable>fields</replaceable> and
     <replaceable>p</replaceable> are specified, the
     <replaceable>fields</replaceable> must include <literal>SECOND</>,
@@ -2751,12 +2751,33 @@ P <optional> <replaceable>years</>-<replaceable>months</>-<replaceable>days</> <
 
    <para>
     <productname>PostgreSQL</productname> provides the
-    standard <acronym>SQL</acronym> type <type>boolean</type>.
-    <type>boolean</type> can have one of only two states:
+    standard <acronym>SQL</acronym> type <type>boolean</type>;
+    see <xref linkend="datatype-boolean-table">.
+    The <type>boolean</type> type can have one of only two states:
     <quote>true</quote> or <quote>false</quote>.  A third state,
     <quote>unknown</quote>, is represented by the
     <acronym>SQL</acronym> null value.
    </para>
+
+   <table id="datatype-boolean-table">
+    <title>Boolean Data Type</title>
+    <tgroup cols="3">
+     <thead>
+      <row>
+       <entry>Name</entry>
+       <entry>Storage Size</entry>
+       <entry>Description</entry>
+      </row>
+     </thead>
+     <tbody>
+      <row>
+       <entry><type>boolean</type></entry>
+       <entry>1 byte</entry>
+       <entry>state of true or false</entry>
+      </row>
+     </tbody>
+    </tgroup>
+   </table>
 
    <para>
     Valid literal values for the <quote>true</quote> state are:
@@ -2786,6 +2807,12 @@ P <optional> <replaceable>years</>-<replaceable>months</>-<replaceable>days</> <
     (<acronym>SQL</acronym>-compliant) usage.
    </para>
 
+   <para>
+    <xref linkend="datatype-boolean-example"> shows that
+    <type>boolean</type> values are output using the letters
+    <literal>t</literal> and <literal>f</literal>.
+   </para>
+
    <example id="datatype-boolean-example">
     <title>Using the <type>boolean</type> type</title>
 
@@ -2805,16 +2832,6 @@ SELECT * FROM test1 WHERE a;
  t | sic est
 </programlisting>
    </example>
-
-   <para>
-    <xref linkend="datatype-boolean-example"> shows that
-    <type>boolean</type> values are output using the letters
-    <literal>t</literal> and <literal>f</literal>.
-   </para>
-
-   <para>
-    <type>boolean</type> uses 1 byte of storage.
-   </para>
   </sect1>
 
   <sect1 id="datatype-enum">
@@ -2852,10 +2869,6 @@ CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
 
      Once created, the enum type can be used in table and function
      definitions much like any other type:
-    </para>
-
-    <example>
-     <title>Basic Enum Usage</title>
 <programlisting>
 CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
 CREATE TABLE person (
@@ -2869,7 +2882,7 @@ SELECT * FROM person WHERE current_mood = 'happy';
  Moe  | happy
 (1 row)
 </programlisting>
-     </example>
+    </para>
     </sect2>
 
     <sect2>
@@ -2880,10 +2893,7 @@ SELECT * FROM person WHERE current_mood = 'happy';
       order in which the values were listed when the type was created.
       All standard comparison operators and related
       aggregate functions are supported for enums.  For example:
-     </para>
-
-     <example>
-      <title>Enum Ordering</title>
+ 
 <programlisting>
 INSERT INTO person VALUES ('Larry', 'sad');
 INSERT INTO person VALUES ('Curly', 'ok');
@@ -2909,7 +2919,7 @@ WHERE current_mood = (SELECT MIN(current_mood) FROM person);
  Larry
 (1 row)
 </programlisting>
-    </example>
+     </para>
    </sect2>
 
    <sect2>
@@ -2917,11 +2927,8 @@ WHERE current_mood = (SELECT MIN(current_mood) FROM person);
 
     <para>
      Each enumerated data type is separate and cannot
-     be compared with other enumerated types.
-    </para>
+     be compared with other enumerated types.  See this example:
 
-    <example>
-     <title>Lack of Casting</title>
 <programlisting>
 CREATE TYPE happiness AS ENUM ('happy', 'very happy', 'ecstatic');
 CREATE TABLE holidays (
@@ -2937,15 +2944,12 @@ SELECT person.name, holidays.num_weeks FROM person, holidays
   WHERE person.current_mood = holidays.happiness;
 ERROR:  operator does not exist: mood = happiness
 </programlisting>
-    </example>
+    </para>
 
     <para>
      If you really need to do something like that, you can either
      write a custom operator or add explicit casts to your query:
-    </para>
 
-    <example>
-     <title>Comparing Different Enums by Casting to Text</title>
 <programlisting>
 SELECT person.name, holidays.num_weeks FROM person, holidays
   WHERE person.current_mood::text = holidays.happiness::text;
@@ -2955,7 +2959,7 @@ SELECT person.name, holidays.num_weeks FROM person, holidays
 (1 row)
 
 </programlisting>
-    </example>
+    </para>
    </sect2>
 
    <sect2>
@@ -3401,7 +3405,7 @@ SELECT person.name, holidays.num_weeks FROM person, holidays
         <row> 
          <entry><type>cidr</type> Input</entry>
          <entry><type>cidr</type> Output</entry>
-         <entry><literal><function>abbrev</function>(<type>cidr</type>)</literal></entry>
+         <entry><literal><function>abbrev(<type>cidr</type>)</function></literal></entry>
         </row>
        </thead>
        <tbody>
@@ -3780,13 +3784,13 @@ SELECT to_tsvector('english', 'The Fat Rats');
 
     <para>
      A <type>tsquery</type> value stores lexemes that are to be
-     searched for, and combines them honoring the boolean operators
+     searched for, and combines them honoring the Boolean operators
      <literal>&amp;</literal> (AND), <literal>|</literal> (OR), and
      <literal>!</> (NOT).  Parentheses can be used to enforce grouping
      of the operators:
 
 <programlisting>
- SELECT 'fat &amp; rat'::tsquery;
+SELECT 'fat &amp; rat'::tsquery;
     tsquery    
 ---------------
  'fat' &amp; 'rat'

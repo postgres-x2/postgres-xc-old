@@ -5,7 +5,7 @@
  * Portions Copyright (c) 1996-2010, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
- * $PostgreSQL: pgsql/src/bin/pg_ctl/pg_ctl.c,v 1.122 2010/04/07 03:48:51 itagaki Exp $
+ * $PostgreSQL: pgsql/src/bin/pg_ctl/pg_ctl.c,v 1.122.2.1 2010/09/14 08:05:54 heikki Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -146,6 +146,7 @@ static char postopts_file[MAXPGPATH];
 static char pid_file[MAXPGPATH];
 static char conf_file[MAXPGPATH];
 static char backup_file[MAXPGPATH];
+static char recovery_file[MAXPGPATH];
 
 #if defined(HAVE_GETRLIMIT) && defined(RLIMIT_CORE)
 static void unlimit_core_size(void);
@@ -157,6 +158,9 @@ static void
 write_eventlog(int level, const char *line)
 {
 	static HANDLE evtHandle = INVALID_HANDLE_VALUE;
+
+	if (silent_mode && level == EVENTLOG_INFORMATION_TYPE)
+		return;
 
 	if (evtHandle == INVALID_HANDLE_VALUE)
 	{
@@ -817,7 +821,15 @@ do_stop(void)
 	}
 	else
 	{
-		if ((shutdown_mode == SMART_MODE) && (stat(backup_file, &statbuf) == 0))
+		/*
+		 * If backup_label exists, an online backup is running. Warn the
+		 * user that smart shutdown will wait for it to finish. However, if
+		 * recovery.conf is also present, we're recovering from an online
+		 * backup instead of performing one.
+		 */
+		if (shutdown_mode == SMART_MODE &&
+			stat(backup_file, &statbuf) == 0 &&
+			stat(recovery_file, &statbuf) != 0)
 		{
 			print_msg(_("WARNING: online backup mode is active\n"
 						"Shutdown will not complete until pg_stop_backup() is called.\n\n"));
@@ -894,7 +906,15 @@ do_restart(void)
 			exit(1);
 		}
 
-		if ((shutdown_mode == SMART_MODE) && (stat(backup_file, &statbuf) == 0))
+		/*
+		 * If backup_label exists, an online backup is running. Warn the
+		 * user that smart shutdown will wait for it to finish. However, if
+		 * recovery.conf is also present, we're recovering from an online
+		 * backup instead of performing one.
+		 */
+		if (shutdown_mode == SMART_MODE &&
+			stat(backup_file, &statbuf) == 0 &&
+			stat(recovery_file, &statbuf) != 0)
 		{
 			print_msg(_("WARNING: online backup mode is active\n"
 						"Shutdown will not complete until pg_stop_backup() is called.\n\n"));
@@ -1129,6 +1149,9 @@ pgwin32_CommandLine(bool registration)
 		/* concatenate */
 		sprintf(cmdLine + strlen(cmdLine), " -t %d", wait_seconds);
 
+	if (registration && silent_mode)
+		strcat(cmdLine, " -s");
+
 	if (post_opts)
 	{
 		strcat(cmdLine, " ");
@@ -1291,7 +1314,7 @@ pgwin32_ServiceMain(DWORD argc, LPTSTR *argv)
 		write_eventlog(EVENTLOG_INFORMATION_TYPE, _("Waiting for server startup...\n"));
 		if (test_postmaster_connection(true) == false)
 		{
-			write_eventlog(EVENTLOG_INFORMATION_TYPE, _("Timed out waiting for server startup\n"));
+			write_eventlog(EVENTLOG_ERROR_TYPE, _("Timed out waiting for server startup\n"));
 			pgwin32_SetServiceStatus(SERVICE_STOPPED);
 			return;
 		}
@@ -2009,6 +2032,7 @@ main(int argc, char **argv)
 		snprintf(pid_file, MAXPGPATH, "%s/postmaster.pid", pg_data);
 		snprintf(conf_file, MAXPGPATH, "%s/postgresql.conf", pg_data);
 		snprintf(backup_file, MAXPGPATH, "%s/backup_label", pg_data);
+		snprintf(recovery_file, MAXPGPATH, "%s/recovery.conf", pg_data);
 	}
 
 	switch (ctl_command)

@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/access/heap/heapam.c,v 1.292 2010/07/06 19:18:55 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/access/heap/heapam.c,v 1.292.2.1 2010/07/29 16:14:45 rhaas Exp $
  *
  *
  * INTERFACE ROUTINES
@@ -3776,8 +3776,11 @@ heap_restrpos(HeapScanDesc scan)
 }
 
 /*
- * If 'tuple' contains any XID greater than latestRemovedXid, update
- * latestRemovedXid to the greatest one found.
+ * If 'tuple' contains any visible XID greater than latestRemovedXid,
+ * ratchet forwards latestRemovedXid to the greatest one found.
+ * This is used as the basis for generating Hot Standby conflicts, so
+ * if a tuple was never visible then removing it should not conflict
+ * with queries.
  */
 void
 HeapTupleHeaderAdvanceLatestRemovedXid(HeapTupleHeader tuple,
@@ -3793,13 +3796,25 @@ HeapTupleHeaderAdvanceLatestRemovedXid(HeapTupleHeader tuple,
 			*latestRemovedXid = xvac;
 	}
 
-	if (TransactionIdPrecedes(*latestRemovedXid, xmax))
-		*latestRemovedXid = xmax;
+	/*
+	 * Ignore tuples inserted by an aborted transaction or
+	 * if the tuple was updated/deleted by the inserting transaction.
+	 *
+	 * Look for a committed hint bit, or if no xmin bit is set, check clog.
+	 * This needs to work on both master and standby, where it is used
+	 * to assess btree delete records.
+	 */
+	if ((tuple->t_infomask & HEAP_XMIN_COMMITTED) ||
+		(!(tuple->t_infomask & HEAP_XMIN_COMMITTED) &&
+		 !(tuple->t_infomask & HEAP_XMIN_INVALID) &&
+		 TransactionIdDidCommit(xmin)))
+	{
+		if (xmax != xmin &&
+			TransactionIdFollows(xmax, *latestRemovedXid))
+				*latestRemovedXid = xmax;
+	}
 
-	if (TransactionIdPrecedes(*latestRemovedXid, xmin))
-		*latestRemovedXid = xmin;
-
-	Assert(TransactionIdIsValid(*latestRemovedXid));
+	/* *latestRemovedXid may still be invalid at end */
 }
 
 /*
@@ -4079,8 +4094,15 @@ log_newpage(RelFileNode *rnode, ForkNumber forkNum, BlockNumber blkno,
 
 	recptr = XLogInsert(RM_HEAP_ID, XLOG_HEAP_NEWPAGE, rdata);
 
-	PageSetLSN(page, recptr);
-	PageSetTLI(page, ThisTimeLineID);
+	/*
+	 * The page may be uninitialized. If so, we can't set the LSN
+	 * and TLI because that would corrupt the page.
+	 */
+	if (!PageIsNew(page))
+	{
+		PageSetLSN(page, recptr);
+		PageSetTLI(page, ThisTimeLineID);
+	}
 
 	END_CRIT_SECTION();
 
@@ -4266,8 +4288,16 @@ heap_xlog_newpage(XLogRecPtr lsn, XLogRecord *record)
 	Assert(record->xl_len == SizeOfHeapNewpage + BLCKSZ);
 	memcpy(page, (char *) xlrec + SizeOfHeapNewpage, BLCKSZ);
 
-	PageSetLSN(page, lsn);
-	PageSetTLI(page, ThisTimeLineID);
+	/*
+	 * The page may be uninitialized. If so, we can't set the LSN
+	 * and TLI because that would corrupt the page.
+	 */
+	if (!PageIsNew(page))
+	{
+		PageSetLSN(page, lsn);
+		PageSetTLI(page, ThisTimeLineID);
+	}
+
 	MarkBufferDirty(buffer);
 	UnlockReleaseBuffer(buffer);
 }

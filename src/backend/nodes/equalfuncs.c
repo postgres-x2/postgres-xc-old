@@ -23,7 +23,7 @@
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/nodes/equalfuncs.c,v 1.385 2010/02/26 02:00:43 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/nodes/equalfuncs.c,v 1.385.4.1 2010/08/18 18:35:30 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -843,6 +843,7 @@ _equalPlaceHolderInfo(PlaceHolderInfo *a, PlaceHolderInfo *b)
 	COMPARE_NODE_FIELD(ph_var);
 	COMPARE_BITMAPSET_FIELD(ph_eval_at);
 	COMPARE_BITMAPSET_FIELD(ph_needed);
+	COMPARE_BITMAPSET_FIELD(ph_may_need);
 	COMPARE_SCALAR_FIELD(ph_width);
 
 	return true;
@@ -1519,6 +1520,7 @@ _equalCreateSeqStmt(CreateSeqStmt *a, CreateSeqStmt *b)
 {
 	COMPARE_NODE_FIELD(sequence);
 	COMPARE_NODE_FIELD(options);
+	COMPARE_SCALAR_FIELD(ownerId);
 
 	return true;
 }

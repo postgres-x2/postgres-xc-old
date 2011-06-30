@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/config.sgml,v 1.294 2010/07/08 10:20:13 mha Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/config.sgml,v 1.294.2.9 2010/08/26 22:00:31 tgl Exp $ -->
 
 <chapter Id="runtime-config">
   <title>Server Configuration</title>
@@ -243,7 +243,7 @@ SET ENABLE_SEQSCAN TO OFF;
       <listitem>
        <para>
          Specifies the configuration file for
-         <xref linkend="auth-username-maps"> username mapping
+         <xref linkend="auth-username-maps"> user name mapping
          (customarily called <filename>pg_ident.conf</>).
          This parameter can only be set at server start.
        </para>
@@ -426,6 +426,20 @@ SET ENABLE_SEQSCAN TO OFF;
         <filename>/tmp</filename>, but can be changed at build time.
         This parameter can only be set at server start.
        </para>
+
+       <para>
+        In addition to the socket file itself, which is named
+        <literal>.s.PGSQL.<replaceable>nnnn</></literal> where
+        <replaceable>nnnn</> is the server's port number, an ordinary file
+        named <literal>.s.PGSQL.<replaceable>nnnn</>.lock</literal> will be
+        created in the <varname>unix_socket_directory</> directory.  Neither
+        file should ever be removed manually.
+       </para>
+
+       <para>
+        This parameter is irrelevant on Windows, which does not have
+        Unix-domain sockets.
+       </para>
       </listitem>
      </varlistentry>
 
@@ -444,6 +458,11 @@ SET ENABLE_SEQSCAN TO OFF;
         By default this is the empty string, which uses the default
         group of the server user.  This parameter can only be set at
         server start.
+       </para>
+
+       <para>
+        This parameter is irrelevant on Windows, which does not have
+        Unix-domain sockets.
        </para>
       </listitem>
      </varlistentry>
@@ -481,6 +500,11 @@ SET ENABLE_SEQSCAN TO OFF;
 
        <para>
         This parameter can only be set at server start.
+       </para>
+
+       <para>
+        This parameter is irrelevant on Windows, which does not have
+        Unix-domain sockets.
        </para>
       </listitem>
      </varlistentry>
@@ -523,18 +547,19 @@ SET ENABLE_SEQSCAN TO OFF;
       </indexterm>
       <listitem>
        <para>
-        Specifies the number of seconds before sending a keepalive packet on an otherwise idle
-        connection.  A value of 0 uses the system default.  This parameter is supported
-        only on systems that support the <symbol>TCP_KEEPIDLE</> or <symbol>TCP_KEEPALIVE</>
-        symbols, and on Windows; on other systems, it must be zero. This parameter is
-        ignored for connections made via a Unix-domain socket.
-         <note>
-          <para>
-           On Windows, a value of 0 will set this parameter to 2 hours,
-           since Windows does not provide a way to read the default value.
-          </para>
-         </note>
+        Specifies the number of seconds before sending a keepalive packet on
+        an otherwise idle connection.  A value of 0 uses the system default.
+        This parameter is supported only on systems that support the
+        <symbol>TCP_KEEPIDLE</> or <symbol>TCP_KEEPALIVE</> symbols, and on
+        Windows; on other systems, it must be zero. This parameter is ignored
+        for connections made via a Unix-domain socket.
        </para>
+       <note>
+        <para>
+         On Windows, a value of 0 will set this parameter to 2 hours,
+         since Windows does not provide a way to read the system default value.
+        </para>
+       </note>
       </listitem>
      </varlistentry>
 
@@ -545,18 +570,19 @@ SET ENABLE_SEQSCAN TO OFF;
       </indexterm>
       <listitem>
        <para>
-        Specifies the number of seconds between sending keepalives on an otherwise idle
-        connection.  A value of 0 uses the system default.  This parameter is supported
-        only on systems that support the <symbol>TCP_KEEPINTVL</>
-        symbol, and on Windows; on other systems, it must be zero. This parameter is
-        ignored for connections made via a Unix-domain socket.
-         <note>
-          <para>
-           On Windows, a value of 0 will set this parameter to 1 second,
-           since Windows does not provide a way to read the default value.
-          </para>
-         </note>
+        Specifies the number of seconds between sending keepalives on an
+        otherwise idle connection.  A value of 0 uses the system default.
+        This parameter is supported only on systems that support the
+        <symbol>TCP_KEEPINTVL</> symbol, and on Windows; on other systems, it
+        must be zero. This parameter is ignored for connections made via a
+        Unix-domain socket.
        </para>
+       <note>
+        <para>
+         On Windows, a value of 0 will set this parameter to 1 second,
+         since Windows does not provide a way to read the system default value.
+        </para>
+       </note>
       </listitem>
      </varlistentry>
 
@@ -568,16 +594,16 @@ SET ENABLE_SEQSCAN TO OFF;
       <listitem>
        <para>
         Specifies the number of keepalive packets to send on an otherwise idle
-        connection.  A value of 0 uses the system default.  This parameter is supported
-        only on systems that support the <symbol>TCP_KEEPCNT</>
-        symbol; on other systems, it must be zero. This parameter is
-        ignored for connections made via a Unix-domain socket.
-         <note>
-          <para>
-           This parameter is not supported on Windows, and must be zero.
-          </para>
-         </note>
+        connection.  A value of 0 uses the system default.  This parameter is
+        supported only on systems that support the <symbol>TCP_KEEPCNT</>
+        symbol; on other systems, it must be zero. This parameter is ignored
+        for connections made via a Unix-domain socket.
        </para>
+       <note>
+        <para>
+         This parameter is not supported on Windows, and must be zero.
+        </para>
+       </note>
       </listitem>
      </varlistentry>
 
@@ -661,7 +687,8 @@ SET ENABLE_SEQSCAN TO OFF;
        <para>
         Specifies a list of <acronym>SSL</> ciphers that are allowed to be
         used on secure connections. See the <application>openssl</>
-        manual page for a list of supported ciphers.
+        manual page for a list of supported ciphers. This parameter is
+        unavailable unless the server is compiled with support for SSL.
        </para>
       </listitem>
      </varlistentry>
@@ -1433,18 +1460,19 @@ SET ENABLE_SEQSCAN TO OFF;
        <para>
         While turning off <varname>fsync</varname> is often a performance
         benefit, this can result in unrecoverable data corruption in
-        the event of an unexpected system shutdown or crash.  Thus it
-        is only advisable to turn off  <varname>fsync</varname> if
+        the event of a power failure or system crash.  Thus it
+        is only advisable to turn off <varname>fsync</varname> if
         you can easily recreate your entire database from external
         data.
        </para>
 
        <para>
         Examples of safe circumstances for turning off
-        <varname>fsync</varname> include the initial loading a new
+        <varname>fsync</varname> include the initial loading of a new
         database cluster from a backup file, using a database cluster
-        for processing statistics on an hourly basis which is then
-        recreated, or for a reporting read-only database clone which
+        for processing a batch of data after which the database
+        will be thrown away and recreated,
+        or for a read-only database clone which
         gets recreated frequently and is not used for failover.  High
         quality hardware alone is not a sufficient justification for
         turning off <varname>fsync</varname>.
@@ -1495,7 +1523,7 @@ SET ENABLE_SEQSCAN TO OFF;
         one transaction is determined by the setting in effect when it
         commits.  It is therefore possible, and useful, to have some
         transactions commit synchronously and others asynchronously.
-        For example, to make a single multi-statement transaction commit
+        For example, to make a single multistatement transaction commit
         asynchronously when the default is the opposite, issue <command>SET
         LOCAL synchronous_commit TO OFF</> within the transaction.
        </para>
@@ -1527,12 +1555,12 @@ SET ENABLE_SEQSCAN TO OFF;
         </listitem>
         <listitem>
         <para>
-         <literal>fsync_writethrough</> (call <function>fsync()</> at each commit, forcing write-through of any disk write cache)
+         <literal>fsync</> (call <function>fsync()</> at each commit)
         </para>
         </listitem>
         <listitem>
         <para>
-         <literal>fsync</> (call <function>fsync()</> at each commit)
+         <literal>fsync_writethrough</> (call <function>fsync()</> at each commit, forcing write-through of any disk write cache)
         </para>
         </listitem>
         <listitem>
@@ -1542,12 +1570,15 @@ SET ENABLE_SEQSCAN TO OFF;
         </listitem>
        </itemizedlist>
        <para>
+        The <literal>open_</>* options also use <literal>O_DIRECT</> if available.
         Not all of these choices are available on all platforms.
         The default is the first method in the above list that is supported
-        by the platform.
-        The <literal>open_</>* options also use <literal>O_DIRECT</> if available.
-        The utility <filename>src/tools/fsync</> in the PostgreSQL source tree
-        can do performance testing of various fsync methods.
+        by the platform, except that <literal>fdatasync</> is the default on
+        Linux.  The default is not necessarily ideal; it might be
+        necessary to change this setting or other aspects of your system
+        configuration in order to create a crash-safe configuration or
+        achieve optimal performance.
+        These aspects are discussed in <xref linkend="wal-reliability">.
         This parameter can only be set in the <filename>postgresql.conf</>
         file or on the server command line.
        </para>
@@ -1926,7 +1957,8 @@ SET ENABLE_SEQSCAN TO OFF;
         doesn't keep any extra segments for standby purposes, and the number
         of old WAL segments available to standby servers is a function of
         the location of the previous checkpoint and status of WAL
-        archiving.  This parameter can only be set in the
+        archiving.  This parameter has no effect on restartpoints.
+        This parameter can only be set in the
         <filename>postgresql.conf</> file or on the server command line.
        </para>
        </listitem>
@@ -2264,7 +2296,7 @@ SET ENABLE_SEQSCAN TO OFF;
        <para>
         Sets the planner's estimate of the cost of a disk page fetch
         that is part of a series of sequential fetches.  The default is 1.0.
-        This value can be overriden for a particular tablespace by setting
+        This value can be overridden for a particular tablespace by setting
         the tablespace parameter of the same name
         (see <xref linkend="sql-altertablespace">).
        </para>
@@ -2280,7 +2312,7 @@ SET ENABLE_SEQSCAN TO OFF;
        <para>
         Sets the planner's estimate of the cost of a
         non-sequentially-fetched disk page.  The default is 4.0.
-        This value can be overriden for a particular tablespace by setting
+        This value can be overridden for a particular tablespace by setting
         the tablespace parameter of the same name
         (see <xref linkend="sql-altertablespace">).
        </para>
@@ -2938,7 +2970,8 @@ local0.*    /var/log/postgresql
         documentation of your system's
         <application>syslog</application> daemon.
         This parameter can only be set in the <filename>postgresql.conf</>
-        file or on the server command line.
+        file or on the server command line. This parameter is unavailable
+        unless the server is compiled with support for syslog.
        </para>
       </listitem>
      </varlistentry>
@@ -2956,7 +2989,8 @@ local0.*    /var/log/postgresql
          <application>syslog</application> logs. The default is
          <literal>postgres</literal>.
          This parameter can only be set in the <filename>postgresql.conf</>
-         file or on the server command line.
+         file or on the server command line. This parameter is unavailable
+         unless the server is compiled with support for syslog.
         </para>
        </listitem>
       </varlistentry>
@@ -3373,9 +3407,8 @@ local0.*    /var/log/postgresql
         fields to displayed messages.  <literal>TERSE</> excludes
         the logging of <literal>DETAIL</>, <literal>HINT</>,
         <literal>QUERY</>, and <literal>CONTEXT</> error information.
-        <literal>VERBOSE</> output includes the <link
-        linkend="errcodes-appendix">SQLSTATE</> error
-        code and the source code file name, function name,
+        <literal>VERBOSE</> output includes the <symbol>SQLSTATE</> error
+        code (see also <xref linkend="errcodes-appendix">) and the source code file name, function name,
         and line number that generated the error.
         Only superusers can change this setting.
        </para>
@@ -3474,7 +3507,7 @@ local0.*    /var/log/postgresql
             </row>
             <row>
              <entry><literal>%e</literal></entry>
-             <entry>SQL state</entry>
+             <entry>SQLSTATE error code</entry>
              <entry>no</entry>
             </row>
             <row>
@@ -3545,7 +3578,7 @@ FROM pg_stat_activity;
         <para>
          <application>Syslog</> produces its own 
          time stamp and process ID information, so you probably do not want to
-         use those escapes if you are logging to <application>syslog</>.
+         include those escapes if you are logging to <application>syslog</>.
         </para>
        </tip>
       </listitem>
@@ -3672,7 +3705,7 @@ FROM pg_stat_activity;
         virtual transaction ID,
         regular transaction ID,
         error severity,
-        SQL state code,
+        SQLSTATE code,
         error message,
         error message detail,
         hint,
@@ -4117,11 +4150,16 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
        <para>
         Specifies the maximum age (in transactions) that a table's
         <structname>pg_class</>.<structfield>relfrozenxid</> field can
-        attain before a <command>VACUUM</> operation is forced to prevent
-        transaction ID wraparound within the table.  Note that the system
-        will launch autovacuum processes to prevent wraparound even when
-        autovacuum is otherwise disabled.
-        The default is 200 million transactions.
+        attain before a <command>VACUUM</> operation is forced
+        to prevent transaction ID wraparound within the table.
+        Note that the system will launch autovacuum processes to
+        prevent wraparound even when autovacuum is otherwise disabled.
+       </para>
+
+       <para>
+        Vacuum also allows removal of old files from the
+        <filename>pg_clog</> subdirectory, which is why the default
+        is a relatively low 200 million transactions.
         This parameter can only be set at server start, but the setting
         can be reduced for individual tables by
         changing storage parameters.
@@ -4247,9 +4285,11 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
        <para>
         The current effective value of the search path can be examined
         via the <acronym>SQL</acronym> function
-        <function>current_schemas()</>.  This is not quite the same as
+        <function>current_schemas</>
+        (see <xref linkend="functions-info">).
+        This is not quite the same as
         examining the value of <varname>search_path</varname>, since
-        <function>current_schemas()</> shows how the items
+        <function>current_schemas</> shows how the items
         appearing in <varname>search_path</varname> were resolved.
        </para>
 
@@ -5403,7 +5443,7 @@ dynamic_library_path = 'C:\tools\postgresql;H:\my_project\lib;$libdir'
         the server. The default value of <literal>NAMEDATALEN</> is
         64; therefore the default
         <varname>max_identifier_length</varname> is 63 bytes, which
-        can be less than 63 characters when using multi-byte encodings.
+        can be less than 63 characters when using multibyte encodings.
        </para>
       </listitem>
      </varlistentry>
@@ -5689,6 +5729,31 @@ plruby.use_strict = true        # generates error: unknown class name
       </listitem>
      </varlistentry>
 
+     <varlistentry id="guc-trace-recovery-messages" xreflabel="trace_recovery_messages">
+      <term><varname>trace_recovery_messages</varname> (<type>enum</type>)</term>
+      <indexterm>
+       <primary><varname>trace_recovery_messages</> configuration parameter</primary>
+      </indexterm>
+      <listitem>
+       <para>
+        Enables logging of recovery-related debugging output that otherwise
+        would not be logged. This parameter allows the user to override the
+        normal setting of <xref linkend="guc-log-min-messages">, but only for
+        specific messages. This is intended for use in debugging Hot Standby.
+        Valid values are <literal>DEBUG5</>, <literal>DEBUG4</>,
+        <literal>DEBUG3</>, <literal>DEBUG2</>, <literal>DEBUG1</>, and
+        <literal>LOG</>.  The default, <literal>LOG</>, does not affect
+        logging decisions at all.  The other values cause recovery-related
+        debug messages of that priority or higher to be logged as though they
+        had <literal>LOG</> priority; for common settings of
+        <varname>log_min_messages</> this results in unconditionally sending
+        them to the server log.
+        This parameter can only be set in the <filename>postgresql.conf</>
+        file or on the server command line.
+       </para>
+      </listitem>
+     </varlistentry>
+
      <varlistentry id="guc-trace-sort" xreflabel="trace_sort">
       <term><varname>trace_sort</varname> (<type>boolean</type>)</term>
       <indexterm>
@@ -5714,36 +5779,27 @@ plruby.use_strict = true        # generates error: unknown class name
         If on, emit information about lock usage.  Information dumped
         includes the type of lock operation, the type of lock and the unique
         identifier of the object being locked or unlocked.  Also included
-        are bitmasks for the lock types already granted on this object as
+        are bit masks for the lock types already granted on this object as
         well as for the lock types awaited on this object.  For each lock
         type a count of the number of granted locks and waiting locks is
         also dumped as well as the totals.  An example of the log file output
         is shown here:
-       </para>
-       <para>
-        LOG:  LockAcquire: new: lock(0xb7acd844) id(24688,24696,0,0,0,1)
-              grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
-              wait(0) type(AccessShareLock)
-       </para>
-       <para>
-        LOG:  GrantLock: lock(0xb7acd844) id(24688,24696,0,0,0,1)
-              grantMask(2) req(1,0,0,0,0,0,0)=1 grant(1,0,0,0,0,0,0)=1
-              wait(0) type(AccessShareLock)
-
-       </para>
-       <para>
-        LOG:  UnGrantLock: updated: lock(0xb7acd844) id(24688,24696,0,0,0,1)
-              grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
-              wait(0) type(AccessShareLock)
-       </para>
-       <para>
-        LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
-              grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
-              wait(0) type(INVALID)
-       </para>
-       <para>
+<screen>
+LOG:  LockAcquire: new: lock(0xb7acd844) id(24688,24696,0,0,0,1)
+      grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
+      wait(0) type(AccessShareLock)
+LOG:  GrantLock: lock(0xb7acd844) id(24688,24696,0,0,0,1)
+      grantMask(2) req(1,0,0,0,0,0,0)=1 grant(1,0,0,0,0,0,0)=1
+      wait(0) type(AccessShareLock)
+LOG:  UnGrantLock: updated: lock(0xb7acd844) id(24688,24696,0,0,0,1)
+      grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
+      wait(0) type(AccessShareLock)
+LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
+      grantMask(0) req(0,0,0,0,0,0,0)=0 grant(0,0,0,0,0,0,0)=0
+      wait(0) type(INVALID)
+</screen>
         Details of the structure being dumped may be found in
-        src/include/storage/lock.h
+        <filename>src/include/storage/lock.h</filename>.
        </para>
        <para>
         This parameter is only available if the <symbol>LOCK_DEBUG</symbol>
@@ -5837,7 +5893,7 @@ plruby.use_strict = true        # generates error: unknown class name
       <listitem>
        <para>
         If set, dumps information about all current locks when a
-        DeadLockTimeout occurs.
+        deadlock timeout occurs.
        </para>
        <para>
         This parameter is only available if the <symbol>LOCK_DEBUG</symbol>
@@ -5855,7 +5911,7 @@ plruby.use_strict = true        # generates error: unknown class name
       <listitem>
        <para>
         If set, logs system resource usage statistics (memory and CPU) on
-        various btree operations.
+        various B-tree operations.
        </para>
        <para>
         This parameter is only available if the <symbol>BTREE_BUILD_STATS</symbol>
@@ -5876,32 +5932,6 @@ plruby.use_strict = true        # generates error: unknown class name
         only available if the <symbol>WAL_DEBUG</symbol> macro was
         defined when <productname>PostgreSQL</productname> was
         compiled.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry id="guc-trace-recovery-messages" xreflabel="trace_recovery_messages">
-      <term><varname>trace_recovery_messages</varname> (<type>enum</type>)</term>
-      <indexterm>
-       <primary><varname>trace_recovery_messages</> configuration parameter</primary>
-      </indexterm>
-      <listitem>
-       <para>
-        Controls which message levels are written to the server log
-        for system modules needed for recovery processing. This allows
-        the user to override the normal setting of log_min_messages,
-        but only for specific messages. This is intended for use in
-        debugging Hot Standby.
-        Valid values are <literal>DEBUG5</>, <literal>DEBUG4</>,
-        <literal>DEBUG3</>, <literal>DEBUG2</>, <literal>DEBUG1</>,
-        <literal>INFO</>, <literal>NOTICE</>, <literal>WARNING</>,
-        <literal>ERROR</>, <literal>LOG</>, <literal>FATAL</>, and
-        <literal>PANIC</>.  Each level includes all the levels that
-        follow it.  The later the level, the fewer messages are sent
-        to the log.  The default is <literal>WARNING</>.  Note that
-        <literal>LOG</> has a different rank here than in
-        <varname>client_min_messages</>.
-        Parameter should be set in the postgresql.conf only.
        </para>
       </listitem>
      </varlistentry>

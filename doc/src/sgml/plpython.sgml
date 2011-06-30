@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/plpython.sgml,v 1.51 2010/07/08 18:42:12 petere Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/plpython.sgml,v 1.51.2.2 2010/09/08 20:35:53 petere Exp $ -->
 
 <chapter id="plpython">
  <title>PL/Python - Python Procedural Language</title>
@@ -93,6 +93,17 @@
    whether PL/Python for Python 2 or Python 3 or both are available.
   </para>
 
+  <tip>
+   <para>
+    The built variant depends on which Python version was found during
+    the installation or which version was explicitly set using
+    the <envar>PYTHON</envar> environment variable;
+    see <xref linkend="install-procedure">.  To make both variants of
+    PL/Python available in one installation, the source tree has to be
+    configured and built twice.
+   </para>
+  </tip>
+
   <para>
    This results in the following usage and migration strategy:
 
@@ -148,7 +159,7 @@
 
   <para>
    See also the
-   document <ulink url="http://docs.python.org/dev/3.0/whatsnew/3.0.html">What's
+   document <ulink url="http://docs.python.org/py3k/whatsnew/3.0.html">What's
    New In Python 3.0</ulink> for more information about porting to
    Python 3.
   </para>
@@ -399,7 +410,8 @@ $$ LANGUAGE plpythonu;
    If an SQL null value<indexterm><primary>null value</primary><secondary
    sortas="PL/Python">PL/Python</secondary></indexterm> is passed to a
    function, the argument value will appear as <symbol>None</symbol> in
-   Python. The above function definition will return the wrong answer for null
+   Python. For example, the function definition of <function>pymax</function>
+   shown in <xref linkend="plpython-funcs"> will return the wrong answer for null
    inputs. We could add <literal>STRICT</literal> to the function definition
    to make <productname>PostgreSQL</productname> do something more reasonable:
    if a null value is passed, the function will not be called at all,
@@ -943,8 +955,8 @@ $$ LANGUAGE plpythonu;
    <function>plpy.fatal</function> actually raise a Python exception
    which, if uncaught, propagates out to the calling query, causing
    the current transaction or subtransaction to be aborted.
-   <literal>raise plpy.ERROR(<replaceable>msg</>)</literal> and
-   <literal>raise plpy.FATAL(<replaceable>msg</>)</literal> are
+   <literal>raise plpy.Error(<replaceable>msg</>)</literal> and
+   <literal>raise plpy.Fatal(<replaceable>msg</>)</literal> are
    equivalent to calling
    <function>plpy.error</function> and
    <function>plpy.fatal</function>, respectively.
@@ -958,4 +970,64 @@ $$ LANGUAGE plpythonu;
   </para>
  </sect1>
 
+ <sect1 id="plpython-envar">
+  <title>Environment Variables</title>
+
+  <para>
+   Some of the environment variables that are accepted by the Python
+   interpreter can also be used to affect PL/Python behavior.  They
+   would need to be set in the environment of the main PostgreSQL
+   server process, for example in a start script.  The available
+   environment variables depend on the version of Python; see the
+   Python documentation for details.  At the time of this writing, the
+   following environment variables have an affect on PL/Python,
+   assuming an adequate Python version:
+   <itemizedlist>
+    <listitem>
+     <para><envar>PYTHONHOME</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONPATH</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONY2K</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONOPTIMIZE</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONDEBUG</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONVERBOSE</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONCASEOK</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONDONTWRITEBYTECODE</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONIOENCODING</envar></para>
+    </listitem>
+
+    <listitem>
+     <para><envar>PYTHONUSERBASE</envar></para>
+    </listitem>
+   </itemizedlist>
+
+   (It appears to be a Python implementation detail beyond the control
+   of PL/Python that some of the environment variables listed on
+   the <command>python</command> man page are only effective in a
+   command-line interpreter and not an embedded Python interpreter.)
+  </para>
+ </sect1>
 </chapter>

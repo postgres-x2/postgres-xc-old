@@ -28,7 +28,7 @@ endif
 ifneq ($(build_os),mingw32)
 abs_builddir := $(shell pwd)
 else
-abs_builddir := $(shell pwd -W)
+abs_builddir := $(shell sh -c "pwd -W")
 endif
 
 all install installdirs uninstall distprep:
@@ -73,7 +73,7 @@ $(top_builddir)/src/port/pg_config_paths.h: $(top_builddir)/src/Makefile.global
 # $(srcdir) to the build directory.
 
 ifdef VPATH
-remaining_files_src := $(wildcard $(srcdir)/*/*.pgc) $(wildcard $(srcdir)/expected/*.c) $(wildcard $(srcdir)/expected/*.stdout) $(wildcard $(srcdir)/expected/*.stderr)
+remaining_files_src := $(wildcard $(srcdir)/*/*.pgc) $(wildcard $(srcdir)/expected/*.c) $(wildcard $(srcdir)/expected/*.stdout) $(wildcard $(srcdir)/expected/*.stderr) $(srcdir)/resultmap
 remaining_files_build := $(patsubst $(srcdir)/%, $(abs_builddir)/%, $(remaining_files_src))
 
 all: $(remaining_files_build)
@@ -90,4 +90,4 @@ checktcp: all
 	./pg_regress  --dbname=regress1,connectdb --top-builddir=$(top_builddir) --temp-install=./tmp_check --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule_tcp --create-role=connectuser,connectdb --host=localhost
 
 installcheck: all
-	./pg_regress  --psqldir=$(PSQLDIR) --dbname=regress1,connectdb --top-builddir=$(top_builddir) --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb
+	./pg_regress  --psqldir="$(PSQLDIR)" --dbname=regress1,connectdb --top-builddir=$(top_builddir) --multibyte=$(MULTIBYTE) $(NOLOCALE) $(THREAD) --schedule=$(srcdir)/ecpg_schedule --create-role=connectuser,connectdb

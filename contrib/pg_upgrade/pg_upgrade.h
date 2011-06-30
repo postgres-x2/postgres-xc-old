@@ -2,7 +2,7 @@
  *	pg_upgrade.h
  *
  *	Copyright (c) 2010, PostgreSQL Global Development Group
- *	$PostgreSQL: pgsql/contrib/pg_upgrade/pg_upgrade.h,v 1.15 2010/07/06 19:18:55 momjian Exp $
+ *	$PostgreSQL: pgsql/contrib/pg_upgrade/pg_upgrade.h,v 1.15.2.1 2010/07/25 03:47:33 momjian Exp $
  */
 
 #include "postgres.h"
@@ -38,19 +38,23 @@
 #define pg_copy_file		copy_file
 #define pg_mv_file			rename
 #define pg_link_file		link
+#define RM_CMD				"rm -f"
 #define RMDIR_CMD			"rm -rf"
-#define EXEC_EXT			"sh"
+#define SHELL_EXT			"sh"
 #else
 #define pg_copy_file		CopyFile
 #define pg_mv_file			pgrename
 #define pg_link_file		win32_pghardlink
 #define sleep(x)			Sleep(x * 1000)
+#define RM_CMD				"DEL /q"
 #define RMDIR_CMD			"RMDIR /s/q"
-#define EXEC_EXT			"bat"
+#define SHELL_EXT			"bat"
 #define EXE_EXT				".exe"
 #endif
 
 #define CLUSTERNAME(cluster)	((cluster) == CLUSTER_OLD ? "old" : "new")
+
+#define atooid(x)  ((Oid) strtoul((x), NULL, 10))
 
 /* OID system catalog preservation added during PG 9.0 development */
 #define TABLE_SPACE_SUBDIRS 201001111
@@ -376,6 +380,8 @@ char	   *pg_strdup(migratorContext *ctx, const char *s);
 void	   *pg_malloc(migratorContext *ctx, int size);
 void		pg_free(void *ptr);
 const char *getErrorText(int errNum);
+unsigned int str2uint(const char *str);
+
 
 /* version.c */
 
@@ -388,8 +394,6 @@ void old_8_3_check_for_name_data_type_usage(migratorContext *ctx,
 									   Cluster whichCluster);
 void old_8_3_check_for_tsquery_usage(migratorContext *ctx,
 								Cluster whichCluster);
-void old_8_3_check_for_isn_and_int8_passing_mismatch(migratorContext *ctx,
-												Cluster whichCluster);
 void old_8_3_rebuild_tsvector_tables(migratorContext *ctx,
 								bool check_mode, Cluster whichCluster);
 void old_8_3_invalidate_hash_gin_indexes(migratorContext *ctx,

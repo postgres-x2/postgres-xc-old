@@ -37,7 +37,7 @@ extern void AnalyzeProcArrayRemove(PGPROC *proc, TransactionId latestXid);
 extern void SetGlobalSnapshotData(int xmin, int xmax, int xcnt, int *xip);
 extern void UnsetGlobalSnapshotData(void);
 #endif /* PGXC */
-extern void ProcArrayInitRecoveryInfo(TransactionId oldestActiveXid);
+
 extern void ProcArrayApplyRecoveryInfo(RunningTransactions running);
 extern void ProcArrayApplyXidAssignment(TransactionId topxid,
 							int nsubxids, TransactionId *subxids);

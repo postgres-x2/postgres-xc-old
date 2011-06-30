@@ -419,6 +419,8 @@ insert into atacc1 (test) values (2);
 insert into atacc1 (test) values (4);
 -- try adding a unique oid constraint
 alter table atacc1 add constraint atacc_oid1 unique(oid);
+-- try to create duplicates via alter table using - should fail
+alter table atacc1 alter column test type integer using 0;
 drop table atacc1;
 
 -- let's do one where the unique constraint fails when added
@@ -1089,6 +1091,15 @@ alter table another
 select * from another order by f1, f2;
 
 drop table another;
+
+-- disallow recursive containment of row types
+create temp table recur1 (f1 int);
+alter table recur1 add column f2 recur1; -- fails
+alter table recur1 add column f2 recur1[]; -- fails
+create temp table recur2 (f1 int, f2 recur1);
+alter table recur1 add column f2 recur2; -- fails
+alter table recur1 add column f2 int;
+alter table recur1 alter column f2 type recur2; -- fails
 
 --
 -- alter function

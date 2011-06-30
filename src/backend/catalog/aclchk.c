@@ -1332,7 +1332,7 @@ RemoveRoleFromObjectACL(Oid roleid, Oid classid, Oid objid)
 			case DEFACLOBJ_RELATION:
 				iacls.objtype = ACL_OBJECT_RELATION;
 				break;
-			case ACL_OBJECT_SEQUENCE:
+			case DEFACLOBJ_SEQUENCE:
 				iacls.objtype = ACL_OBJECT_SEQUENCE;
 				break;
 			case DEFACLOBJ_FUNCTION:
@@ -1385,6 +1385,12 @@ RemoveRoleFromObjectACL(Oid roleid, Oid classid, Oid objid)
 				break;
 			case TableSpaceRelationId:
 				istmt.objtype = ACL_OBJECT_TABLESPACE;
+				break;
+			case ForeignServerRelationId:
+				istmt.objtype = ACL_OBJECT_FOREIGN_SERVER;
+				break;
+			case ForeignDataWrapperRelationId:
+				istmt.objtype = ACL_OBJECT_FDW;
 				break;
 			default:
 				elog(ERROR, "unexpected object class %u", classid);

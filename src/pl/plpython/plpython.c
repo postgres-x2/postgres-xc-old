@@ -1,7 +1,7 @@
 /**********************************************************************
  * plpython.c - python as a procedural language for PostgreSQL
  *
- *	$PostgreSQL: pgsql/src/pl/plpython/plpython.c,v 1.148 2010/07/08 19:00:11 tgl Exp $
+ *	$PostgreSQL: pgsql/src/pl/plpython/plpython.c,v 1.148.2.1 2010/08/25 19:37:52 petere Exp $
  *
  *********************************************************************
  */
@@ -153,10 +153,8 @@ typedef union PLyTypeInput
  */
 
 struct PLyObToDatum;
-struct PLyTypeInfo;
-typedef Datum (*PLyObToDatumFunc) (struct PLyTypeInfo *,
-											   struct PLyObToDatum *,
-											   PyObject *);
+typedef Datum (*PLyObToDatumFunc) (struct PLyObToDatum *, int32 typmod,
+								   PyObject *);
 
 typedef struct PLyObToDatum
 {
@@ -346,14 +344,10 @@ static PyObject *PLyList_FromArray(PLyDatumToOb *arg, Datum d);
 
 static PyObject *PLyDict_FromTuple(PLyTypeInfo *, HeapTuple, TupleDesc);
 
-static Datum PLyObject_ToBool(PLyTypeInfo *, PLyObToDatum *,
-				 PyObject *);
-static Datum PLyObject_ToBytea(PLyTypeInfo *, PLyObToDatum *,
-				  PyObject *);
-static Datum PLyObject_ToDatum(PLyTypeInfo *, PLyObToDatum *,
-				  PyObject *);
-static Datum PLySequence_ToArray(PLyTypeInfo *, PLyObToDatum *,
-					PyObject *);
+static Datum PLyObject_ToBool(PLyObToDatum *, int32, PyObject *);
+static Datum PLyObject_ToBytea(PLyObToDatum *, int32, PyObject *);
+static Datum PLyObject_ToDatum(PLyObToDatum *, int32, PyObject *);
+static Datum PLySequence_ToArray(PLyObToDatum *, int32, PyObject *);
 
 static HeapTuple PLyMapping_ToTuple(PLyTypeInfo *, PyObject *);
 static HeapTuple PLySequence_ToTuple(PLyTypeInfo *, PyObject *);
@@ -421,7 +415,8 @@ static void
 plpython_error_callback(void *arg)
 {
 	if (PLy_curr_procedure)
-		errcontext("PL/Python function \"%s\"", PLy_procedure_name(PLy_curr_procedure));
+		errcontext("PL/Python function \"%s\"",
+				   PLy_procedure_name(PLy_curr_procedure));
 }
 
 static void
@@ -743,7 +738,9 @@ PLy_modify_tuple(PLyProcedure *proc, PyObject *pltd, TriggerData *tdata,
 			{
 				PLyObToDatum *att = &proc->result.out.r.atts[atti];
 
-				modvalues[i] = (att->func) (&proc->result, att, plval);
+				modvalues[i] = (att->func) (att,
+											tupdesc->attrs[atti]->atttypmod,
+											plval);
 				modnulls[i] = ' ';
 			}
 			else
@@ -987,7 +984,10 @@ PLy_function_handler(FunctionCallInfo fcinfo, PLyProcedure *proc)
 	{
 		if (!proc->is_setof || proc->setof == NULL)
 		{
-			/* Simple type returning function or first time for SETOF function */
+			/*
+			 * Simple type returning function or first time for SETOF function:
+			 * actually execute the function.
+			 */
 			plargs = PLy_function_build_args(fcinfo, proc);
 			plrv = PLy_procedure_call(proc, "args", plargs);
 			if (!proc->is_setof)
@@ -1002,14 +1002,10 @@ PLy_function_handler(FunctionCallInfo fcinfo, PLyProcedure *proc)
 		}
 
 		/*
-		 * Disconnect from SPI manager and then create the return values datum
-		 * (if the input function does a palloc for it this must not be
-		 * allocated in the SPI memory context because SPI_finish would free
-		 * it).
+		 * If it returns a set, call the iterator to get the next return item.
+		 * We stay in the SPI context while doing this, because PyIter_Next()
+		 * calls back into Python code which might contain SPI calls.
 		 */
-		if (SPI_finish() != SPI_OK_FINISH)
-			elog(ERROR, "SPI_finish failed");
-
 		if (proc->is_setof)
 		{
 			bool		has_error = false;
@@ -1066,10 +1062,23 @@ PLy_function_handler(FunctionCallInfo fcinfo, PLyProcedure *proc)
 							(errcode(ERRCODE_DATA_EXCEPTION),
 						  errmsg("error fetching next item from iterator")));
 
+				/* Disconnect from the SPI manager before returning */
+				if (SPI_finish() != SPI_OK_FINISH)
+					elog(ERROR, "SPI_finish failed");
+
 				fcinfo->isnull = true;
 				return (Datum) NULL;
 			}
 		}
+
+		/*
+		 * Disconnect from SPI manager and then create the return values datum
+		 * (if the input function does a palloc for it this must not be
+		 * allocated in the SPI memory context because SPI_finish would free
+		 * it).
+		 */
+		if (SPI_finish() != SPI_OK_FINISH)
+			elog(ERROR, "SPI_finish failed");
 
 		plerrcontext.callback = plpython_return_error_callback;
 		plerrcontext.previous = error_context_stack;
@@ -1131,9 +1140,7 @@ PLy_function_handler(FunctionCallInfo fcinfo, PLyProcedure *proc)
 		else
 		{
 			fcinfo->isnull = false;
-			rv = (proc->result.out.d.func) (&proc->result,
-											&proc->result.out.d,
-											plrv);
+			rv = (proc->result.out.d.func) (&proc->result.out.d, -1, plrv);
 		}
 	}
 	PG_CATCH();
@@ -1315,6 +1322,8 @@ PLy_procedure_get(FunctionCallInfo fcinfo, Oid tgreloid)
 			elog(FATAL, "expected a PyCObject, didn't get one");
 
 		proc = PyCObject_AsVoidPtr(plproc);
+		if (!proc)
+			PLy_elog(ERROR, "PyCObject_AsVoidPtr() failed");
 		if (proc->me != plproc)
 			elog(FATAL, "proc->me != plproc");
 		/* did we find an up-to-date cache entry? */
@@ -1539,8 +1548,11 @@ PLy_procedure_create(HeapTuple procTup, Oid tgreloid, char *key)
 		PLy_procedure_compile(proc, procSource);
 
 		pfree(procSource);
+		procSource = NULL;
 
 		proc->me = PyCObject_FromVoidPtr(proc, NULL);
+		if (!proc->me)
+			PLy_elog(ERROR, "PyCObject_FromVoidPtr() failed");
 		PyDict_SetItemString(PLy_procedure_cache, key, proc->me);
 	}
 	PG_CATCH();
@@ -2030,7 +2042,10 @@ PLyList_FromArray(PLyDatumToOb *arg, Datum d)
 						 elm->typlen, elm->typbyval, elm->typalign,
 						 &isnull);
 		if (isnull)
+		{
+			Py_INCREF(Py_None);
 			PyList_SET_ITEM(list, i, Py_None);
+		}
 		else
 			PyList_SET_ITEM(list, i, elm->func(elm, elem));
 	}
@@ -2093,9 +2108,7 @@ PLyDict_FromTuple(PLyTypeInfo *info, HeapTuple tuple, TupleDesc desc)
  * type can parse.
  */
 static Datum
-PLyObject_ToBool(PLyTypeInfo *info,
-				 PLyObToDatum *arg,
-				 PyObject *plrv)
+PLyObject_ToBool(PLyObToDatum *arg, int32 typmod, PyObject *plrv)
 {
 	Datum		rv;
 
@@ -2114,9 +2127,7 @@ PLyObject_ToBool(PLyTypeInfo *info,
  * with embedded nulls.  And it's faster this way.
  */
 static Datum
-PLyObject_ToBytea(PLyTypeInfo *info,
-				  PLyObToDatum *arg,
-				  PyObject *plrv)
+PLyObject_ToBytea(PLyObToDatum *arg, int32 typmod, PyObject *plrv)
 {
 	PyObject   *volatile plrv_so = NULL;
 	Datum		rv;
@@ -2158,9 +2169,7 @@ PLyObject_ToBytea(PLyTypeInfo *info,
  * cstring into PostgreSQL type.
  */
 static Datum
-PLyObject_ToDatum(PLyTypeInfo *info,
-				  PLyObToDatum *arg,
-				  PyObject *plrv)
+PLyObject_ToDatum(PLyObToDatum *arg, int32 typmod, PyObject *plrv)
 {
 	PyObject   *volatile plrv_bo = NULL;
 	Datum		rv;
@@ -2196,7 +2205,10 @@ PLyObject_ToDatum(PLyTypeInfo *info,
 		else if (slen > plen)
 			elog(ERROR, "could not convert Python object into cstring: Python string longer than reported length");
 		pg_verifymbstr(plrv_sc, slen, false);
-		rv = InputFunctionCall(&arg->typfunc, plrv_sc, arg->typioparam, -1);
+		rv = InputFunctionCall(&arg->typfunc,
+							   plrv_sc,
+							   arg->typioparam,
+							   typmod);
 	}
 	PG_CATCH();
 	{
@@ -2211,9 +2223,7 @@ PLyObject_ToDatum(PLyTypeInfo *info,
 }
 
 static Datum
-PLySequence_ToArray(PLyTypeInfo *info,
-					PLyObToDatum *arg,
-					PyObject *plrv)
+PLySequence_ToArray(PLyObToDatum *arg, int32 typmod, PyObject *plrv)
 {
 	ArrayType  *array;
 	int			i;
@@ -2245,7 +2255,7 @@ PLySequence_ToArray(PLyTypeInfo *info,
 			 * We don't support arrays of row types yet, so the first argument
 			 * can be NULL.
 			 */
-			elems[i] = arg->elm->func(NULL, arg->elm, obj);
+			elems[i] = arg->elm->func(arg->elm, -1, obj);
 		}
 		Py_XDECREF(obj);
 	}
@@ -2294,7 +2304,7 @@ PLyMapping_ToTuple(PLyTypeInfo *info, PyObject *mapping)
 			}
 			else if (value)
 			{
-				values[i] = (att->func) (info, att, value);
+				values[i] = (att->func) (att, -1, value);
 				nulls[i] = false;
 			}
 			else
@@ -2371,7 +2381,7 @@ PLySequence_ToTuple(PLyTypeInfo *info, PyObject *sequence)
 			}
 			else if (value)
 			{
-				values[i] = (att->func) (info, att, value);
+				values[i] = (att->func) (att, -1, value);
 				nulls[i] = false;
 			}
 
@@ -2431,7 +2441,7 @@ PLyObject_ToTuple(PLyTypeInfo *info, PyObject *object)
 			}
 			else if (value)
 			{
-				values[i] = (att->func) (info, att, value);
+				values[i] = (att->func) (att, -1, value);
 				nulls[i] = false;
 			}
 			else
@@ -2762,14 +2772,9 @@ PLy_result_ass_item(PyObject *arg, Py_ssize_t idx, PyObject *item)
 static PyObject *
 PLy_result_slice(PyObject *arg, Py_ssize_t lidx, Py_ssize_t hidx)
 {
-	PyObject   *rv;
 	PLyResultObject *ob = (PLyResultObject *) arg;
 
-	rv = PyList_GetSlice(ob->rows, lidx, hidx);
-	if (rv == NULL)
-		return NULL;
-	Py_INCREF(rv);
-	return rv;
+	return PyList_GetSlice(ob->rows, lidx, hidx);
 }
 
 static int
@@ -3013,7 +3018,9 @@ PLy_spi_execute_plan(PyObject *ob, PyObject *list, long limit)
 				PG_TRY();
 				{
 					plan->values[j] =
-						plan->args[j].out.d.func(NULL, &(plan->args[j].out.d), elem);
+						plan->args[j].out.d.func(&(plan->args[j].out.d),
+												 -1,
+												 elem);
 				}
 				PG_CATCH();
 				{

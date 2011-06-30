@@ -11,7 +11,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/access/transam/xact.c,v 1.293 2010/07/06 19:18:55 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/access/transam/xact.c,v 1.293.2.4 2010/08/13 15:45:17 rhaas Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -498,10 +498,32 @@ AssignTransactionId(TransactionState s)
 
 	/*
 	 * Ensure parent(s) have XIDs, so that a child always has an XID later
-	 * than its parent.
+	 * than its parent.  Musn't recurse here, or we might get a stack overflow
+	 * if we're at the bottom of a huge stack of subtransactions none of which
+	 * have XIDs yet.
 	 */
 	if (isSubXact && !TransactionIdIsValid(s->parent->transactionId))
-		AssignTransactionId(s->parent);
+	{
+		TransactionState	p = s->parent;
+		TransactionState   *parents;
+		size_t	parentOffset = 0;
+
+		parents = palloc(sizeof(TransactionState) *  s->nestingLevel);
+		while (p != NULL && !TransactionIdIsValid(p->transactionId))
+		{
+			parents[parentOffset++] = p;
+			p = p->parent;
+		}
+
+		/*
+		 * This is technically a recursive call, but the recursion will
+		 * never be more than one layer deep.
+		 */
+		while (parentOffset != 0)
+			AssignTransactionId(parents[--parentOffset]);
+
+		pfree(parents);
+	}
 
 	/*
 	 * Generate a new Xid and record it in PG_PROC and pg_subtrans.
@@ -1061,15 +1083,16 @@ RecordTransactionCommit(void)
 	bool		haveNonTemp;
 	int			nchildren;
 	TransactionId *children;
-	int			nmsgs;
+	int			nmsgs = 0;
 	SharedInvalidationMessage *invalMessages = NULL;
-	bool		RelcacheInitFileInval;
+	bool		RelcacheInitFileInval = false;
 
 	/* Get data needed for commit record */
 	nrels = smgrGetPendingDeletes(true, &rels, &haveNonTemp);
 	nchildren = xactGetCommittedChildren(&children);
-	nmsgs = xactGetCommittedInvalidationMessages(&invalMessages,
-												 &RelcacheInitFileInval);
+	if (XLogStandbyInfoActive())
+		nmsgs = xactGetCommittedInvalidationMessages(&invalMessages,
+													 &RelcacheInitFileInval);
 
 	/*
 	 * If we haven't been assigned an XID yet, we neither can, nor do we want
@@ -1237,7 +1260,7 @@ RecordTransactionCommit(void)
 		 * Report the latest async commit LSN, so that the WAL writer knows to
 		 * flush this commit.
 		 */
-		XLogSetAsyncCommitLSN(XactLastRecEnd);
+		XLogSetAsyncXactLSN(XactLastRecEnd);
 
 		/*
 		 * We must not immediately update the CLOG, since we didn't flush the
@@ -1540,7 +1563,7 @@ RecordTransactionAbort(bool isSubXact)
 	 * problems occur at that point.
 	 */
 	if (!isSubXact)
-		XLogSetAsyncCommitLSN(XactLastRecEnd);
+		XLogSetAsyncXactLSN(XactLastRecEnd);
 
 	/*
 	 * Mark the transaction aborted in clog.  This is not absolutely necessary
@@ -5069,9 +5092,9 @@ xact_redo_abort(xl_xact_abort *xlrec, TransactionId xid)
 	sub_xids = (TransactionId *) &(xlrec->xnodes[xlrec->nrels]);
 	max_xid = TransactionIdLatest(xid, xlrec->nsubxacts, sub_xids);
 
-	/* Make sure nextXid is beyond any XID mentioned in the record */
-
 	/*
+	 * Make sure nextXid is beyond any XID mentioned in the record.
+	 *
 	 * We don't expect anyone else to modify nextXid, hence we don't need to
 	 * hold a lock while checking this. We still acquire the lock to modify
 	 * it, though.

@@ -46,6 +46,10 @@ transfer_all_new_dbs(migratorContext *ctx, DbInfoArr *olddb_arr,
 		int			n_maps;
 		pageCnvCtx *pageConverter = NULL;
 
+		if (!old_db)
+			pg_log(ctx, PG_FATAL,
+			   "the new cluster database %s was not found in the old cluster\n", new_db->db_name);
+		
 		n_maps = 0;
 		mappings = gen_db_file_maps(ctx, old_db, new_db, &n_maps, old_pgdata,
 									new_pgdata);
@@ -94,9 +98,9 @@ get_pg_database_relfilenode(migratorContext *ctx, Cluster whichCluster)
 
 	i_relfile = PQfnumber(res, "relfilenode");
 	if (whichCluster == CLUSTER_OLD)
-		ctx->old.pg_database_oid = atol(PQgetvalue(res, 0, i_relfile));
+		ctx->old.pg_database_oid = atooid(PQgetvalue(res, 0, i_relfile));
 	else
-		ctx->new.pg_database_oid = atol(PQgetvalue(res, 0, i_relfile));
+		ctx->new.pg_database_oid = atooid(PQgetvalue(res, 0, i_relfile));
 
 	PQclear(res);
 	PQfinish(conn);
@@ -218,7 +222,7 @@ transfer_relfile(migratorContext *ctx, pageCnvCtx *pageConverter, const char *ol
 	}
 	else
 	{
-		pg_log(ctx, PG_INFO, "linking %s to %s\n", newfile, oldfile);
+		pg_log(ctx, PG_INFO, "linking %s to %s\n", oldfile, newfile);
 
 		if ((msg = linkAndUpdateFile(ctx, pageConverter, oldfile, newfile)) != NULL)
 			pg_log(ctx, PG_FATAL,

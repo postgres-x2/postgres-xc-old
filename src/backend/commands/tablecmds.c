@@ -9,7 +9,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/commands/tablecmds.c,v 1.332 2010/07/06 19:18:56 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/commands/tablecmds.c,v 1.332.2.4 2010/08/18 18:35:29 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -294,6 +294,7 @@ static void ATExecSetOptions(Relation rel, const char *colName,
 				 Node *options, bool isReset);
 static void ATExecSetStorage(Relation rel, const char *colName,
 				 Node *newValue);
+static void ATPrepDropColumn(Relation rel, bool recurse, AlterTableCmd *cmd);
 static void ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 				 DropBehavior behavior,
 				 bool recurse, bool recursing,
@@ -333,7 +334,8 @@ static void ATExecEnableDisableTrigger(Relation rel, char *trigname,
 						   char fires_when, bool skip_system);
 static void ATExecEnableDisableRule(Relation rel, char *rulename,
 						char fires_when);
-static void ATExecAddInherit(Relation rel, RangeVar *parent);
+static void ATPrepAddInherit(Relation child_rel);
+static void ATExecAddInherit(Relation child_rel, RangeVar *parent);
 static void ATExecDropInherit(Relation rel, RangeVar *parent);
 static void copy_relation_data(SMgrRelation rel, SMgrRelation dst,
 				   ForkNumber forkNum, bool istemp);
@@ -344,11 +346,21 @@ static const char *storage_name(char c);
  *		DefineRelation
  *				Creates a new relation.
  *
+ * stmt carries parsetree information from an ordinary CREATE TABLE statement.
+ * The other arguments are used to extend the behavior for other cases:
+ * relkind: relkind to assign to the new relation
+ * ownerId: if not InvalidOid, use this as the new relation's owner.
+ *
+ * Note that permissions checks are done against current user regardless of
+ * ownerId.  A nonzero ownerId is used when someone is creating a relation
+ * "on behalf of" someone else, so we still want to see that the current user
+ * has permissions to do it.
+ *
  * If successful, returns the OID of the new relation.
  * ----------------------------------------------------------------
  */
 Oid
-DefineRelation(CreateStmt *stmt, char relkind)
+DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId)
 {
 	char		relname[NAMEDATALEN];
 	Oid			namespaceId;
@@ -455,6 +467,10 @@ DefineRelation(CreateStmt *stmt, char relkind)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("only shared relations can be placed in pg_global tablespace")));
 
+	/* Identify user ID that will own the table */
+	if (!OidIsValid(ownerId))
+		ownerId = GetUserId();
+
 	/*
 	 * Parse and validate reloptions, if any.
 	 */
@@ -547,7 +563,7 @@ DefineRelation(CreateStmt *stmt, char relkind)
 										  InvalidOid,
 										  InvalidOid,
 										  ofTypeId,
-										  GetUserId(),
+										  ownerId,
 										  descriptor,
 										  list_concat(cookedDefaults,
 													  old_constraints),
@@ -1043,7 +1059,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 			/*
 			 * Reconstruct the indexes to match, and we're done.
 			 */
-			reindex_relation(heap_relid, true, false);
+			reindex_relation(heap_relid, true, 0);
 		}
 	}
 
@@ -2545,10 +2561,8 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_DropColumn:		/* DROP COLUMN */
 			ATSimplePermissions(rel, false);
+			ATPrepDropColumn(rel, recurse, cmd);
 			/* Recursion occurs during execution phase */
-			/* No command-specific prep needed except saving recurse flag */
-			if (recurse)
-				cmd->subtype = AT_DropColumnRecurse;
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AddIndex:		/* ADD INDEX */
@@ -2625,6 +2639,12 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			/* No command-specific prep needed */
 			pass = AT_PASS_MISC;
 			break;
+		case AT_AddInherit:		/* INHERIT */
+			ATSimplePermissions(rel, false);
+			/* This command never recurses */
+			ATPrepAddInherit(rel);
+			pass = AT_PASS_MISC;
+			break;
 		case AT_EnableTrig:		/* ENABLE TRIGGER variants */
 		case AT_EnableAlwaysTrig:
 		case AT_EnableReplicaTrig:
@@ -2637,8 +2657,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_EnableAlwaysRule:
 		case AT_EnableReplicaRule:
 		case AT_DisableRule:
-		case AT_AddInherit:		/* INHERIT / NO INHERIT */
-		case AT_DropInherit:
+		case AT_DropInherit:	/* NO INHERIT */
 			ATSimplePermissions(rel, false);
 			/* These commands never recurse */
 			/* No command-specific prep needed */
@@ -2968,13 +2987,14 @@ ATRewriteTables(List **wqueue)
 
 			/*
 			 * Swap the physical files of the old and new heaps, then rebuild
-			 * indexes and discard the new heap.  We can use RecentXmin for
+			 * indexes and discard the old heap.  We can use RecentXmin for
 			 * the table's new relfrozenxid because we rewrote all the tuples
 			 * in ATRewriteTable, so no older Xid remains in the table.  Also,
 			 * we never try to swap toast tables by content, since we have no
 			 * interest in letting this code work on system catalogs.
 			 */
-			finish_heap_swap(tab->relid, OIDNewHeap, false, false, RecentXmin);
+			finish_heap_swap(tab->relid, OIDNewHeap,
+							 false, false, true, RecentXmin);
 		}
 		else
 		{
@@ -3628,6 +3648,11 @@ static void
 ATPrepAddColumn(List **wqueue, Relation rel, bool recurse,
 				AlterTableCmd *cmd)
 {
+	if (rel->rd_rel->reloftype)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot add column to typed table")));
+
 	/*
 	 * Recurse to add the column to child classes, if requested.
 	 *
@@ -3675,11 +3700,6 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 	int32		typmod;
 	Form_pg_type tform;
 	Expr	   *defval;
-
-	if (rel->rd_rel->reloftype)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot add column to typed table")));
 
 	attrdesc = heap_open(AttributeRelationId, RowExclusiveLock);
 
@@ -3769,7 +3789,9 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 	typeOid = HeapTupleGetOid(typeTuple);
 
 	/* make sure datatype is legal for a column */
-	CheckAttributeType(colDef->colname, typeOid, false);
+	CheckAttributeType(colDef->colname, typeOid,
+					   list_make1_oid(rel->rd_rel->reltype),
+					   false);
 
 	/* construct new attribute's pg_attribute entry */
 	attribute.attrelid = myrelid;
@@ -4386,6 +4408,19 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue)
  * correctly.)
  */
 static void
+ATPrepDropColumn(Relation rel, bool recurse, AlterTableCmd *cmd)
+{
+	if (rel->rd_rel->reloftype)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot drop column from typed table")));
+
+	/* No command-specific prep needed except saving recurse flag */
+	if (recurse)
+		cmd->subtype = AT_DropColumnRecurse;
+}
+
+static void
 ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 				 DropBehavior behavior,
 				 bool recurse, bool recursing,
@@ -4396,11 +4431,6 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 	AttrNumber	attnum;
 	List	   *children;
 	ObjectAddress object;
-
-	if (rel->rd_rel->reloftype)
-		ereport(ERROR,
-				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("cannot drop column from typed table")));
 
 	/* At top level, permission check was done in ATPrepCmd, else do it */
 	if (recursing)
@@ -4748,6 +4778,15 @@ ATAddCheckConstraint(List **wqueue, AlteredTableInfo *tab, Relation rel,
 
 	/* Advance command counter in case same table is visited multiple times */
 	CommandCounterIncrement();
+
+	/*
+	 * If the constraint got merged with an existing constraint, we're done.
+	 * We mustn't recurse to child tables in this case, because they've already
+	 * got the constraint, and visiting them again would lead to an incorrect
+	 * value for coninhcount.
+	 */
+	if (newcons == NIL)
+		return;
 
 	/*
 	 * Propagate to children as appropriate.  Unlike most other ALTER
@@ -5848,6 +5887,11 @@ ATPrepAlterColumnType(List **wqueue,
 	NewColumnValue *newval;
 	ParseState *pstate = make_parsestate(NULL);
 
+	if (rel->rd_rel->reloftype)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot alter column type of typed table")));
+
 	/* lookup the attribute so we can check inheritance status */
 	tuple = SearchSysCacheAttName(RelationGetRelid(rel), colName);
 	if (!HeapTupleIsValid(tuple))
@@ -5876,7 +5920,9 @@ ATPrepAlterColumnType(List **wqueue,
 	targettype = typenameTypeId(NULL, typeName, &targettypmod);
 
 	/* make sure datatype is legal for a column */
-	CheckAttributeType(colName, targettype, false);
+	CheckAttributeType(colName, targettype,
+					   list_make1_oid(rel->rd_rel->reltype),
+					   false);
 
 	/*
 	 * Set up an expression to transform the old data value to the new type.
@@ -6167,6 +6213,24 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 								   colName)));
 				break;
 
+			case OCLASS_TRIGGER:
+				/*
+				 * A trigger can depend on a column because the column is
+				 * specified as an update target, or because the column is
+				 * used in the trigger's WHEN condition.  The first case would
+				 * not require any extra work, but the second case would
+				 * require updating the WHEN expression, which will take a
+				 * significant amount of new code.  Since we can't easily tell
+				 * which case applies, we punt for both.  FIXME someday.
+				 */
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("cannot alter type of a column used in a trigger definition"),
+						 errdetail("%s depends on column \"%s\"",
+								   getObjectDescription(&foundObject),
+								   colName)));
+				break;
+
 			case OCLASS_DEFAULT:
 
 				/*
@@ -6187,7 +6251,6 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			case OCLASS_OPFAMILY:
 			case OCLASS_AMOP:
 			case OCLASS_AMPROC:
-			case OCLASS_TRIGGER:
 			case OCLASS_SCHEMA:
 			case OCLASS_TSPARSER:
 			case OCLASS_TSDICT:
@@ -7093,11 +7156,20 @@ static void
 copy_relation_data(SMgrRelation src, SMgrRelation dst,
 				   ForkNumber forkNum, bool istemp)
 {
+	char	   *buf;
+	Page		page;
 	bool		use_wal;
 	BlockNumber nblocks;
 	BlockNumber blkno;
-	char		buf[BLCKSZ];
-	Page		page = (Page) buf;
+
+	/*
+	 * palloc the buffer so that it's MAXALIGN'd.  If it were just a local
+	 * char[] array, the compiler might align it on any byte boundary, which
+	 * can seriously hurt transfer speed to and from the kernel; not to
+	 * mention possibly making log_newpage's accesses to the page header fail.
+	 */
+	buf = (char *) palloc(BLCKSZ);
+	page = (Page) buf;
 
 	/*
 	 * We need to log the copied data in WAL iff WAL archiving/streaming is
@@ -7125,6 +7197,8 @@ copy_relation_data(SMgrRelation src, SMgrRelation dst,
 		 */
 		smgrextend(dst, forkNum, blkno, buf, true);
 	}
+
+	pfree(buf);
 
 	/*
 	 * If the rel isn't temp, we must fsync it down to disk before it's safe
@@ -7175,6 +7249,15 @@ ATExecEnableDisableRule(Relation rel, char *trigname,
  * check constraints of the parent appear in the child and that they have the
  * same data types and expressions.
  */
+static void
+ATPrepAddInherit(Relation child_rel)
+{
+	if (child_rel->rd_rel->reloftype)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot change inheritance of typed table")));
+}
+
 static void
 ATExecAddInherit(Relation child_rel, RangeVar *parent)
 {

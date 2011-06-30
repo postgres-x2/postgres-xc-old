@@ -9,7 +9,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/utils/adt/ruleutils.c,v 1.326 2010/05/30 18:10:41 tgl Exp $
+ *	  $PostgreSQL: pgsql/src/backend/utils/adt/ruleutils.c,v 1.326.2.1 2010/07/09 21:11:57 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -224,6 +224,7 @@ static void get_opclass_name(Oid opclass, Oid actual_datatype,
 static Node *processIndirection(Node *node, deparse_context *context,
 				   bool printit);
 static void printSubscripts(ArrayRef *aref, deparse_context *context);
+static char *get_relation_name(Oid relid);
 static char *generate_relation_name(Oid relid, List *namespaces);
 static char *generate_function_name(Oid funcid, int nargs, List *argnames,
 					   Oid *argtypes, bool *is_variadic);
@@ -837,7 +838,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 
 	indexpr_item = list_head(indexprs);
 
-	context = deparse_context_for(get_rel_name(indrelid), indrelid);
+	context = deparse_context_for(get_relation_name(indrelid), indrelid);
 
 	/*
 	 * Start the index definition.	Note that the index's name should never be
@@ -1241,7 +1242,7 @@ pg_get_constraintdef_worker(Oid constraintId, bool fullCommand,
 				if (conForm->conrelid != InvalidOid)
 				{
 					/* relation constraint */
-					context = deparse_context_for(get_rel_name(conForm->conrelid),
+					context = deparse_context_for(get_relation_name(conForm->conrelid),
 												  conForm->conrelid);
 				}
 				else
@@ -3899,6 +3900,49 @@ get_variable(Var *var, int levelsup, bool showstar, deparse_context *context)
 		return NULL;			/* keep compiler quiet */
 	}
 
+	/*
+	 * The planner will sometimes emit Vars referencing resjunk elements of a
+	 * subquery's target list (this is currently only possible if it chooses
+	 * to generate a "physical tlist" for a SubqueryScan or CteScan node).
+	 * Although we prefer to print subquery-referencing Vars using the
+	 * subquery's alias, that's not possible for resjunk items since they have
+	 * no alias.  So in that case, drill down to the subplan and print the
+	 * contents of the referenced tlist item.  This works because in a plan
+	 * tree, such Vars can only occur in a SubqueryScan or CteScan node,
+	 * and we'll have set dpns->inner_plan to reference the child plan node.
+	 */
+	if ((rte->rtekind == RTE_SUBQUERY || rte->rtekind == RTE_CTE) &&
+		attnum > list_length(rte->eref->colnames) &&
+		dpns->inner_plan)
+	{
+		TargetEntry *tle;
+		Plan	   *save_outer;
+		Plan	   *save_inner;
+
+		tle = get_tle_by_resno(dpns->inner_plan->targetlist, var->varattno);
+		if (!tle)
+			elog(ERROR, "bogus varattno for subquery var: %d", var->varattno);
+
+		Assert(netlevelsup == 0);
+		save_outer = dpns->outer_plan;
+		save_inner = dpns->inner_plan;
+		push_plan(dpns, dpns->inner_plan);
+
+		/*
+		 * Force parentheses because our caller probably assumed a Var is a
+		 * simple expression.
+		 */
+		if (!IsA(tle->expr, Var))
+			appendStringInfoChar(buf, '(');
+		get_rule_expr((Node *) tle->expr, context, true);
+		if (!IsA(tle->expr, Var))
+			appendStringInfoChar(buf, ')');
+
+		dpns->outer_plan = save_outer;
+		dpns->inner_plan = save_inner;
+		return NULL;
+	}
+
 	/* Identify names to use */
 	schemaname = NULL;			/* default assumptions */
 	refname = rte->eref->aliasname;
@@ -5116,54 +5160,36 @@ get_rule_expr(Node *node, deparse_context *context,
 					CaseWhen   *when = (CaseWhen *) lfirst(temp);
 					Node	   *w = (Node *) when->expr;
 
-					if (!PRETTY_INDENT(context))
-						appendStringInfoChar(buf, ' ');
-					appendContextKeyword(context, "WHEN ",
-										 0, 0, 0);
 					if (caseexpr->arg)
 					{
 						/*
-						 * The parser should have produced WHEN clauses of the
-						 * form "CaseTestExpr = RHS"; we want to show just the
-						 * RHS.  If the user wrote something silly like "CASE
-						 * boolexpr WHEN TRUE THEN ...", then the optimizer's
-						 * simplify_boolean_equality() may have reduced this
-						 * to just "CaseTestExpr" or "NOT CaseTestExpr", for
-						 * which we have to show "TRUE" or "FALSE".  Also,
-						 * depending on context the original CaseTestExpr
-						 * might have been reduced to a Const (but we won't
-						 * see "WHEN Const").  We have also to consider the
-						 * possibility that an implicit coercion was inserted
-						 * between the CaseTestExpr and the operator.
+						 * The parser should have produced WHEN clauses of
+						 * the form "CaseTestExpr = RHS", possibly with an
+						 * implicit coercion inserted above the CaseTestExpr.
+						 * For accurate decompilation of rules it's essential
+						 * that we show just the RHS.  However in an
+						 * expression that's been through the optimizer, the
+						 * WHEN clause could be almost anything (since the
+						 * equality operator could have been expanded into an
+						 * inline function).  If we don't recognize the form
+						 * of the WHEN clause, just punt and display it as-is.
 						 */
 						if (IsA(w, OpExpr))
 						{
 							List	   *args = ((OpExpr *) w)->args;
-							Node	   *lhs;
-							Node	   *rhs;
 
-							Assert(list_length(args) == 2);
-							lhs = strip_implicit_coercions(linitial(args));
-							Assert(IsA(lhs, CaseTestExpr) ||
-								   IsA(lhs, Const));
-							rhs = (Node *) lsecond(args);
-							get_rule_expr(rhs, context, false);
+							if (list_length(args) == 2 &&
+								IsA(strip_implicit_coercions(linitial(args)),
+									CaseTestExpr))
+								w = (Node *) lsecond(args);
 						}
-						else if (IsA(strip_implicit_coercions(w),
-									 CaseTestExpr))
-							appendStringInfo(buf, "TRUE");
-						else if (not_clause(w))
-						{
-							Assert(IsA(strip_implicit_coercions((Node *) get_notclausearg((Expr *) w)),
-									   CaseTestExpr));
-							appendStringInfo(buf, "FALSE");
-						}
-						else
-							elog(ERROR, "unexpected CASE WHEN clause: %d",
-								 (int) nodeTag(w));
 					}
-					else
-						get_rule_expr(w, context, false);
+
+					if (!PRETTY_INDENT(context))
+						appendStringInfoChar(buf, ' ');
+					appendContextKeyword(context, "WHEN ",
+										 0, 0, 0);
+					get_rule_expr(w, context, false);
 					appendStringInfo(buf, " THEN ");
 					get_rule_expr((Node *) when->result, context, true);
 				}
@@ -5176,6 +5202,19 @@ get_rule_expr(Node *node, deparse_context *context,
 					appendStringInfoChar(buf, ' ');
 				appendContextKeyword(context, "END",
 									 -PRETTYINDENT_VAR, 0, 0);
+			}
+			break;
+
+		case T_CaseTestExpr:
+			{
+				/*
+				 * Normally we should never get here, since for expressions
+				 * that can contain this node type we attempt to avoid
+				 * recursing to it.  But in an optimized expression we might
+				 * be unable to avoid that (see comments for CaseExpr).  If we
+				 * do see one, print it as CASE_TEST_EXPR.
+				 */
+				appendStringInfo(buf, "CASE_TEST_EXPR");
 			}
 			break;
 
@@ -6298,7 +6337,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			gavealias = true;
 		}
 		else if (rte->rtekind == RTE_RELATION &&
-				 strcmp(rte->eref->aliasname, get_rel_name(rte->relid)) != 0)
+				 strcmp(rte->eref->aliasname, get_relation_name(rte->relid)) != 0)
 		{
 			/*
 			 * Apparently the rel has been renamed since the rule was made.
@@ -6796,6 +6835,23 @@ quote_qualified_identifier(const char *qualifier,
 		appendStringInfo(&buf, "%s.", quote_identifier(qualifier));
 	appendStringInfoString(&buf, quote_identifier(ident));
 	return buf.data;
+}
+
+/*
+ * get_relation_name
+ *		Get the unqualified name of a relation specified by OID
+ *
+ * This differs from the underlying get_rel_name() function in that it will
+ * throw error instead of silently returning NULL if the OID is bad.
+ */
+static char *
+get_relation_name(Oid relid)
+{
+	char	   *relname = get_rel_name(relid);
+
+	if (!relname)
+		elog(ERROR, "cache lookup failed for relation %u", relid);
+	return relname;
 }
 
 /*

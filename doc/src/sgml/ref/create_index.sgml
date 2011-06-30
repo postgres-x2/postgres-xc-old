@@ -1,5 +1,5 @@
 <!--
-$PostgreSQL: pgsql/doc/src/sgml/ref/create_index.sgml,v 1.74 2010/04/03 07:22:58 petere Exp $
+$PostgreSQL: pgsql/doc/src/sgml/ref/create_index.sgml,v 1.74.2.1 2010/07/29 19:34:37 petere Exp $
 PostgreSQL documentation
 -->
 
@@ -368,7 +368,16 @@ CREATE [ UNIQUE ] INDEX [ CONCURRENTLY ] [ <replaceable class="parameter">name</
    <para>
     In a concurrent index build, the index is actually entered into the
     system catalogs in one transaction, then the two table scans occur in a
-    second and third transaction.
+    second and third transaction.  All active transactions at the time the
+    second table scan starts, not just ones that already involve the table,
+    have the potential to block the concurrent index creation until they
+    finish.  When checking for transactions that could still use the original
+    index, concurrent index creation advances through potentially interfering
+    older transactions one at a time, obtaining shared locks on their virtual
+    transaction identifiers to wait for them to complete.
+   </para>
+
+   <para>
     If a problem arises while scanning the table, such as a
     uniqueness violation in a unique index, the <command>CREATE INDEX</>
     command will fail but leave behind an <quote>invalid</> index. This index
@@ -557,12 +566,12 @@ CREATE INDEX code_idx ON films (code) TABLESPACE indexspace;
    To create a GiST index on a point attribute so that we
    can efficiently use box operators on the result of the
    conversion function:
-  <programlisting>
+<programlisting>
 CREATE INDEX pointloc
     ON points USING gist (box(location,location));
 SELECT * FROM points
     WHERE box(location,location) &amp;&amp; '(0,0),(1,1)'::box;
-  </programlisting>
+</programlisting>
   </para>
 
   <para>

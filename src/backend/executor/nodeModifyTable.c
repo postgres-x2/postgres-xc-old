@@ -8,7 +8,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/executor/nodeModifyTable.c,v 1.7 2010/02/26 02:00:42 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/executor/nodeModifyTable.c,v 1.7.4.1 2010/08/18 21:52:32 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -453,31 +453,14 @@ ExecUpdate(ItemPointer tupleid,
 	if (resultRelInfo->ri_TrigDesc &&
 		resultRelInfo->ri_TrigDesc->n_before_row[TRIGGER_EVENT_UPDATE] > 0)
 	{
-		HeapTuple	newtuple;
+		slot = ExecBRUpdateTriggers(estate, epqstate, resultRelInfo,
+									tupleid, slot);
 
-		newtuple = ExecBRUpdateTriggers(estate, epqstate, resultRelInfo,
-										tupleid, tuple);
-
-		if (newtuple == NULL)	/* "do nothing" */
+		if (slot == NULL)		/* "do nothing" */
 			return NULL;
 
-		if (newtuple != tuple)	/* modified by Trigger(s) */
-		{
-			/*
-			 * Put the modified tuple into a slot for convenience of routines
-			 * below.  We assume the tuple was allocated in per-tuple memory
-			 * context, and therefore will go away by itself. The tuple table
-			 * slot should not try to clear it.
-			 */
-			TupleTableSlot *newslot = estate->es_trig_tuple_slot;
-			TupleDesc	tupdesc = RelationGetDescr(resultRelationDesc);
-
-			if (newslot->tts_tupleDescriptor != tupdesc)
-				ExecSetSlotDescriptor(newslot, tupdesc);
-			ExecStoreTuple(newtuple, newslot, InvalidBuffer, false);
-			slot = newslot;
-			tuple = newtuple;
-		}
+		/* trigger might have changed tuple */
+		tuple = ExecMaterializeSlot(slot);
 	}
 
 	/*
@@ -682,6 +665,14 @@ ExecModifyTable(ModifyTableState *node)
 	 */
 	for (;;)
 	{
+		/*
+		 * Reset the per-output-tuple exprcontext.  This is needed because
+		 * triggers expect to use that context as workspace.  It's a bit ugly
+		 * to do this below the top level of the plan, however.  We might need
+		 * to rethink this later.
+		 */
+		ResetPerTupleExprContext(estate);
+
 		planSlot = ExecProcNode(subplanstate);
 
 		if (TupIsNull(planSlot))
@@ -693,7 +684,8 @@ ExecModifyTable(ModifyTableState *node)
 				estate->es_result_relation_info++;
 				subplanstate = node->mt_plans[node->mt_whichplan];
 				junkfilter = estate->es_result_relation_info->ri_junkFilter;
-				EvalPlanQualSetPlan(&node->mt_epqstate, subplanstate->plan);
+				EvalPlanQualSetPlan(&node->mt_epqstate, subplanstate->plan,
+									node->mt_arowmarks[node->mt_whichplan]);
 				continue;
 			}
 			else
@@ -807,10 +799,11 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	mtstate->ps.targetlist = NIL;		/* not actually used */
 
 	mtstate->mt_plans = (PlanState **) palloc0(sizeof(PlanState *) * nplans);
+	mtstate->mt_arowmarks = (List **) palloc0(sizeof(List *) * nplans);
 	mtstate->mt_nplans = nplans;
 	mtstate->operation = operation;
-	/* set up epqstate with dummy subplan pointer for the moment */
-	EvalPlanQualInit(&mtstate->mt_epqstate, estate, NULL, node->epqParam);
+	/* set up epqstate with dummy subplan data for the moment */
+	EvalPlanQualInit(&mtstate->mt_epqstate, estate, NULL, NIL, node->epqParam);
 	mtstate->fireBSTriggers = true;
 
 	/* For the moment, assume our targets are exactly the global result rels */
@@ -831,11 +824,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		i++;
 	}
 	estate->es_result_relation_info = NULL;
-
-	/* select first subplan */
-	mtstate->mt_whichplan = 0;
-	subplan = (Plan *) linitial(node->plans);
-	EvalPlanQualSetPlan(&mtstate->mt_epqstate, subplan);
 
 	/*
 	 * Initialize RETURNING projections if needed.
@@ -900,8 +888,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	foreach(l, node->rowMarks)
 	{
 		PlanRowMark *rc = (PlanRowMark *) lfirst(l);
-		ExecRowMark *erm = NULL;
-		ListCell   *lce;
+		ExecRowMark *erm;
 
 		Assert(IsA(rc, PlanRowMark));
 
@@ -909,19 +896,25 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		if (rc->isParent)
 			continue;
 
-		foreach(lce, estate->es_rowMarks)
-		{
-			erm = (ExecRowMark *) lfirst(lce);
-			if (erm->rti == rc->rti)
-				break;
-			erm = NULL;
-		}
-		if (erm == NULL)
-			elog(ERROR, "failed to find ExecRowMark for PlanRowMark %u",
-				 rc->rti);
+		/* find ExecRowMark (same for all subplans) */
+		erm = ExecFindRowMark(estate, rc->rti);
 
-		EvalPlanQualAddRowMark(&mtstate->mt_epqstate, erm);
+		/* build ExecAuxRowMark for each subplan */
+		for (i = 0; i < nplans; i++)
+		{
+			ExecAuxRowMark *aerm;
+
+			subplan = mtstate->mt_plans[i]->plan;
+			aerm = ExecBuildAuxRowMark(erm, subplan->targetlist);
+			mtstate->mt_arowmarks[i] = lappend(mtstate->mt_arowmarks[i], aerm);
+		}
 	}
+
+	/* select first subplan */
+	mtstate->mt_whichplan = 0;
+	subplan = (Plan *) linitial(node->plans);
+	EvalPlanQualSetPlan(&mtstate->mt_epqstate, subplan,
+						mtstate->mt_arowmarks[0]);
 
 	/*
 	 * Initialize the junk filter(s) if needed.  INSERT queries need a filter

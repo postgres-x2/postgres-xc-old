@@ -375,8 +375,17 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	 * We have three cases to deal with: DEFAULT VALUES (selectStmt == NULL),
 	 * VALUES list, or general SELECT input.  We special-case VALUES, both for
 	 * efficiency and so we can handle DEFAULT specifications.
+	 *
+	 * The grammar allows attaching ORDER BY, LIMIT, FOR UPDATE, or WITH to a
+	 * VALUES clause.  If we have any of those, treat it as a general SELECT;
+	 * so it will work, but you can't use DEFAULT items together with those.
 	 */
-	isGeneralSelect = (selectStmt && selectStmt->valuesLists == NIL);
+	isGeneralSelect = (selectStmt && (selectStmt->valuesLists == NIL ||
+									  selectStmt->sortClause != NIL ||
+									  selectStmt->limitOffset != NULL ||
+									  selectStmt->limitCount != NULL ||
+									  selectStmt->lockingClause != NIL ||
+									  selectStmt->withClause != NULL));
 
 	/*
 	 * If a non-nil rangetable/namespace was passed in, and we are doing
@@ -929,7 +938,7 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
  *	  transforms a VALUES clause that's being used as a standalone SELECT
  *
  * We build a Query containing a VALUES RTE, rather as if one had written
- *			SELECT * FROM (VALUES ...)
+ *			SELECT * FROM (VALUES ...) AS "*VALUES*"
  */
 static Query *
 transformValuesClause(ParseState *pstate, SelectStmt *stmt)
@@ -1054,6 +1063,7 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 	rtr->rtindex = list_length(pstate->p_rtable);
 	Assert(rte == rt_fetch(rtr->rtindex, pstate->p_rtable));
 	pstate->p_joinlist = lappend(pstate->p_joinlist, rtr);
+	pstate->p_relnamespace = lappend(pstate->p_relnamespace, rte);
 	pstate->p_varnamespace = lappend(pstate->p_varnamespace, rte);
 
 	/*

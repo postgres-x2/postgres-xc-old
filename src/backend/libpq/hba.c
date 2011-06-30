@@ -27,6 +27,7 @@
 
 #include "libpq/ip.h"
 #include "libpq/libpq.h"
+#include "postmaster/postmaster.h"
 #include "regex/regex.h"
 #include "replication/walsender.h"
 #include "storage/fd.h"
@@ -490,6 +491,8 @@ check_role(const char *role, Oid roleid, char *param_str)
 				return true;
 		}
 		else if (strcmp(tok, role) == 0 ||
+				 (strcmp(tok, "replication\n") == 0 && 
+				  strcmp(role,"replication") ==0) ||
 				 strcmp(tok, "all\n") == 0)
 			return true;
 	}
@@ -705,8 +708,20 @@ parse_hba_line(List *line, int line_num, HbaLine *parsedline)
 
 		if (token[4] == 's')	/* "hostssl" */
 		{
+			/* SSL support must be actually active, else complain */
 #ifdef USE_SSL
-			parsedline->conntype = ctHostSSL;
+			if (EnableSSL)
+				parsedline->conntype = ctHostSSL;
+			else
+			{
+				ereport(LOG,
+						(errcode(ERRCODE_CONFIG_FILE_ERROR),
+						 errmsg("hostssl requires SSL to be turned on"),
+						 errhint("Set ssl = on in postgresql.conf."),
+						 errcontext("line %d of configuration file \"%s\"",
+									line_num, HbaFileName)));
+				return false;
+			}
 #else
 			ereport(LOG,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),

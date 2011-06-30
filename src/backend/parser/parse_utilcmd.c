@@ -20,7 +20,7 @@
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2011 Nippon Telegraph and Telephone Corporation
  *
- *	$PostgreSQL: pgsql/src/backend/parser/parse_utilcmd.c,v 2.40 2010/02/26 02:00:53 momjian Exp $
+ *	$PostgreSQL: pgsql/src/backend/parser/parse_utilcmd.c,v 2.40.4.1 2010/08/18 18:35:30 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -395,6 +395,18 @@ transformColumnDefinition(ParseState *pstate, CreateStmtContext *cxt,
 		seqstmt = makeNode(CreateSeqStmt);
 		seqstmt->sequence = makeRangeVar(snamespace, sname, -1);
 		seqstmt->options = NIL;
+
+		/*
+		 * If this is ALTER ADD COLUMN, make sure the sequence will be owned
+		 * by the table's owner.  The current user might be someone else
+		 * (perhaps a superuser, or someone who's only a member of the owning
+		 * role), but the SEQUENCE OWNED BY mechanisms will bleat unless
+		 * table and sequence have exactly the same owning role.
+		 */
+		if (cxt->rel)
+			seqstmt->ownerId = cxt->rel->rd_rel->relowner;
+		else
+			seqstmt->ownerId = InvalidOid;
 
 		cxt->blist = lappend(cxt->blist, seqstmt);
 

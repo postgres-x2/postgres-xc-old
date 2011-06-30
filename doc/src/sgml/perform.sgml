@@ -1,4 +1,4 @@
-<!-- $PostgreSQL: pgsql/doc/src/sgml/perform.sgml,v 1.82 2010/06/28 22:46:11 momjian Exp $ -->
+<!-- $PostgreSQL: pgsql/doc/src/sgml/perform.sgml,v 1.82.2.1 2010/07/26 20:28:35 petere Exp $ -->
 
  <chapter id="performance-tips">
   <title>Performance Tips</title>
@@ -430,18 +430,30 @@ WHERE t1.unique1 &lt; 100 AND t1.unique2 = t2.unique2;
 
    <para>
     The <literal>Total runtime</literal> shown by <command>EXPLAIN
-    ANALYZE</command> includes executor start-up and shut-down time, as well
-    as time spent processing the result rows.  It does not include parsing,
-    rewriting, or planning time.  For a <command>SELECT</> query, the total
-    run time will normally be just a little larger than the total time
-    reported for the top-level plan node.  For <command>INSERT</>,
-    <command>UPDATE</>, and <command>DELETE</> commands, the total run time
-    might be considerably larger, because it includes the time spent processing
-    the result rows.  For these commands, the time for the top plan node is
-    essentially the time spent locating the old rows and/or computing
-    the new ones, but it doesn't include the time spent applying the changes.
-    Time spent firing triggers, if any, is also outside the top plan node,
-    and is shown separately for each trigger.
+    ANALYZE</command> includes executor start-up and shut-down time, but not
+    parsing, rewriting, or planning time.  For <command>INSERT</>,
+    <command>UPDATE</>, and <command>DELETE</> commands, the time spent
+    applying the table changes is charged to a top-level Insert, Update,
+    or Delete plan node.  (The plan nodes underneath this node represent
+    the work of locating the old rows and/or computing the new ones.)
+    Time spent executing <literal>BEFORE</> triggers, if any, is charged to
+    the related Insert, Update, or Delete node, although time spent executing
+    <literal>AFTER</> triggers is not.  The time spent in each trigger
+    (either <literal>BEFORE</> or <literal>AFTER</>) is also shown separately
+    and is included in total runtime.
+    Note, however, that deferred constraint triggers will not be executed
+    until end of transaction and are thus not shown by
+    <command>EXPLAIN ANALYZE</command>.
+   </para>
+
+   <para>
+    There are two significant ways in which runtimes measured by
+    <command>EXPLAIN ANALYZE</command> can deviate from normal execution of
+    the same query.  First, since no output rows are delivered to the client,
+    network transmission costs and I/O formatting costs are not included.
+    Second, the overhead added by <command>EXPLAIN ANALYZE</command> can be
+    significant, especially on machines with slow <function>gettimeofday()</>
+    kernel calls.
    </para>
 
    <para>
@@ -1086,7 +1098,7 @@ SELECT * FROM x, y, a, b, c WHERE something AND somethingelse;
       <para>
        You can get the effect of disabling foreign keys by using
        the <option>--disable-triggers</> option &mdash; but realize that
-       that eliminates, rather than just postponing, foreign key
+       that eliminates, rather than just postpones, foreign key
        validation, and so it is possible to insert bad data if you use it.
       </para>
      </footnote>

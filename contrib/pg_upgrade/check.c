@@ -4,7 +4,7 @@
  *	server checks and output routines
  *
  *	Copyright (c) 2010, PostgreSQL Global Development Group
- *	$PostgreSQL: pgsql/contrib/pg_upgrade/check.c,v 1.11 2010/07/06 19:18:55 momjian Exp $
+ *	$PostgreSQL: pgsql/contrib/pg_upgrade/check.c,v 1.11.2.3 2010/07/25 03:47:33 momjian Exp $
  */
 
 #include "pg_upgrade.h"
@@ -14,6 +14,9 @@ static void set_locale_and_encoding(migratorContext *ctx, Cluster whichCluster);
 static void check_new_db_is_empty(migratorContext *ctx);
 static void check_locale_and_encoding(migratorContext *ctx, ControlData *oldctrl,
 						  ControlData *newctrl);
+static void check_for_isn_and_int8_passing_mismatch(migratorContext *ctx,
+												Cluster whichCluster);
+static void check_for_reg_data_type_usage(migratorContext *ctx, Cluster whichCluster);
 
 
 void
@@ -25,7 +28,7 @@ output_check_banner(migratorContext *ctx, bool *live_check)
 		if (ctx->old.port == ctx->new.port)
 			pg_log(ctx, PG_FATAL, "When checking a live server, "
 				   "the old and new port numbers must be different.\n");
-		pg_log(ctx, PG_REPORT, "PerForming Consistency Checks on Old Live Server\n");
+		pg_log(ctx, PG_REPORT, "Performing Consistency Checks on Old Live Server\n");
 		pg_log(ctx, PG_REPORT, "------------------------------------------------\n");
 	}
 	else
@@ -61,7 +64,8 @@ check_old_cluster(migratorContext *ctx, bool live_check,
 	 * Check for various failure cases
 	 */
 
-	old_8_3_check_for_isn_and_int8_passing_mismatch(ctx, CLUSTER_OLD);
+	check_for_reg_data_type_usage(ctx, CLUSTER_OLD);
+	check_for_isn_and_int8_passing_mismatch(ctx, CLUSTER_OLD);
 
 	/* old = PG 8.3 checks? */
 	if (GET_MAJOR_VERSION(ctx->old.major_version) <= 803)
@@ -152,9 +156,9 @@ issue_warnings(migratorContext *ctx, char *sequence_script_file_name)
 		{
 			prep_status(ctx, "Adjusting sequences");
 			exec_prog(ctx, true,
-				  SYSTEMQUOTE "\"%s/psql\" --set ON_ERROR_STOP=on --port %d "
-				   "--username \"%s\" -f \"%s\" --dbname template1 >> \"%s\""
-					  SYSTEMQUOTE,
+				  SYSTEMQUOTE "\"%s/psql\" --set ON_ERROR_STOP=on "
+				  "--no-psqlrc --port %d --username \"%s\" "
+				  "-f \"%s\" --dbname template1 >> \"%s\"" SYSTEMQUOTE,
 					  ctx->new.bindir, ctx->new.port, ctx->user,
 					  sequence_script_file_name, ctx->logfile);
 			unlink(sequence_script_file_name);
@@ -385,7 +389,7 @@ create_script_for_old_cluster_deletion(migratorContext *ctx,
 	prep_status(ctx, "Creating script to delete old cluster");
 
 	snprintf(*deletion_script_file_name, MAXPGPATH, "%s/delete_old_cluster.%s",
-			 ctx->cwd, EXEC_EXT);
+			 ctx->cwd, SHELL_EXT);
 
 	if ((script = fopen(*deletion_script_file_name, "w")) == NULL)
 		pg_log(ctx, PG_FATAL, "Could not create necessary file:  %s\n",
@@ -412,6 +416,11 @@ create_script_for_old_cluster_deletion(migratorContext *ctx,
 			int			dbnum;
 
 			fprintf(script, "\n");
+			/* remove PG_VERSION? */
+			if (GET_MAJOR_VERSION(ctx->old.major_version) <= 804)
+				fprintf(script, RM_CMD " %s%s/PG_VERSION\n",
+						ctx->tablespaces[tblnum], ctx->old.tablespace_suffix);
+
 			for (dbnum = 0; dbnum < ctx->new.dbarr.ndbs; dbnum++)
 			{
 				fprintf(script, RMDIR_CMD " %s%s/%d\n",
@@ -438,4 +447,197 @@ create_script_for_old_cluster_deletion(migratorContext *ctx,
 #endif
 
 	check_ok(ctx);
+}
+
+
+/*
+ * 	check_for_isn_and_int8_passing_mismatch()
+ *
+ *	/contrib/isn relies on data type int8, and in 8.4 int8 can now be passed
+ *	by value.  The schema dumps the CREATE TYPE PASSEDBYVALUE setting so
+ *	it must match for the old and new servers.
+ */
+void
+check_for_isn_and_int8_passing_mismatch(migratorContext *ctx, Cluster whichCluster)
+{
+	ClusterInfo *active_cluster = (whichCluster == CLUSTER_OLD) ?
+	&ctx->old : &ctx->new;
+	int			dbnum;
+	FILE	   *script = NULL;
+	bool		found = false;
+	char		output_path[MAXPGPATH];
+
+	prep_status(ctx, "Checking for /contrib/isn with bigint-passing mismatch");
+
+	if (ctx->old.controldata.float8_pass_by_value ==
+		ctx->new.controldata.float8_pass_by_value)
+	{
+		/* no mismatch */
+		check_ok(ctx);
+		return;
+	}
+
+	snprintf(output_path, sizeof(output_path), "%s/contrib_isn_and_int8_pass_by_value.txt",
+			 ctx->cwd);
+
+	for (dbnum = 0; dbnum < active_cluster->dbarr.ndbs; dbnum++)
+	{
+		PGresult   *res;
+		bool		db_used = false;
+		int			ntups;
+		int			rowno;
+		int			i_nspname,
+					i_proname;
+		DbInfo	   *active_db = &active_cluster->dbarr.dbs[dbnum];
+		PGconn	   *conn = connectToServer(ctx, active_db->db_name, whichCluster);
+
+		/* Find any functions coming from contrib/isn */
+		res = executeQueryOrDie(ctx, conn,
+								"SELECT n.nspname, p.proname "
+								"FROM	pg_catalog.pg_proc p, "
+								"		pg_catalog.pg_namespace n "
+								"WHERE	p.pronamespace = n.oid AND "
+								"		p.probin = '$libdir/isn'");
+
+		ntups = PQntuples(res);
+		i_nspname = PQfnumber(res, "nspname");
+		i_proname = PQfnumber(res, "proname");
+		for (rowno = 0; rowno < ntups; rowno++)
+		{
+			found = true;
+			if (script == NULL && (script = fopen(output_path, "w")) == NULL)
+				pg_log(ctx, PG_FATAL, "Could not create necessary file:  %s\n", output_path);
+			if (!db_used)
+			{
+				fprintf(script, "Database:  %s\n", active_db->db_name);
+				db_used = true;
+			}
+			fprintf(script, "  %s.%s\n",
+					PQgetvalue(res, rowno, i_nspname),
+					PQgetvalue(res, rowno, i_proname));
+		}
+
+		PQclear(res);
+
+		PQfinish(conn);
+	}
+
+	if (found)
+	{
+		fclose(script);
+		pg_log(ctx, PG_REPORT, "fatal\n");
+		pg_log(ctx, PG_FATAL,
+			   "| Your installation contains \"/contrib/isn\" functions\n"
+			   "| which rely on the bigint data type.  Your old and\n"
+			   "| new clusters pass bigint values differently so this\n"
+			   "| cluster cannot currently be upgraded.  You can\n"
+			   "| manually migrate data that use \"/contrib/isn\"\n"
+			   "| facilities and remove \"/contrib/isn\" from the\n"
+			   "| old cluster and restart the migration.  A list\n"
+			   "| of the problem functions is in the file:\n"
+			   "| \t%s\n\n", output_path);
+	}
+	else
+		check_ok(ctx);
+}
+
+
+/*
+ * check_for_reg_data_type_usage()
+ *	pg_upgrade only preserves these system values:
+ *		pg_class.relfilenode
+ *		pg_type.oid
+ *		pg_enum.oid
+ *
+ *  Most of the reg* data types reference system catalog info that is
+ *	not preserved, and hence these data types cannot be used in user
+ *	tables upgraded by pg_upgrade.
+ */
+void
+check_for_reg_data_type_usage(migratorContext *ctx, Cluster whichCluster)
+{
+	ClusterInfo *active_cluster = (whichCluster == CLUSTER_OLD) ?
+	&ctx->old : &ctx->new;
+	int			dbnum;
+	FILE	   *script = NULL;
+	bool		found = false;
+	char		output_path[MAXPGPATH];
+
+	prep_status(ctx, "Checking for reg* system oid user data types");
+
+	snprintf(output_path, sizeof(output_path), "%s/tables_using_reg.txt",
+			 ctx->cwd);
+
+	for (dbnum = 0; dbnum < active_cluster->dbarr.ndbs; dbnum++)
+	{
+		PGresult   *res;
+		bool		db_used = false;
+		int			ntups;
+		int			rowno;
+		int			i_nspname,
+					i_relname,
+					i_attname;
+		DbInfo	   *active_db = &active_cluster->dbarr.dbs[dbnum];
+		PGconn	   *conn = connectToServer(ctx, active_db->db_name, whichCluster);
+
+		res = executeQueryOrDie(ctx, conn,
+								"SELECT n.nspname, c.relname, a.attname "
+								"FROM	pg_catalog.pg_class c, "
+								"		pg_catalog.pg_namespace n, "
+								"		pg_catalog.pg_attribute a "
+								"WHERE	c.oid = a.attrelid AND "
+								"		NOT a.attisdropped AND "
+								"		a.atttypid IN ( "
+								"			'pg_catalog.regproc'::pg_catalog.regtype, "
+								"			'pg_catalog.regprocedure'::pg_catalog.regtype, "
+								"			'pg_catalog.regoper'::pg_catalog.regtype, "
+								"			'pg_catalog.regoperator'::pg_catalog.regtype, "
+								"			'pg_catalog.regclass'::pg_catalog.regtype, "
+								/* regtype.oid is preserved, so 'regtype' is OK */
+								"			'pg_catalog.regconfig'::pg_catalog.regtype, "
+								"			'pg_catalog.regdictionary'::pg_catalog.regtype) AND "
+								"		c.relnamespace = n.oid AND "
+							  "		n.nspname != 'pg_catalog' AND "
+						 "		n.nspname != 'information_schema'");
+
+		ntups = PQntuples(res);
+		i_nspname = PQfnumber(res, "nspname");
+		i_relname = PQfnumber(res, "relname");
+		i_attname = PQfnumber(res, "attname");
+		for (rowno = 0; rowno < ntups; rowno++)
+		{
+			found = true;
+			if (script == NULL && (script = fopen(output_path, "w")) == NULL)
+				pg_log(ctx, PG_FATAL, "Could not create necessary file:  %s\n", output_path);
+			if (!db_used)
+			{
+				fprintf(script, "Database:  %s\n", active_db->db_name);
+				db_used = true;
+			}
+			fprintf(script, "  %s.%s.%s\n",
+					PQgetvalue(res, rowno, i_nspname),
+					PQgetvalue(res, rowno, i_relname),
+					PQgetvalue(res, rowno, i_attname));
+		}
+
+		PQclear(res);
+
+		PQfinish(conn);
+	}
+
+	if (found)
+	{
+		fclose(script);
+		pg_log(ctx, PG_REPORT, "fatal\n");
+		pg_log(ctx, PG_FATAL,
+			   "| Your installation contains one of the reg* data types in\n"
+			   "| user tables.  These data types reference system oids that\n"
+			   "| are not preserved by pg_upgrade, so this cluster cannot\n"
+			   "| currently be upgraded.  You can remove the problem tables\n"
+			   "| and restart the migration.  A list of the problem columns\n"
+			   "| is in the file:\n"
+			   "| \t%s\n\n", output_path);
+	}
+	else
+		check_ok(ctx);
 }

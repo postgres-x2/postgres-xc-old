@@ -158,6 +158,9 @@ typedef struct Result
  *	 ModifyTable node -
  *		Apply rows produced by subplan(s) to result table(s),
  *		by inserting, updating, or deleting.
+ *
+ * Note that rowMarks and epqParam are presumed to be valid for all the
+ * subplan(s); they can't contain any info that varies across subplans.
  * ----------------
  */
 typedef struct ModifyTable
@@ -695,21 +698,32 @@ typedef enum RowMarkType
  * prti == parent's RT index, and can therefore be recognized as children by
  * the fact that prti != rti.
  *
- * The AttrNumbers are filled in during preprocess_targetlist.	We use
- * different subsets of them for plain relations, inheritance children,
- * and non-table relations.
+ * The planner also adds resjunk output columns to the plan that carry
+ * information sufficient to identify the locked or fetched rows.  For
+ * tables (markType != ROW_MARK_COPY), these columns are named
+ *		tableoid%u			OID of table
+ *		ctid%u				TID of row
+ * The tableoid column is only present for an inheritance hierarchy.
+ * When markType == ROW_MARK_COPY, there is instead a single column named
+ *		wholerow%u			whole-row value of relation
+ * In all three cases, %u represents the rowmark ID number (rowmarkId).
+ * This number is unique within a plan tree, except that child relation
+ * entries copy their parent's rowmarkId.  (Assigning unique numbers
+ * means we needn't renumber rowmarkIds when flattening subqueries, which
+ * would require finding and renaming the resjunk columns as well.)
+ * Note this means that all tables in an inheritance hierarchy share the
+ * same resjunk column names.  However, in an inherited UPDATE/DELETE the
+ * columns could have different physical column numbers in each subplan.
  */
 typedef struct PlanRowMark
 {
 	NodeTag		type;
 	Index		rti;			/* range table index of markable relation */
 	Index		prti;			/* range table index of parent relation */
+	Index		rowmarkId;		/* unique identifier for resjunk columns */
 	RowMarkType markType;		/* see enum above */
 	bool		noWait;			/* NOWAIT option */
 	bool		isParent;		/* true if this is a "dummy" parent entry */
-	AttrNumber	ctidAttNo;		/* resno of ctid junk attribute, if any */
-	AttrNumber	toidAttNo;		/* resno of tableoid junk attribute, if any */
-	AttrNumber	wholeAttNo;		/* resno of whole-row junk attribute, if any */
 } PlanRowMark;
 
 

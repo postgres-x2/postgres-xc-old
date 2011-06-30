@@ -15,7 +15,7 @@
  *
  *
  * IDENTIFICATION
- *		$PostgreSQL: pgsql/src/bin/pg_dump/pg_backup_archiver.c,v 1.187 2010/07/06 19:18:59 momjian Exp $
+ *		$PostgreSQL: pgsql/src/bin/pg_dump/pg_backup_archiver.c,v 1.187.2.1 2010/08/21 13:59:50 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -79,6 +79,10 @@ const char *progname;
 
 static const char *modulename = gettext_noop("archiver");
 
+/* index array created by fix_dependencies -- only used in parallel restore */
+static TocEntry	  **tocsByDumpId;			/* index by dumpId - 1 */
+static DumpId		maxDumpId;				/* length of above array */
+
 
 static ArchiveHandle *_allocAH(const char *FileSpec, const ArchiveFormat fmt,
 		 const int compression, ArchiveMode mode);
@@ -102,7 +106,7 @@ static bool _tocEntryIsACL(TocEntry *te);
 static void _disableTriggersIfNecessary(ArchiveHandle *AH, TocEntry *te, RestoreOptions *ropt);
 static void _enableTriggersIfNecessary(ArchiveHandle *AH, TocEntry *te, RestoreOptions *ropt);
 static TocEntry *getTocEntryByDumpId(ArchiveHandle *AH, DumpId id);
-static void _moveAfter(ArchiveHandle *AH, TocEntry *pos, TocEntry *te);
+static void _moveBefore(ArchiveHandle *AH, TocEntry *pos, TocEntry *te);
 static int	_discoverArchiveFormat(ArchiveHandle *AH);
 
 static void dump_lo_buf(ArchiveHandle *AH);
@@ -134,9 +138,7 @@ static void fix_dependencies(ArchiveHandle *AH);
 static bool has_lock_conflicts(TocEntry *te1, TocEntry *te2);
 static void repoint_table_dependencies(ArchiveHandle *AH,
 						   DumpId tableId, DumpId tableDataId);
-static void identify_locking_dependencies(TocEntry *te,
-							  TocEntry **tocsByDumpId,
-							  DumpId maxDumpId);
+static void identify_locking_dependencies(TocEntry *te);
 static void reduce_dependencies(ArchiveHandle *AH, TocEntry *te,
 					TocEntry *ready_list);
 static void mark_create_done(ArchiveHandle *AH, TocEntry *te);
@@ -990,19 +992,12 @@ SortTocFromFile(Archive *AHX, RestoreOptions *ropt)
 {
 	ArchiveHandle *AH = (ArchiveHandle *) AHX;
 	FILE	   *fh;
-	char		buf[1024];
-	char	   *cmnt;
-	char	   *endptr;
-	DumpId		id;
-	TocEntry   *te;
-	TocEntry   *tePrev;
+	char		buf[100];
+	bool		incomplete_line;
 
 	/* Allocate space for the 'wanted' array, and init it */
 	ropt->idWanted = (bool *) malloc(sizeof(bool) * AH->maxDumpId);
 	memset(ropt->idWanted, 0, sizeof(bool) * AH->maxDumpId);
-
-	/* Set prev entry as head of list */
-	tePrev = AH->toc;
 
 	/* Setup the file */
 	fh = fopen(ropt->tocFile, PG_BINARY_R);
@@ -1010,15 +1005,37 @@ SortTocFromFile(Archive *AHX, RestoreOptions *ropt)
 		die_horribly(AH, modulename, "could not open TOC file \"%s\": %s\n",
 					 ropt->tocFile, strerror(errno));
 
+	incomplete_line = false;
 	while (fgets(buf, sizeof(buf), fh) != NULL)
 	{
+		bool		prev_incomplete_line = incomplete_line;
+		int			buflen;
+		char	   *cmnt;
+		char	   *endptr;
+		DumpId		id;
+		TocEntry   *te;
+
+		/*
+		 * Some lines in the file might be longer than sizeof(buf).  This is
+		 * no problem, since we only care about the leading numeric ID which
+		 * can be at most a few characters; but we have to skip continuation
+		 * bufferloads when processing a long line.
+		 */
+		buflen = strlen(buf);
+		if (buflen > 0 && buf[buflen - 1] == '\n')
+			incomplete_line = false;
+		else
+			incomplete_line = true;
+		if (prev_incomplete_line)
+			continue;
+
 		/* Truncate line at comment, if any */
 		cmnt = strchr(buf, ';');
 		if (cmnt != NULL)
 			cmnt[0] = '\0';
 
 		/* Ignore if all blank */
-		if (strspn(buf, " \t\r") == strlen(buf))
+		if (strspn(buf, " \t\r\n") == strlen(buf))
 			continue;
 
 		/* Get an ID, check it's valid and not already seen */
@@ -1036,10 +1053,21 @@ SortTocFromFile(Archive *AHX, RestoreOptions *ropt)
 			die_horribly(AH, modulename, "could not find entry for ID %d\n",
 						 id);
 
+		/* Mark it wanted */
 		ropt->idWanted[id - 1] = true;
 
-		_moveAfter(AH, tePrev, te);
-		tePrev = te;
+		/*
+		 * Move each item to the end of the list as it is selected, so that
+		 * they are placed in the desired order.  Any unwanted items will end
+		 * up at the front of the list, which may seem unintuitive but it's
+		 * what we need.  In an ordinary serial restore that makes no
+		 * difference, but in a parallel restore we need to mark unrestored
+		 * items' dependencies as satisfied before we start examining
+		 * restorable items.  Otherwise they could have surprising
+		 * side-effects on the order in which restorable items actually get
+		 * restored.
+		 */
+		_moveBefore(AH, AH->toc, te);
 	}
 
 	if (fclose(fh) != 0)
@@ -1471,33 +1499,37 @@ warn_or_die_horribly(ArchiveHandle *AH,
 	va_end(ap);
 }
 
+#ifdef NOT_USED
+
 static void
 _moveAfter(ArchiveHandle *AH, TocEntry *pos, TocEntry *te)
 {
+	/* Unlink te from list */
 	te->prev->next = te->next;
 	te->next->prev = te->prev;
 
+	/* and insert it after "pos" */
 	te->prev = pos;
 	te->next = pos->next;
-
 	pos->next->prev = te;
 	pos->next = te;
 }
 
-#ifdef NOT_USED
+#endif
 
 static void
 _moveBefore(ArchiveHandle *AH, TocEntry *pos, TocEntry *te)
 {
+	/* Unlink te from list */
 	te->prev->next = te->next;
 	te->next->prev = te->prev;
 
+	/* and insert it before "pos" */
 	te->prev = pos->prev;
 	te->next = pos;
 	pos->prev->next = te;
 	pos->prev = te;
 }
-#endif
 
 static TocEntry *
 getTocEntryByDumpId(ArchiveHandle *AH, DumpId id)
@@ -3140,12 +3172,12 @@ dumpTimestamp(ArchiveHandle *AH, const char *msg, time_t tim)
  * Main engine for parallel restore.
  *
  * Work is done in three phases.
- * First we process tocEntries until we come to one that is marked
- * SECTION_DATA or SECTION_POST_DATA, in a single connection, just as for a
- * standard restore.  Second we process the remaining non-ACL steps in
- * parallel worker children (threads on Windows, processes on Unix), each of
- * which connects separately to the database.  Finally we process all the ACL
- * entries in a single connection (that happens back in RestoreArchive).
+ * First we process all SECTION_PRE_DATA tocEntries, in a single connection,
+ * just as for a standard restore.  Second we process the remaining non-ACL
+ * steps in parallel worker children (threads on Windows, processes on Unix),
+ * each of which connects separately to the database.  Finally we process all
+ * the ACL entries in a single connection (that happens back in
+ * RestoreArchive).
  */
 static void
 restore_toc_entries_parallel(ArchiveHandle *AH)
@@ -3155,6 +3187,7 @@ restore_toc_entries_parallel(ArchiveHandle *AH)
 	ParallelSlot *slots;
 	int			work_status;
 	int			next_slot;
+	bool		skipped_some;
 	TocEntry	pending_list;
 	TocEntry	ready_list;
 	TocEntry   *next_work_item;
@@ -3180,13 +3213,35 @@ restore_toc_entries_parallel(ArchiveHandle *AH)
 	 * Do all the early stuff in a single connection in the parent. There's no
 	 * great point in running it in parallel, in fact it will actually run
 	 * faster in a single connection because we avoid all the connection and
-	 * setup overhead.
+	 * setup overhead.  Also, pg_dump is not currently very good about
+	 * showing all the dependencies of SECTION_PRE_DATA items, so we do not
+	 * risk trying to process them out-of-order.
 	 */
+	skipped_some = false;
 	for (next_work_item = AH->toc->next; next_work_item != AH->toc; next_work_item = next_work_item->next)
 	{
-		if (next_work_item->section == SECTION_DATA ||
-			next_work_item->section == SECTION_POST_DATA)
-			break;
+		/* NB: process-or-continue logic must be the inverse of loop below */
+		if (next_work_item->section != SECTION_PRE_DATA)
+		{
+			/* DATA and POST_DATA items are just ignored for now */
+			if (next_work_item->section == SECTION_DATA ||
+				next_work_item->section == SECTION_POST_DATA)
+			{
+				skipped_some = true;
+				continue;
+			}
+			else
+			{
+				/*
+				 * SECTION_NONE items, such as comments, can be processed now
+				 * if we are still in the PRE_DATA part of the archive.  Once
+				 * we've skipped any items, we have to consider whether the
+				 * comment's dependencies are satisfied, so skip it for now.
+				 */
+				if (skipped_some)
+					continue;
+			}
+		}
 
 		ahlog(AH, 1, "processing item %d %s %s\n",
 			  next_work_item->dumpId,
@@ -3229,8 +3284,28 @@ restore_toc_entries_parallel(ArchiveHandle *AH)
 	 */
 	par_list_header_init(&pending_list);
 	par_list_header_init(&ready_list);
-	for (; next_work_item != AH->toc; next_work_item = next_work_item->next)
+	skipped_some = false;
+	for (next_work_item = AH->toc->next; next_work_item != AH->toc; next_work_item = next_work_item->next)
 	{
+		/* NB: process-or-continue logic must be the inverse of loop above */
+		if (next_work_item->section == SECTION_PRE_DATA)
+		{
+			/* All PRE_DATA items were dealt with above */
+			continue;
+		}
+		if (next_work_item->section == SECTION_DATA ||
+			next_work_item->section == SECTION_POST_DATA)
+		{
+			/* set this flag at same point that previous loop did */
+			skipped_some = true;
+		}
+		else
+		{
+			/* SECTION_NONE items must be processed if previous loop didn't */
+			if (!skipped_some)
+				continue;
+		}
+
 		if (next_work_item->depCount > 0)
 			par_list_append(&pending_list, next_work_item);
 		else
@@ -3718,7 +3793,12 @@ mark_work_done(ArchiveHandle *AH, TocEntry *ready_list,
 /*
  * Process the dependency information into a form useful for parallel restore.
  *
- * We set up depCount fields that are the number of as-yet-unprocessed
+ * This function takes care of fixing up some missing or badly designed
+ * dependencies, and then prepares subsidiary data structures that will be
+ * used in the main parallel-restore logic, including:
+ * 1. We build the tocsByDumpId[] index array.
+ * 2. We build the revDeps[] arrays of incoming dependency dumpIds.
+ * 3. We set up depCount fields that are the number of as-yet-unprocessed
  * dependencies for each TOC entry.
  *
  * We also identify locking dependencies so that we can avoid trying to
@@ -3727,22 +3807,20 @@ mark_work_done(ArchiveHandle *AH, TocEntry *ready_list,
 static void
 fix_dependencies(ArchiveHandle *AH)
 {
-	TocEntry  **tocsByDumpId;
 	TocEntry   *te;
-	DumpId		maxDumpId;
 	int			i;
 
 	/*
-	 * For some of the steps here, it is convenient to have an array that
-	 * indexes the TOC entries by dump ID, rather than searching the TOC list
-	 * repeatedly.	Entries for dump IDs not present in the TOC will be NULL.
+	 * It is convenient to have an array that indexes the TOC entries by dump
+	 * ID, rather than searching the TOC list repeatedly.  Entries for dump
+	 * IDs not present in the TOC will be NULL.
 	 *
 	 * NOTE: because maxDumpId is just the highest dump ID defined in the
 	 * archive, there might be dependencies for IDs > maxDumpId.  All uses of
 	 * this array must guard against out-of-range dependency numbers.
 	 *
-	 * Also, initialize the depCount fields, and make sure all the TOC items
-	 * are marked as not being in any parallel-processing list.
+	 * Also, initialize the depCount/revDeps/nRevDeps fields, and make sure
+	 * the TOC items are marked as not being in any parallel-processing list.
 	 */
 	maxDumpId = AH->maxDumpId;
 	tocsByDumpId = (TocEntry **) calloc(maxDumpId, sizeof(TocEntry *));
@@ -3750,6 +3828,8 @@ fix_dependencies(ArchiveHandle *AH)
 	{
 		tocsByDumpId[te->dumpId - 1] = te;
 		te->depCount = te->nDeps;
+		te->revDeps = NULL;
+		te->nRevDeps = 0;
 		te->par_prev = NULL;
 		te->par_next = NULL;
 	}
@@ -3767,6 +3847,9 @@ fix_dependencies(ArchiveHandle *AH)
 	 * TABLE, if possible.	However, if the dependency isn't in the archive
 	 * then just assume it was a TABLE; this is to cover cases where the table
 	 * was suppressed but we have the data and some dependent post-data items.
+	 *
+	 * XXX this is O(N^2) if there are a lot of tables.  We ought to fix
+	 * pg_dump to produce correctly-linked dependencies in the first place.
 	 */
 	for (te = AH->toc->next; te != AH->toc; te = te->next)
 	{
@@ -3813,8 +3896,14 @@ fix_dependencies(ArchiveHandle *AH)
 	}
 
 	/*
-	 * It is possible that the dependencies list items that are not in the
-	 * archive at all.	Subtract such items from the depCounts.
+	 * At this point we start to build the revDeps reverse-dependency arrays,
+	 * so all changes of dependencies must be complete.
+	 */
+
+	/*
+	 * Count the incoming dependencies for each item.  Also, it is possible
+	 * that the dependencies list items that are not in the archive at
+	 * all.  Subtract such items from the depCounts.
 	 */
 	for (te = AH->toc->next; te != AH->toc; te = te->next)
 	{
@@ -3822,8 +3911,40 @@ fix_dependencies(ArchiveHandle *AH)
 		{
 			DumpId		depid = te->dependencies[i];
 
-			if (depid > maxDumpId || tocsByDumpId[depid - 1] == NULL)
+			if (depid <= maxDumpId && tocsByDumpId[depid - 1] != NULL)
+				tocsByDumpId[depid - 1]->nRevDeps++;
+			else
 				te->depCount--;
+		}
+	}
+
+	/*
+	 * Allocate space for revDeps[] arrays, and reset nRevDeps so we can
+	 * use it as a counter below.
+	 */
+	for (te = AH->toc->next; te != AH->toc; te = te->next)
+	{
+		if (te->nRevDeps > 0)
+			te->revDeps = (DumpId *) malloc(te->nRevDeps * sizeof(DumpId));
+		te->nRevDeps = 0;
+	}
+
+	/*
+	 * Build the revDeps[] arrays of incoming-dependency dumpIds.  This
+	 * had better agree with the loops above.
+	 */
+	for (te = AH->toc->next; te != AH->toc; te = te->next)
+	{
+		for (i = 0; i < te->nDeps; i++)
+		{
+			DumpId		depid = te->dependencies[i];
+
+			if (depid <= maxDumpId && tocsByDumpId[depid - 1] != NULL)
+			{
+				TocEntry   *otherte = tocsByDumpId[depid - 1];
+
+				otherte->revDeps[otherte->nRevDeps++] = te->dumpId;
+			}
 		}
 	}
 
@@ -3834,10 +3955,8 @@ fix_dependencies(ArchiveHandle *AH)
 	{
 		te->lockDeps = NULL;
 		te->nLockDeps = 0;
-		identify_locking_dependencies(te, tocsByDumpId, maxDumpId);
+		identify_locking_dependencies(te);
 	}
-
-	free(tocsByDumpId);
 }
 
 /*
@@ -3871,13 +3990,9 @@ repoint_table_dependencies(ArchiveHandle *AH,
  * Identify which objects we'll need exclusive lock on in order to restore
  * the given TOC entry (*other* than the one identified by the TOC entry
  * itself).  Record their dump IDs in the entry's lockDeps[] array.
- * tocsByDumpId[] is a convenience array (of size maxDumpId) to avoid
- * searching the TOC for each dependency.
  */
 static void
-identify_locking_dependencies(TocEntry *te,
-							  TocEntry **tocsByDumpId,
-							  DumpId maxDumpId)
+identify_locking_dependencies(TocEntry *te)
 {
 	DumpId	   *lockids;
 	int			nlockids;
@@ -3931,31 +4046,21 @@ identify_locking_dependencies(TocEntry *te,
 static void
 reduce_dependencies(ArchiveHandle *AH, TocEntry *te, TocEntry *ready_list)
 {
-	DumpId		target = te->dumpId;
 	int			i;
 
-	ahlog(AH, 2, "reducing dependencies for %d\n", target);
+	ahlog(AH, 2, "reducing dependencies for %d\n", te->dumpId);
 
-	/*
-	 * We must examine all entries, not only the ones after the target item,
-	 * because if the user used a -L switch then the original dependency-
-	 * respecting order has been destroyed by SortTocFromFile.
-	 */
-	for (te = AH->toc->next; te != AH->toc; te = te->next)
+	for (i = 0; i < te->nRevDeps; i++)
 	{
-		for (i = 0; i < te->nDeps; i++)
+		TocEntry   *otherte = tocsByDumpId[te->revDeps[i] - 1];
+
+		otherte->depCount--;
+		if (otherte->depCount == 0 && otherte->par_prev != NULL)
 		{
-			if (te->dependencies[i] == target)
-			{
-				te->depCount--;
-				if (te->depCount == 0 && te->par_prev != NULL)
-				{
-					/* It must be in the pending list, so remove it ... */
-					par_list_remove(te);
-					/* ... and add to ready_list */
-					par_list_append(ready_list, te);
-				}
-			}
+			/* It must be in the pending list, so remove it ... */
+			par_list_remove(otherte);
+			/* ... and add to ready_list */
+			par_list_append(ready_list, otherte);
 		}
 	}
 }

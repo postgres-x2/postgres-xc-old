@@ -245,6 +245,7 @@ pull_up_sublinks_jointree_recurse(PlannerInfo *root, Node *jtnode,
 		 * as a sublink that is executed only for row pairs that meet the
 		 * other join conditions.  Fixing this seems to require considerable
 		 * restructuring of the executor, but maybe someday it can happen.
+		 * (See also the comparable case in pull_up_sublinks_qual_recurse.)
 		 *
 		 * We don't expect to see any pre-existing JOIN_SEMI or JOIN_ANTI
 		 * nodes here.
@@ -317,6 +318,7 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 	{
 		SubLink    *sublink = (SubLink *) node;
 		JoinExpr   *j;
+		Relids		child_rels;
 
 		/* Is it a convertible ANY or EXISTS clause? */
 		if (sublink->subLinkType == ANY_SUBLINK)
@@ -325,7 +327,16 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 											available_rels);
 			if (j)
 			{
-				/* Yes, insert the new join node into the join tree */
+				/* Yes; recursively process what we pulled up */
+				j->rarg = pull_up_sublinks_jointree_recurse(root,
+															j->rarg,
+															&child_rels);
+				/* Any inserted joins get stacked onto j->rarg */
+				j->quals = pull_up_sublinks_qual_recurse(root,
+														 j->quals,
+														 child_rels,
+														 &j->rarg);
+				/* Now insert the new join node into the join tree */
 				j->larg = *jtlink;
 				*jtlink = (Node *) j;
 				/* and return NULL representing constant TRUE */
@@ -338,7 +349,16 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 											   available_rels);
 			if (j)
 			{
-				/* Yes, insert the new join node into the join tree */
+				/* Yes; recursively process what we pulled up */
+				j->rarg = pull_up_sublinks_jointree_recurse(root,
+															j->rarg,
+															&child_rels);
+				/* Any inserted joins get stacked onto j->rarg */
+				j->quals = pull_up_sublinks_qual_recurse(root,
+														 j->quals,
+														 child_rels,
+														 &j->rarg);
+				/* Now insert the new join node into the join tree */
 				j->larg = *jtlink;
 				*jtlink = (Node *) j;
 				/* and return NULL representing constant TRUE */
@@ -362,7 +382,28 @@ pull_up_sublinks_qual_recurse(PlannerInfo *root, Node *node,
 												   available_rels);
 				if (j)
 				{
-					/* Yes, insert the new join node into the join tree */
+					/*
+					 * For the moment, refrain from recursing underneath NOT.
+					 * As in pull_up_sublinks_jointree_recurse, recursing here
+					 * would result in inserting a join underneath an ANTI
+					 * join with which it could not commute, and that could
+					 * easily lead to a worse plan than what we've
+					 * historically generated.
+					 */
+#ifdef NOT_USED
+					/* Yes; recursively process what we pulled up */
+					Relids		child_rels;
+
+					j->rarg = pull_up_sublinks_jointree_recurse(root,
+																j->rarg,
+																&child_rels);
+					/* Any inserted joins get stacked onto j->rarg */
+					j->quals = pull_up_sublinks_qual_recurse(root,
+															 j->quals,
+															 child_rels,
+															 &j->rarg);
+#endif
+					/* Now insert the new join node into the join tree */
 					j->larg = *jtlink;
 					*jtlink = (Node *) j;
 					/* and return NULL representing constant TRUE */
@@ -1745,6 +1786,11 @@ reduce_outer_joins_pass2(Node *jtnode,
 			 * is that we pass either the local or the upper constraints,
 			 * never both, to the children of an outer join.
 			 *
+			 * Note that a SEMI join works like an inner join here: it's okay
+			 * to pass down both local and upper constraints.  (There can't
+			 * be any upper constraints affecting its inner side, but it's
+			 * not worth having a separate code path to avoid passing them.)
+			 *
 			 * At a FULL join we just punt and pass nothing down --- is it
 			 * possible to be smarter?
 			 */
@@ -1754,7 +1800,7 @@ reduce_outer_joins_pass2(Node *jtnode,
 				if (!computed_local_nonnullable_vars)
 					local_nonnullable_vars = find_nonnullable_vars(j->quals);
 				local_forced_null_vars = find_forced_null_vars(j->quals);
-				if (jointype == JOIN_INNER)
+				if (jointype == JOIN_INNER || jointype == JOIN_SEMI)
 				{
 					/* OK to merge upper and local constraints */
 					local_nonnullable_rels = bms_add_members(local_nonnullable_rels,
@@ -1774,14 +1820,14 @@ reduce_outer_joins_pass2(Node *jtnode,
 
 			if (left_state->contains_outer)
 			{
-				if (jointype == JOIN_INNER)
+				if (jointype == JOIN_INNER || jointype == JOIN_SEMI)
 				{
 					/* pass union of local and upper constraints */
 					pass_nonnullable_rels = local_nonnullable_rels;
 					pass_nonnullable_vars = local_nonnullable_vars;
 					pass_forced_null_vars = local_forced_null_vars;
 				}
-				else if (jointype != JOIN_FULL) /* ie, LEFT/SEMI/ANTI */
+				else if (jointype != JOIN_FULL)		/* ie, LEFT or ANTI */
 				{
 					/* can't pass local constraints to non-nullable side */
 					pass_nonnullable_rels = nonnullable_rels;

@@ -1,5 +1,5 @@
 <!--
-$PostgreSQL: pgsql/doc/src/sgml/ref/psql-ref.sgml,v 1.244 2010/04/03 07:23:02 petere Exp $
+$PostgreSQL: pgsql/doc/src/sgml/ref/psql-ref.sgml,v 1.244.2.2 2010/08/17 04:37:19 petere Exp $
 PostgreSQL documentation
 -->
 
@@ -79,7 +79,9 @@ PostgreSQL documentation
       <para>
       Specifies that <application>psql</application> is to execute one
       command string, <replaceable class="parameter">command</replaceable>,
-      and then exit. This is useful in shell scripts.
+      and then exit. This is useful in shell scripts. Start-up files
+      (<filename>psqlrc</filename> and <filename>~/.psqlrc</filename>) are
+      ignored with this option.
       </para>
       <para>
       <replaceable class="parameter">command</replaceable> must be either
@@ -1032,7 +1034,7 @@ testdb=&gt;
         If <replaceable class="parameter">pattern</replaceable> is
         specified, only those servers whose name matches the pattern
         are listed.  If the form <literal>\des+</literal> is used, a
-        full desription of each server is shown, including the
+        full description of each server is shown, including the
         server's ACL, type, version, and options.
         </para>
         </listitem>
@@ -1673,8 +1675,8 @@ lo_import 152801
         <para>
          Prompts the user to set variable <replaceable
          class="parameter">name</>.  An optional prompt, <replaceable
-         class="parameter">text</>, can be specified.  (For multi-word
-         prompts, use single-quotes.)
+         class="parameter">text</>, can be specified.  (For multiword
+         prompts, use single quotes.)
         </para>
 
         <para>
@@ -2578,7 +2580,7 @@ bar
         <listitem>
         <para>
         The value of the last affected OID, as returned from an
-        <command>INSERT</command> or <command>lo_insert</command>
+        <command>INSERT</command> or <command>\lo_import</command>
         command. This variable is only guaranteed to be valid until
         after the result of the next <acronym>SQL</acronym> command has
         been displayed.
@@ -2755,7 +2757,7 @@ testdb=&gt; <userinput>SELECT * FROM :"foo";</userinput>
 testdb=&gt; <userinput>\set content `cat my_file.txt`</userinput>
 testdb=&gt; <userinput>INSERT INTO my_table VALUES (:'content');</userinput>
 </programlisting>
-    (Note that this still won't work if my_file.txt contains NUL bytes.
+    (Note that this still won't work if <filename>my_file.txt</filename> contains NUL bytes.
     psql does not support embedded NUL bytes in variable values.)
     </para>
 
@@ -3090,10 +3092,12 @@ $endif
   <itemizedlist>
    <listitem>
     <para>
-     Before starting up, <application>psql</application> attempts to
+     Unless it is passed an <option>-X</option>
+     or <option>-c</option> option,
+     <application>psql</application> attempts to
      read and execute commands from the system-wide
      <filename>psqlrc</filename> file and the user's
-     <filename>~/.psqlrc</filename> file.
+     <filename>~/.psqlrc</filename> file before starting up.
      (On Windows, the user's startup file is named
      <filename>%APPDATA%\postgresql\psqlrc.conf</filename>.)
      See <filename><replaceable>PREFIX</>/share/psqlrc.sample</>

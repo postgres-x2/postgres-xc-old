@@ -1090,6 +1090,7 @@ Exec_UnlistenAllCommit(void)
 void
 ProcessCompletedNotifies(void)
 {
+	MemoryContext caller_context;
 	bool		signalled;
 
 	/* Nothing to do if we didn't send any notifications */
@@ -1102,6 +1103,12 @@ ProcessCompletedNotifies(void)
 	 * right back here after error cleanup.
 	 */
 	backendHasSentNotifications = false;
+
+	/*
+	 * We must preserve the caller's memory context (probably MessageContext)
+	 * across the transaction we do here.
+	 */
+	caller_context = CurrentMemoryContext;
 
 	if (Trace_notify)
 		elog(DEBUG1, "ProcessCompletedNotifies");
@@ -1134,6 +1141,8 @@ ProcessCompletedNotifies(void)
 	}
 
 	CommitTransactionCommand();
+
+	MemoryContextSwitchTo(caller_context);
 
 	/* We don't need pq_flush() here since postgres.c will do one shortly */
 }
@@ -2090,7 +2099,10 @@ ProcessIncomingNotify(void)
 {
 	bool		catchup_enabled;
 
-	/* Do nothing if we aren't actively listening */
+	/* We *must* reset the flag */
+	notifyInterruptOccurred = 0;
+
+	/* Do nothing else if we aren't actively listening */
 	if (listenChannels == NIL)
 		return;
 
@@ -2101,8 +2113,6 @@ ProcessIncomingNotify(void)
 		elog(DEBUG1, "ProcessIncomingNotify");
 
 	set_ps_display("notify interrupt", false);
-
-	notifyInterruptOccurred = 0;
 
 	/*
 	 * We must run asyncQueueReadAllNotifications inside a transaction, else

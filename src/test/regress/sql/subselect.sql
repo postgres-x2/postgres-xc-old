@@ -348,3 +348,18 @@ from
    from int8_tbl) sq0
   join
   int4_tbl i4 on dummy = i4.f1;
+
+--
+-- Test case for premature memory release during hashing of subplan output
+--
+
+select '1'::text in (select '1'::name union all select '1'::name);
+
+--
+-- Test case for planner bug with nested EXISTS handling
+--
+select a.thousand from tenk1 a, tenk1 b
+where a.thousand = b.thousand
+  and exists ( select 1 from tenk1 c where b.hundred = c.hundred
+                   and not exists ( select 1 from tenk1 d
+                                    where a.thousand = d.thousand ) );

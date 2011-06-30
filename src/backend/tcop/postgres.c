@@ -9,7 +9,7 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL: pgsql/src/backend/tcop/postgres.c,v 1.595 2010/07/06 19:18:57 momjian Exp $
+ *	  $PostgreSQL: pgsql/src/backend/tcop/postgres.c,v 1.595.2.1 2010/08/12 23:25:45 rhaas Exp $
  *
  * NOTES
  *	  this is the "main" module of the postgres backend and
@@ -131,6 +131,12 @@ static long max_stack_depth_bytes = 100 * 1024L;
  */
 char	   *stack_base_ptr = NULL;
 
+/*
+ * On IA64 we also have to remember the register stack base.
+ */
+#if defined(__ia64__) || defined(__ia64)
+char	   *register_stack_base_ptr = NULL;
+#endif
 
 /*
  * Flag to mark SIGHUP. Whenever the main loop comes around it
@@ -2823,7 +2829,7 @@ SigHupHandler(SIGNAL_ARGS)
 
 /*
  * RecoveryConflictInterrupt: out-of-line portion of recovery conflict
- * handling ollowing receipt of SIGUSR1. Designed to be similar to die()
+ * handling following receipt of SIGUSR1. Designed to be similar to die()
  * and StatementCancelHandler(). Called only by a normal user backend
  * that begins a transaction during recovery.
  */
@@ -2984,7 +2990,7 @@ ProcessInterrupts(void)
 					 errdetail_recovery_conflict()));
 		else if (RecoveryConflictPending)
 			ereport(FATAL,
-					(errcode(ERRCODE_ADMIN_SHUTDOWN),
+					(errcode(ERRCODE_DATABASE_DROPPED),
 			  errmsg("terminating connection due to conflict with recovery"),
 					 errdetail_recovery_conflict()));
 		else
@@ -3065,6 +3071,42 @@ ProcessInterrupts(void)
 
 
 /*
+ * IA64-specific code to fetch the AR.BSP register for stack depth checks.
+ *
+ * We currently support gcc, icc, and HP-UX inline assembly here.
+ */
+#if defined(__ia64__) || defined(__ia64)
+
+#if defined(__hpux) && !defined(__GNUC__) && !defined __INTEL_COMPILER
+#include <ia64/sys/inline.h>
+#define ia64_get_bsp() ((char *) (_Asm_mov_from_ar(_AREG_BSP, _NO_FENCE)))
+#else
+
+#ifdef __INTEL_COMPILER
+#include <asm/ia64regs.h>
+#endif
+
+static __inline__ char *
+ia64_get_bsp(void)
+{
+	char	   *ret;
+
+#ifndef __INTEL_COMPILER
+	/* the ;; is a "stop", seems to be required before fetching BSP */
+	__asm__ __volatile__(
+		";;\n"
+		"	mov	%0=ar.bsp	\n"
+:		"=r"(ret));
+#else
+  ret = (char *) __getReg(_IA64_REG_AR_BSP);
+#endif
+  return ret;
+}
+#endif
+#endif /* IA64 */
+
+
+/*
  * check_stack_depth: check for excessively deep recursion
  *
  * This should be called someplace in any recursive routine that might possibly
@@ -3106,6 +3148,28 @@ check_stack_depth(void)
 		 errhint("Increase the configuration parameter \"max_stack_depth\", "
 		   "after ensuring the platform's stack depth limit is adequate.")));
 	}
+
+	/*
+	 * On IA64 there is a separate "register" stack that requires its own
+	 * independent check.  For this, we have to measure the change in the
+	 * "BSP" pointer from PostgresMain to here.  Logic is just as above,
+	 * except that we know IA64's register stack grows up.
+	 *
+	 * Note we assume that the same max_stack_depth applies to both stacks.
+	 */
+#if defined(__ia64__) || defined(__ia64)
+	stack_depth = (long) (ia64_get_bsp() - register_stack_base_ptr);
+
+	if (stack_depth > max_stack_depth_bytes &&
+		register_stack_base_ptr != NULL)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+				 errmsg("stack depth limit exceeded"),
+		 errhint("Increase the configuration parameter \"max_stack_depth\", "
+		   "after ensuring the platform's stack depth limit is adequate.")));
+	}
+#endif /* IA64 */
 }
 
 /* GUC assign hook for max_stack_depth */
@@ -3561,6 +3625,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 	/* Set up reference point for stack depth checking */
 	stack_base_ptr = &stack_base;
+#if defined(__ia64__) || defined(__ia64)
+	register_stack_base_ptr = ia64_get_bsp();
+#endif
 
 	/* Compute paths, if we didn't inherit them from postmaster */
 	if (my_exec_path[0] == '\0')

@@ -725,15 +725,52 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 				break;
 		}
 
+		/*
+		 * Check that relation is a legal target for marking.
+		 *
+		 * In most cases parser and/or planner should have noticed this
+		 * already, but they don't cover all cases.
+		 */
+		if (relation)
+		{
+			switch (relation->rd_rel->relkind)
+			{
+				case RELKIND_RELATION:
+					/* OK */
+					break;
+				case RELKIND_SEQUENCE:
+					/* Must disallow this because we don't vacuum sequences */
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("cannot lock rows in sequence \"%s\"",
+									RelationGetRelationName(relation))));
+					break;
+				case RELKIND_TOASTVALUE:
+					/* This will be disallowed in 9.1, but for now OK */
+					break;
+				case RELKIND_VIEW:
+					/* Should not get here */
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("cannot lock rows in view \"%s\"",
+									RelationGetRelationName(relation))));
+					break;
+				default:
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("cannot lock rows in relation \"%s\"",
+									RelationGetRelationName(relation))));
+					break;
+			}
+		}
+
 		erm = (ExecRowMark *) palloc(sizeof(ExecRowMark));
 		erm->relation = relation;
 		erm->rti = rc->rti;
 		erm->prti = rc->prti;
+		erm->rowmarkId = rc->rowmarkId;
 		erm->markType = rc->markType;
 		erm->noWait = rc->noWait;
-		erm->ctidAttNo = rc->ctidAttNo;
-		erm->toidAttNo = rc->toidAttNo;
-		erm->wholeAttNo = rc->wholeAttNo;
 		ItemPointerSetInvalid(&(erm->curCtid));
 		estate->es_rowMarks = lappend(estate->es_rowMarks, erm);
 	}
@@ -1338,6 +1375,77 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
 
 
 /*
+ * ExecFindRowMark -- find the ExecRowMark struct for given rangetable index
+ */
+ExecRowMark *
+ExecFindRowMark(EState *estate, Index rti)
+{
+	ListCell   *lc;
+
+	foreach(lc, estate->es_rowMarks)
+	{
+		ExecRowMark *erm = (ExecRowMark *) lfirst(lc);
+
+		if (erm->rti == rti)
+			return erm;
+	}
+	elog(ERROR, "failed to find ExecRowMark for rangetable index %u", rti);
+	return NULL;				/* keep compiler quiet */
+}
+
+/*
+ * ExecBuildAuxRowMark -- create an ExecAuxRowMark struct
+ *
+ * Inputs are the underlying ExecRowMark struct and the targetlist of the
+ * input plan node (not planstate node!).  We need the latter to find out
+ * the column numbers of the resjunk columns.
+ */
+ExecAuxRowMark *
+ExecBuildAuxRowMark(ExecRowMark *erm, List *targetlist)
+{
+	ExecAuxRowMark *aerm = (ExecAuxRowMark *) palloc0(sizeof(ExecAuxRowMark));
+	char		resname[32];
+
+	aerm->rowmark = erm;
+
+	/* Look up the resjunk columns associated with this rowmark */
+	if (erm->relation)
+	{
+		Assert(erm->markType != ROW_MARK_COPY);
+
+		/* if child rel, need tableoid */
+		if (erm->rti != erm->prti)
+		{
+			snprintf(resname, sizeof(resname), "tableoid%u", erm->rowmarkId);
+			aerm->toidAttNo = ExecFindJunkAttributeInTlist(targetlist,
+														   resname);
+			if (!AttributeNumberIsValid(aerm->toidAttNo))
+				elog(ERROR, "could not find junk %s column", resname);
+		}
+
+		/* always need ctid for real relations */
+		snprintf(resname, sizeof(resname), "ctid%u", erm->rowmarkId);
+		aerm->ctidAttNo = ExecFindJunkAttributeInTlist(targetlist,
+													   resname);
+		if (!AttributeNumberIsValid(aerm->ctidAttNo))
+			elog(ERROR, "could not find junk %s column", resname);
+	}
+	else
+	{
+		Assert(erm->markType == ROW_MARK_COPY);
+
+		snprintf(resname, sizeof(resname), "wholerow%u", erm->rowmarkId);
+		aerm->wholeAttNo = ExecFindJunkAttributeInTlist(targetlist,
+														resname);
+		if (!AttributeNumberIsValid(aerm->wholeAttNo))
+			elog(ERROR, "could not find junk %s column", resname);
+	}
+
+	return aerm;
+}
+
+
+/*
  * EvalPlanQual logic --- recheck modified tuple(s) to see if we want to
  * process the updated version under READ COMMITTED rules.
  *
@@ -1627,11 +1735,13 @@ EvalPlanQualFetch(EState *estate, Relation relation, int lockmode,
 /*
  * EvalPlanQualInit -- initialize during creation of a plan state node
  * that might need to invoke EPQ processing.
- * Note: subplan can be NULL if it will be set later with EvalPlanQualSetPlan.
+ *
+ * Note: subplan/auxrowmarks can be NULL/NIL if they will be set later
+ * with EvalPlanQualSetPlan.
  */
 void
 EvalPlanQualInit(EPQState *epqstate, EState *estate,
-				 Plan *subplan, int epqParam)
+				 Plan *subplan, List *auxrowmarks, int epqParam)
 {
 	/* Mark the EPQ state inactive */
 	epqstate->estate = NULL;
@@ -1639,7 +1749,7 @@ EvalPlanQualInit(EPQState *epqstate, EState *estate,
 	epqstate->origslot = NULL;
 	/* ... and remember data that EvalPlanQualBegin will need */
 	epqstate->plan = subplan;
-	epqstate->rowMarks = NIL;
+	epqstate->arowMarks = auxrowmarks;
 	epqstate->epqParam = epqParam;
 }
 
@@ -1649,25 +1759,14 @@ EvalPlanQualInit(EPQState *epqstate, EState *estate,
  * We need this so that ModifyTuple can deal with multiple subplans.
  */
 void
-EvalPlanQualSetPlan(EPQState *epqstate, Plan *subplan)
+EvalPlanQualSetPlan(EPQState *epqstate, Plan *subplan, List *auxrowmarks)
 {
 	/* If we have a live EPQ query, shut it down */
 	EvalPlanQualEnd(epqstate);
 	/* And set/change the plan pointer */
 	epqstate->plan = subplan;
-}
-
-/*
- * EvalPlanQualAddRowMark -- add an ExecRowMark that EPQ needs to handle.
- *
- * Currently, only non-locking RowMarks are supported.
- */
-void
-EvalPlanQualAddRowMark(EPQState *epqstate, ExecRowMark *erm)
-{
-	if (RowMarkRequiresRowShareLock(erm->markType))
-		elog(ERROR, "EvalPlanQual doesn't support locking rowmarks");
-	epqstate->rowMarks = lappend(epqstate->rowMarks, erm);
+	/* The rowmarks depend on the plan, too */
+	epqstate->arowMarks = auxrowmarks;
 }
 
 /*
@@ -1717,12 +1816,16 @@ EvalPlanQualFetchRowMarks(EPQState *epqstate)
 
 	Assert(epqstate->origslot != NULL);
 
-	foreach(l, epqstate->rowMarks)
+	foreach(l, epqstate->arowMarks)
 	{
-		ExecRowMark *erm = (ExecRowMark *) lfirst(l);
+		ExecAuxRowMark *aerm = (ExecAuxRowMark *) lfirst(l);
+		ExecRowMark *erm = aerm->rowmark;
 		Datum		datum;
 		bool		isNull;
 		HeapTupleData tuple;
+
+		if (RowMarkRequiresRowShareLock(erm->markType))
+			elog(ERROR, "EvalPlanQual doesn't support locking rowmarks");
 
 		/* clear any leftover test tuple for this rel */
 		EvalPlanQualSetTuple(epqstate, erm->rti, NULL);
@@ -1739,7 +1842,7 @@ EvalPlanQualFetchRowMarks(EPQState *epqstate)
 				Oid			tableoid;
 
 				datum = ExecGetJunkAttribute(epqstate->origslot,
-											 erm->toidAttNo,
+											 aerm->toidAttNo,
 											 &isNull);
 				/* non-locked rels could be on the inside of outer joins */
 				if (isNull)
@@ -1755,7 +1858,7 @@ EvalPlanQualFetchRowMarks(EPQState *epqstate)
 
 			/* fetch the tuple's ctid */
 			datum = ExecGetJunkAttribute(epqstate->origslot,
-										 erm->ctidAttNo,
+										 aerm->ctidAttNo,
 										 &isNull);
 			/* non-locked rels could be on the inside of outer joins */
 			if (isNull)
@@ -1780,7 +1883,7 @@ EvalPlanQualFetchRowMarks(EPQState *epqstate)
 
 			/* fetch the whole-row Var for the relation */
 			datum = ExecGetJunkAttribute(epqstate->origslot,
-										 erm->wholeAttNo,
+										 aerm->wholeAttNo,
 										 &isNull);
 			/* non-locked rels could be on the inside of outer joins */
 			if (isNull)
