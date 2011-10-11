@@ -952,7 +952,7 @@ MarkBufferDirty(Buffer buffer)
 	volatile BufferDesc *bufHdr;
 
 	if (!BufferIsValid(buffer))
-		elog(ERROR, "bad buffer id: %d", buffer);
+		elog(ERROR, "bad buffer ID: %d", buffer);
 
 	if (BufferIsLocal(buffer))
 	{
@@ -2198,7 +2198,7 @@ ReleaseBuffer(Buffer buffer)
 	volatile BufferDesc *bufHdr;
 
 	if (!BufferIsValid(buffer))
-		elog(ERROR, "bad buffer id: %d", buffer);
+		elog(ERROR, "bad buffer ID: %d", buffer);
 
 	ResourceOwnerForgetBuffer(CurrentResourceOwner, buffer);
 
@@ -2270,7 +2270,7 @@ SetBufferCommitInfoNeedsSave(Buffer buffer)
 	volatile BufferDesc *bufHdr;
 
 	if (!BufferIsValid(buffer))
-		elog(ERROR, "bad buffer id: %d", buffer);
+		elog(ERROR, "bad buffer ID: %d", buffer);
 
 	if (BufferIsLocal(buffer))
 	{
@@ -2449,10 +2449,11 @@ LockBufferForCleanup(Buffer buffer)
 		/* Wait to be signaled by UnpinBuffer() */
 		if (InHotStandby)
 		{
-			/* Share the bufid that Startup process waits on */
+			/* Publish the bufid that Startup process waits on */
 			SetStartupBufferPinWaitBufId(buffer - 1);
 			/* Set alarm and then wait to be signaled by UnpinBuffer() */
 			ResolveRecoveryConflictWithBufferPin();
+			/* Reset the published bufid */
 			SetStartupBufferPinWaitBufId(-1);
 		}
 		else
@@ -2465,7 +2466,7 @@ LockBufferForCleanup(Buffer buffer)
 
 /*
  * Check called from RecoveryConflictInterrupt handler when Startup
- * process requests cancelation of all pin holders that are blocking it.
+ * process requests cancellation of all pin holders that are blocking it.
  */
 bool
 HoldingBufferPinThatDelaysRecovery(void)

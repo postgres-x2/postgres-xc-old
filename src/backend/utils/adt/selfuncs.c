@@ -143,7 +143,8 @@ static double ineq_histogram_selectivity(PlannerInfo *root,
 static double eqjoinsel_inner(Oid operator,
 				VariableStatData *vardata1, VariableStatData *vardata2);
 static double eqjoinsel_semi(Oid operator,
-			   VariableStatData *vardata1, VariableStatData *vardata2);
+			   VariableStatData *vardata1, VariableStatData *vardata2,
+			   RelOptInfo *inner_rel);
 static bool convert_to_scalar(Datum value, Oid valuetypid, double *scaledvalue,
 				  Datum lobound, Datum hibound, Oid boundstypid,
 				  double *scaledlobound, double *scaledhibound);
@@ -172,6 +173,7 @@ static bool get_actual_variable_range(PlannerInfo *root,
 						  VariableStatData *vardata,
 						  Oid sortop,
 						  Datum *min, Datum *max);
+static RelOptInfo *find_join_input_rel(PlannerInfo *root, Relids relids);
 static Selectivity prefix_selectivity(PlannerInfo *root,
 				   VariableStatData *vardata,
 				   Oid vartype, Oid opfamily, Const *prefixcon);
@@ -2007,6 +2009,7 @@ eqjoinsel(PG_FUNCTION_ARGS)
 	VariableStatData vardata1;
 	VariableStatData vardata2;
 	bool		join_is_reversed;
+	RelOptInfo *inner_rel;
 
 	get_join_variables(root, args, sjinfo,
 					   &vardata1, &vardata2, &join_is_reversed);
@@ -2020,11 +2023,21 @@ eqjoinsel(PG_FUNCTION_ARGS)
 			break;
 		case JOIN_SEMI:
 		case JOIN_ANTI:
+			/*
+			 * Look up the join's inner relation.  min_righthand is sufficient
+			 * information because neither SEMI nor ANTI joins permit any
+			 * reassociation into or out of their RHS, so the righthand will
+			 * always be exactly that set of rels.
+			 */
+			inner_rel = find_join_input_rel(root, sjinfo->min_righthand);
+
 			if (!join_is_reversed)
-				selec = eqjoinsel_semi(operator, &vardata1, &vardata2);
+				selec = eqjoinsel_semi(operator, &vardata1, &vardata2,
+									   inner_rel);
 			else
 				selec = eqjoinsel_semi(get_commutator(operator),
-									   &vardata2, &vardata1);
+									   &vardata2, &vardata1,
+									   inner_rel);
 			break;
 		default:
 			/* other values not expected here */
@@ -2245,21 +2258,9 @@ eqjoinsel_inner(Oid operator,
 		 * XXX Can we be smarter if we have an MCV list for just one side? It
 		 * seems that if we assume equal distribution for the other side, we
 		 * end up with the same answer anyway.
-		 *
-		 * An additional hack we use here is to clamp the nd1 and nd2 values
-		 * to not more than what we are estimating the input relation sizes to
-		 * be, providing a crude correction for the selectivity of restriction
-		 * clauses on those relations.	(We don't do that in the other path
-		 * since there we are comparing the nd values to stats for the whole
-		 * relations.)
 		 */
 		double		nullfrac1 = stats1 ? stats1->stanullfrac : 0.0;
 		double		nullfrac2 = stats2 ? stats2->stanullfrac : 0.0;
-
-		if (vardata1->rel)
-			nd1 = Min(nd1, vardata1->rel->rows);
-		if (vardata2->rel)
-			nd2 = Min(nd2, vardata2->rel->rows);
 
 		selec = (1.0 - nullfrac1) * (1.0 - nullfrac2);
 		if (nd1 > nd2)
@@ -2286,7 +2287,8 @@ eqjoinsel_inner(Oid operator,
  */
 static double
 eqjoinsel_semi(Oid operator,
-			   VariableStatData *vardata1, VariableStatData *vardata2)
+			   VariableStatData *vardata1, VariableStatData *vardata2,
+			   RelOptInfo *inner_rel)
 {
 	double		selec;
 	double		nd1;
@@ -2305,6 +2307,25 @@ eqjoinsel_semi(Oid operator,
 
 	nd1 = get_variable_numdistinct(vardata1);
 	nd2 = get_variable_numdistinct(vardata2);
+
+	/*
+	 * We clamp nd2 to be not more than what we estimate the inner relation's
+	 * size to be.  This is intuitively somewhat reasonable since obviously
+	 * there can't be more than that many distinct values coming from the
+	 * inner rel.  The reason for the asymmetry (ie, that we don't clamp nd1
+	 * likewise) is that this is the only pathway by which restriction clauses
+	 * applied to the inner rel will affect the join result size estimate,
+	 * since set_joinrel_size_estimates will multiply SEMI/ANTI selectivity by
+	 * only the outer rel's size.  If we clamped nd1 we'd be double-counting
+	 * the selectivity of outer-rel restrictions.
+	 *
+	 * We can apply this clamping both with respect to the base relation from
+	 * which the join variable comes (if there is just one), and to the
+	 * immediate inner input relation of the current join.
+	 */
+	if (vardata2->rel)
+		nd2 = Min(nd2, vardata2->rel->rows);
+	nd2 = Min(nd2, inner_rel->rows);
 
 	if (HeapTupleIsValid(vardata1->statsTuple))
 	{
@@ -2349,11 +2370,21 @@ eqjoinsel_semi(Oid operator,
 					uncertainfrac,
 					uncertain;
 		int			i,
-					nmatches;
+					nmatches,
+					clamped_nvalues2;
+
+		/*
+		 * The clamping above could have resulted in nd2 being less than
+		 * nvalues2; in which case, we assume that precisely the nd2 most
+		 * common values in the relation will appear in the join input, and so
+		 * compare to only the first nd2 members of the MCV list.  Of course
+		 * this is frequently wrong, but it's the best bet we can make.
+		 */
+		clamped_nvalues2 = Min(nvalues2, nd2);
 
 		fmgr_info(get_opcode(operator), &eqproc);
 		hasmatch1 = (bool *) palloc0(nvalues1 * sizeof(bool));
-		hasmatch2 = (bool *) palloc0(nvalues2 * sizeof(bool));
+		hasmatch2 = (bool *) palloc0(clamped_nvalues2 * sizeof(bool));
 
 		/*
 		 * Note we assume that each MCV will match at most one member of the
@@ -2366,7 +2397,7 @@ eqjoinsel_semi(Oid operator,
 		{
 			int			j;
 
-			for (j = 0; j < nvalues2; j++)
+			for (j = 0; j < clamped_nvalues2; j++)
 			{
 				if (hasmatch2[j])
 					continue;
@@ -2411,7 +2442,7 @@ eqjoinsel_semi(Oid operator,
 		{
 			nd1 -= nmatches;
 			nd2 -= nmatches;
-			if (nd1 <= nd2 || nd2 <= 0)
+			if (nd1 <= nd2 || nd2 < 0)
 				uncertainfrac = 1.0;
 			else
 				uncertainfrac = nd2 / nd1;
@@ -2432,12 +2463,7 @@ eqjoinsel_semi(Oid operator,
 
 		if (nd1 != DEFAULT_NUM_DISTINCT && nd2 != DEFAULT_NUM_DISTINCT)
 		{
-			if (vardata1->rel)
-				nd1 = Min(nd1, vardata1->rel->rows);
-			if (vardata2->rel)
-				nd2 = Min(nd2, vardata2->rel->rows);
-
-			if (nd1 <= nd2 || nd2 <= 0)
+			if (nd1 <= nd2 || nd2 < 0)
 				selec = 1.0 - nullfrac1;
 			else
 				selec = (nd2 / nd1) * (1.0 - nullfrac1);
@@ -3089,7 +3115,9 @@ estimate_num_groups(PlannerInfo *root, List *groupExprs, double input_rows)
 		 * PlaceHolderVar doesn't change the number of groups, which boils
 		 * down to ignoring the possible addition of nulls to the result set).
 		 */
-		varshere = pull_var_clause(groupexpr, PVC_RECURSE_PLACEHOLDERS);
+		varshere = pull_var_clause(groupexpr,
+								   PVC_RECURSE_AGGREGATES,
+								   PVC_RECURSE_PLACEHOLDERS);
 
 		/*
 		 * If we find any variable-free GROUP BY item, then either it is a
@@ -4754,6 +4782,37 @@ get_actual_variable_range(PlannerInfo *root, VariableStatData *vardata,
 	}
 
 	return have_data;
+}
+
+/*
+ * find_join_input_rel
+ *		Look up the input relation for a join.
+ *
+ * We assume that the input relation's RelOptInfo must have been constructed
+ * already.
+ */
+static RelOptInfo *
+find_join_input_rel(PlannerInfo *root, Relids relids)
+{
+	RelOptInfo *rel = NULL;
+
+	switch (bms_membership(relids))
+	{
+		case BMS_EMPTY_SET:
+			/* should not happen */
+			break;
+		case BMS_SINGLETON:
+			rel = find_base_rel(root, bms_singleton_member(relids));
+			break;
+		case BMS_MULTIPLE:
+			rel = find_join_rel(root, relids);
+			break;
+	}
+
+	if (rel == NULL)
+		elog(ERROR, "could not find RelOptInfo for given relids");
+
+	return rel;
 }
 
 

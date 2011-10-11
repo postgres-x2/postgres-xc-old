@@ -183,11 +183,15 @@ InitProcGlobal(void)
 	 */
 	ProcGlobal->freeProcs = NULL;
 	ProcGlobal->autovacFreeProcs = NULL;
+	ProcGlobal->startupProc = NULL;
+	ProcGlobal->startupProcPid = 0;
+	ProcGlobal->startupBufferPinWaitBufId = -1;
 
 	ProcGlobal->spins_per_delay = DEFAULT_SPINS_PER_DELAY;
 
 	/*
-	 * Pre-create the PGPROC structures and create a semaphore for each.
+	 * Pre-create the PGPROC structures and create a semaphore and latch
+	 * for each.
 	 */
 	procs = (PGPROC *) ShmemAlloc((MaxConnections) * sizeof(PGPROC));
 	if (!procs)
@@ -198,9 +202,9 @@ InitProcGlobal(void)
 	for (i = 0; i < MaxConnections; i++)
 	{
 		PGSemaphoreCreate(&(procs[i].sem));
+		InitSharedLatch(&procs[i].procLatch);
 		procs[i].links.next = (SHM_QUEUE *) ProcGlobal->freeProcs;
 		ProcGlobal->freeProcs = &procs[i];
-		InitSharedLatch(&procs[i].waitLatch);
 	}
 
 	/*
@@ -217,9 +221,9 @@ InitProcGlobal(void)
 	for (i = 0; i < autovacuum_max_workers + 1; i++)
 	{
 		PGSemaphoreCreate(&(procs[i].sem));
+		InitSharedLatch(&procs[i].procLatch);
 		procs[i].links.next = (SHM_QUEUE *) ProcGlobal->autovacFreeProcs;
 		ProcGlobal->autovacFreeProcs = &procs[i];
-		InitSharedLatch(&procs[i].waitLatch);
 	}
 
 	/*
@@ -230,7 +234,7 @@ InitProcGlobal(void)
 	{
 		AuxiliaryProcs[i].pid = 0;		/* marks auxiliary proc as not in use */
 		PGSemaphoreCreate(&(AuxiliaryProcs[i].sem));
-		InitSharedLatch(&procs[i].waitLatch);
+		InitSharedLatch(&AuxiliaryProcs[i].procLatch);
 	}
 
 	/* Create ProcStructLock spinlock, too */
@@ -306,8 +310,8 @@ InitProcess(void)
 		MarkPostmasterChildActive();
 
 	/*
-	 * Initialize all fields of MyProc, except for the semaphore which was
-	 * prepared for us by InitProcGlobal.
+	 * Initialize all fields of MyProc, except for the semaphore and latch,
+	 * which were prepared for us by InitProcGlobal.
 	 */
 	SHMQueueElemInit(&(MyProc->links));
 	MyProc->waitStatus = STATUS_OK;
@@ -333,12 +337,17 @@ InitProcess(void)
 		SHMQueueInit(&(MyProc->myProcLocks[i]));
 	MyProc->recoveryConflictPending = false;
 
-	/* Initialise for sync rep */
+	/* Initialize fields for sync rep */
 	MyProc->waitLSN.xlogid = 0;
 	MyProc->waitLSN.xrecoff = 0;
 	MyProc->syncRepState = SYNC_REP_NOT_WAITING;
 	SHMQueueElemInit(&(MyProc->syncRepLinks));
-	OwnLatch((Latch *) &MyProc->waitLatch);
+
+	/*
+	 * Acquire ownership of the PGPROC's latch, so that we can use WaitLatch.
+	 * Note that there's no particular need to do ResetLatch here.
+	 */
+	OwnLatch(&MyProc->procLatch);
 
 	/*
 	 * We might be reusing a semaphore that belonged to a failed process. So
@@ -379,7 +388,6 @@ InitProcessPhase2(void)
 	/*
 	 * Arrange to clean that up at backend exit.
 	 */
-	on_shmem_exit(SyncRepCleanupAtProcExit, 0);
 	on_shmem_exit(RemoveProcFromArray, 0);
 }
 
@@ -454,8 +462,8 @@ InitAuxiliaryProcess(void)
 	SpinLockRelease(ProcStructLock);
 
 	/*
-	 * Initialize all fields of MyProc, except for the semaphore which was
-	 * prepared for us by InitProcGlobal.
+	 * Initialize all fields of MyProc, except for the semaphore and latch,
+	 * which were prepared for us by InitProcGlobal.
 	 */
 	SHMQueueElemInit(&(MyProc->links));
 	MyProc->waitStatus = STATUS_OK;
@@ -474,6 +482,12 @@ InitAuxiliaryProcess(void)
 	MyProc->waitProcLock = NULL;
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
 		SHMQueueInit(&(MyProc->myProcLocks[i]));
+
+	/*
+	 * Acquire ownership of the PGPROC's latch, so that we can use WaitLatch.
+	 * Note that there's no particular need to do ResetLatch here.
+	 */
+	OwnLatch(&MyProc->procLatch);
 
 	/*
 	 * We might be reusing a semaphore that belonged to a failed process. So
@@ -502,7 +516,6 @@ PublishStartupProcessInformation(void)
 
 	procglobal->startupProc = MyProc;
 	procglobal->startupProcPid = MyProcPid;
-	procglobal->startupBufferPinWaitBufId = 0;
 
 	SpinLockRelease(ProcStructLock);
 }
@@ -529,14 +542,10 @@ SetStartupBufferPinWaitBufId(int bufid)
 int
 GetStartupBufferPinWaitBufId(void)
 {
-	int			bufid;
-
 	/* use volatile pointer to prevent code rearrangement */
 	volatile PROC_HDR *procglobal = ProcGlobal;
 
-	bufid = procglobal->startupBufferPinWaitBufId;
-
-	return bufid;
+	return procglobal->startupBufferPinWaitBufId;
 }
 
 /*
@@ -691,12 +700,18 @@ ProcKill(int code, Datum arg)
 
 	Assert(MyProc != NULL);
 
+	/* Make sure we're out of the sync rep lists */
+	SyncRepCleanupAtProcExit();
+
 	/*
 	 * Release any LW locks I am holding.  There really shouldn't be any, but
 	 * it's cheap to check again before we cut the knees off the LWLock
 	 * facility by releasing our PGPROC ...
 	 */
 	LWLockReleaseAll();
+
+	/* Release ownership of the process's latch, too */
+	DisownLatch(&MyProc->procLatch);
 
 	SpinLockAcquire(ProcStructLock);
 
@@ -752,6 +767,9 @@ AuxiliaryProcKill(int code, Datum arg)
 
 	/* Release any LW locks I am holding (see notes above) */
 	LWLockReleaseAll();
+
+	/* Release ownership of the process's latch, too */
+	DisownLatch(&MyProc->procLatch);
 
 	SpinLockAcquire(ProcStructLock);
 
@@ -954,6 +972,15 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	 */
 	LWLockRelease(partitionLock);
 
+	/*
+	 * Also, now that we will successfully clean up after an ereport, it's
+	 * safe to check to see if there's a buffer pin deadlock against the
+	 * Startup process.  Of course, that's only necessary if we're doing
+	 * Hot Standby and are not the Startup process ourselves.
+	 */
+	if (RecoveryInProgress() && !InRecovery)
+		CheckRecoveryConflictDeadlock();
+
 	/* Reset deadlock_state before enabling the signal handler */
 	deadlock_state = DS_NOT_YET_CHECKED;
 
@@ -1017,7 +1044,7 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 			{
 				int			pid = autovac->pid;
 
-				elog(DEBUG2, "sending cancel to blocking autovacuum pid = %d",
+				elog(DEBUG2, "sending cancel to blocking autovacuum PID %d",
 					 pid);
 
 				/* don't hold the lock across the kill() syscall */
@@ -1345,7 +1372,7 @@ CheckDeadLock(void)
 		 * the lock.
 		 *
 		 * If blocked by autovacuum, this wakeup will enable ProcSleep to send
-		 * the cancelling signal to the autovacuum worker.
+		 * the canceling signal to the autovacuum worker.
 		 */
 		PGSemaphoreUnlock(&MyProc->sem);
 	}

@@ -528,20 +528,14 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	/* Identify archive format to emit */
 	archiveFormat = parseArchiveFormat(format, &archiveMode);
 
 	/* archiveFormat specific setup */
 	if (archiveFormat == archNull)
 		plainText = 1;
 
-	/*
-	 * Ignore compression level for plain format. XXX: This is a bit
-	 * inconsistent, tar-format throws an error instead.
-	 */
-	if (archiveFormat == archNull)
-		compressLevel = 0;
-
-	/* Custom and directory formats are compressed by default */
+	/* Custom and directory formats are compressed by default, others not */
 	if (compressLevel == -1)
 	{
 		if (archiveFormat == archCustom || archiveFormat == archDirectory)
@@ -550,7 +544,7 @@ main(int argc, char **argv)
 			compressLevel = 0;
 	}
 
-	/* open the output file */
+	/* Open the output file */
 	g_fout = CreateArchive(filename, archiveFormat, compressLevel, archiveMode);
 
 	if (g_fout == NULL)
@@ -3970,14 +3964,13 @@ getTables(int *numTables)
 		 * owning column, if any (note this dependency is AUTO as of 8.2)
 		 */
 		appendPQExpBuffer(query,
-						  "SELECT c.tableoid, c.oid, relname, "
-						  "relacl, relkind, relnamespace, "
-						  "(%s relowner) AS rolname, "
-						  "relchecks, (reltriggers <> 0) AS relhastriggers, "
-						  "relhasindex, relhasrules, relhasoids, "
-						  "relfrozenxid, "
-						  "0 AS toid, "
-						  "0 AS tfrozenxid, "
+						  "SELECT c.tableoid, c.oid, c.relname, "
+						  "c.relacl, c.relkind, c.relnamespace, "
+						  "(%s c.relowner) AS rolname, "
+						  "c.relchecks, (c.reltriggers <> 0) AS relhastriggers, "
+						  "c.relhasindex, c.relhasrules, c.relhasoids, "
+						  "c.relfrozenxid, tc.oid AS toid, "
+						  "tc.relfrozenxid AS tfrozenxid, "
 						  "'p' AS relpersistence, "
 						  "NULL AS reloftype, "
 						  "d.refobjid AS owning_tab, "
@@ -3991,7 +3984,8 @@ getTables(int *numTables)
 						  "d.classid = c.tableoid AND d.objid = c.oid AND "
 						  "d.objsubid = 0 AND "
 						  "d.refclassid = c.tableoid AND d.deptype = 'a') "
-						  "WHERE relkind in ('%c', '%c', '%c', '%c') "
+					   "LEFT JOIN pg_class tc ON (c.reltoastrelid = tc.oid) "
+						  "WHERE c.relkind in ('%c', '%c', '%c', '%c') "
 						  "ORDER BY c.oid",
 						  username_subquery,
 						  RELKIND_SEQUENCE,
@@ -6396,7 +6390,8 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 						  "fdwhandler::pg_catalog.regproc, "
 						  "fdwvalidator::pg_catalog.regproc, fdwacl, "
 						  "array_to_string(ARRAY("
-						  "		SELECT option_name || ' ' || quote_literal(option_value) "
+						  "		SELECT quote_ident(option_name) || ' ' || "
+						  "            quote_literal(option_value) "
 						  "		FROM pg_options_to_table(fdwoptions)), ', ') AS fdwoptions "
 						  "FROM pg_foreign_data_wrapper",
 						  username_subquery);
@@ -6408,7 +6403,8 @@ getForeignDataWrappers(int *numForeignDataWrappers)
 						  "'-' AS fdwhandler, "
 						  "fdwvalidator::pg_catalog.regproc, fdwacl, "
 						  "array_to_string(ARRAY("
-						  "		SELECT option_name || ' ' || quote_literal(option_value) "
+						  "		SELECT quote_ident(option_name) || ' ' || "
+						  "            quote_literal(option_value) "
 						  "		FROM pg_options_to_table(fdwoptions)), ', ') AS fdwoptions "
 						  "FROM pg_foreign_data_wrapper",
 						  username_subquery);
@@ -6495,7 +6491,8 @@ getForeignServers(int *numForeignServers)
 					  "(%s srvowner) AS rolname, "
 					  "srvfdw, srvtype, srvversion, srvacl,"
 					  "array_to_string(ARRAY("
-		 "		SELECT option_name || ' ' || quote_literal(option_value) "
+		 "		SELECT quote_ident(option_name) || ' ' || "
+		 "             quote_literal(option_value) "
 	   "		FROM pg_options_to_table(srvoptions)), ', ') AS srvoptions "
 					  "FROM pg_foreign_server",
 					  username_subquery);
@@ -11422,7 +11419,7 @@ dumpUserMappings(Archive *fout,
 
 	appendPQExpBuffer(query,
 					  "SELECT usename, "
-					  "array_to_string(ARRAY(SELECT option_name || ' ' || quote_literal(option_value) FROM pg_options_to_table(umoptions)), ', ') AS umoptions\n"
+					  "array_to_string(ARRAY(SELECT quote_ident(option_name) || ' ' || quote_literal(option_value) FROM pg_options_to_table(umoptions)), ', ') AS umoptions\n"
 					  "FROM pg_user_mappings "
 					  "WHERE srvid = %u",
 					  catalogId.oid);
@@ -12070,7 +12067,8 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 			/* retrieve name of foreign server and generic options */
 			appendPQExpBuffer(query,
 							  "SELECT fs.srvname, array_to_string(ARRAY("
-				"   SELECT option_name || ' ' || quote_literal(option_value)"
+				"   SELECT quote_ident(option_name) || ' ' || "
+				"          quote_literal(option_value)"
 			   "   FROM pg_options_to_table(ftoptions)), ', ') AS ftoptions "
 						"FROM pg_foreign_table ft JOIN pg_foreign_server fs "
 							  "	ON (fs.oid = ft.ftserver) "

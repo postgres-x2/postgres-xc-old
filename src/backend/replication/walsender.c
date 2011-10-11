@@ -37,16 +37,16 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include "funcapi.h"
-#include "access/xlog_internal.h"
 #include "access/transam.h"
+#include "access/xlog_internal.h"
 #include "catalog/pg_type.h"
+#include "funcapi.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
+#include "nodes/replnodes.h"
 #include "replication/basebackup.h"
-#include "replication/replnodes.h"
 #include "replication/walprotocol.h"
 #include "replication/walsender.h"
 #include "storage/fd.h"
@@ -515,7 +515,7 @@ ProcessRepliesIfAny(void)
 			default:
 				ereport(FATAL,
 						(errcode(ERRCODE_PROTOCOL_VIOLATION),
-						 errmsg("invalid standby message type %d",
+						 errmsg("invalid standby message type \"%c\"",
 								firstchar)));
 		}
 	}
@@ -566,7 +566,7 @@ ProcessStandbyMessage(void)
 		default:
 			ereport(COMMERROR,
 					(errcode(ERRCODE_PROTOCOL_VIOLATION),
-					 errmsg("unexpected message type %c", msgtype)));
+					 errmsg("unexpected message type \"%c\"", msgtype)));
 			proc_exit(0);
 	}
 }
@@ -807,7 +807,7 @@ WalSndLoop(void)
 			/* Sleep */
 			WaitLatchOrSocket(&MyWalSnd->latch, MyProcPort->sock,
 							  true, pq_is_send_pending(),
-							  sleeptime * 1000L);
+							  sleeptime);
 
 			/* Check for replication timeout */
 			if (replication_timeout > 0 &&
@@ -1188,18 +1188,33 @@ XLogSend(char *msgbuf, bool *caughtup)
 static void
 WalSndSigHupHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	got_SIGHUP = true;
 	if (MyWalSnd)
 		SetLatch(&MyWalSnd->latch);
+
+	errno = save_errno;
 }
 
 /* SIGTERM: set flag to shut down */
 static void
 WalSndShutdownHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	walsender_shutdown_requested = true;
 	if (MyWalSnd)
 		SetLatch(&MyWalSnd->latch);
+
+	/*
+	 * Set the standard (non-walsender) state as well, so that we can
+	 * abort things like do_pg_stop_backup().
+	 */
+	InterruptPending = true;
+	ProcDiePending = true;
+
+	errno = save_errno;
 }
 
 /*
@@ -1238,16 +1253,24 @@ WalSndQuickDieHandler(SIGNAL_ARGS)
 static void
 WalSndXLogSendHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	latch_sigusr1_handler();
+
+	errno = save_errno;
 }
 
 /* SIGUSR2: set flag to do a last cycle and shut down afterwards */
 static void
 WalSndLastCycleHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	walsender_ready_to_stop = true;
 	if (MyWalSnd)
 		SetLatch(&MyWalSnd->latch);
+
+	errno = save_errno;
 }
 
 /* Set up signal handlers */

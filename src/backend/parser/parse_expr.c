@@ -836,12 +836,15 @@ transformAExprOp(ParseState *pstate, A_Expr *a)
 	/*
 	 * Special-case "foo = NULL" and "NULL = foo" for compatibility with
 	 * standards-broken products (like Microsoft's).  Turn these into IS NULL
-	 * exprs.
+	 * exprs. (If either side is a CaseTestExpr, then the expression was
+	 * generated internally from a CASE-WHEN expression, and
+	 * transform_null_equals does not apply.)
 	 */
 	if (Transform_null_equals &&
 		list_length(a->name) == 1 &&
 		strcmp(strVal(linitial(a->name)), "=") == 0 &&
-		(exprIsNullConstant(lexpr) || exprIsNullConstant(rexpr)))
+		(exprIsNullConstant(lexpr) || exprIsNullConstant(rexpr)) &&
+		(!IsA(lexpr, CaseTestExpr) && !IsA(rexpr, CaseTestExpr)))
 	{
 		NullTest   *n = makeNode(NullTest);
 
@@ -2200,8 +2203,7 @@ make_row_comparison_op(ParseState *pstate, List *opname,
 	List	   *opfamilies;
 	ListCell   *l,
 			   *r;
-	List	  **opfamily_lists;
-	List	  **opstrat_lists;
+	List	  **opinfo_lists;
 	Bitmapset  *strats;
 	int			nopers;
 	int			i;
@@ -2271,8 +2273,7 @@ make_row_comparison_op(ParseState *pstate, List *opname,
 	 * containing the operators, and see which interpretations (strategy
 	 * numbers) exist for each operator.
 	 */
-	opfamily_lists = (List **) palloc(nopers * sizeof(List *));
-	opstrat_lists = (List **) palloc(nopers * sizeof(List *));
+	opinfo_lists = (List **) palloc(nopers * sizeof(List *));
 	strats = NULL;
 	i = 0;
 	foreach(l, opexprs)
@@ -2281,17 +2282,18 @@ make_row_comparison_op(ParseState *pstate, List *opname,
 		Bitmapset  *this_strats;
 		ListCell   *j;
 
-		get_op_btree_interpretation(opno,
-									&opfamily_lists[i], &opstrat_lists[i]);
+		opinfo_lists[i] = get_op_btree_interpretation(opno);
 
 		/*
-		 * convert strategy number list to a Bitmapset to make the
+		 * convert strategy numbers into a Bitmapset to make the
 		 * intersection calculation easy.
 		 */
 		this_strats = NULL;
-		foreach(j, opstrat_lists[i])
+		foreach(j, opinfo_lists[i])
 		{
-			this_strats = bms_add_member(this_strats, lfirst_int(j));
+			OpBtreeInterpretation *opinfo = lfirst(j);
+
+			this_strats = bms_add_member(this_strats, opinfo->strategy);
 		}
 		if (i == 0)
 			strats = this_strats;
@@ -2339,14 +2341,15 @@ make_row_comparison_op(ParseState *pstate, List *opname,
 	for (i = 0; i < nopers; i++)
 	{
 		Oid			opfamily = InvalidOid;
+		ListCell   *j;
 
-		forboth(l, opfamily_lists[i], r, opstrat_lists[i])
+		foreach(j, opinfo_lists[i])
 		{
-			int			opstrat = lfirst_int(r);
+			OpBtreeInterpretation *opinfo = lfirst(j);
 
-			if (opstrat == rctype)
+			if (opinfo->strategy == rctype)
 			{
-				opfamily = lfirst_oid(l);
+				opfamily = opinfo->opfamily_id;
 				break;
 			}
 		}

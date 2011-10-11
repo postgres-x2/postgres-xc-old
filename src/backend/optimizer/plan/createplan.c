@@ -815,7 +815,9 @@ create_remotejoin_plan(PlannerInfo *root, JoinPath *best_path, Plan *parent, Pla
 			 * intermediate, the children vars may or may not be referenced
 			 * multiple times in it.
 			 */
-			parent_vars = pull_var_clause((Node *)parent->targetlist, PVC_REJECT_PLACEHOLDERS);
+			parent_vars = pull_var_clause((Node *)parent->targetlist,
+										  PVC_RECURSE_AGGREGATES,
+										  PVC_REJECT_PLACEHOLDERS);
 
 			findReferencedVars(parent_vars, outer_plan, &out_tlist, &out_relids);
 			findReferencedVars(parent_vars, inner_plan, &in_tlist, &in_relids);
@@ -4448,7 +4450,13 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 
 			if (!tle)
 			{
-				/* No matching tlist item; look for a computable expression */
+				/*
+				 * No matching tlist item; look for a computable expression.
+				 * Note that we treat Aggrefs as if they were variables; this
+				 * is necessary when attempting to sort the output from an Agg
+				 * node for use in a WindowFunc (since grouping_planner will
+				 * have treated the Aggrefs as variables, too).
+				 */
 				Expr	   *sortexpr = NULL;
 
 				foreach(j, ec->ec_members)
@@ -4461,6 +4469,7 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 						continue;
 					sortexpr = em->em_expr;
 					exprvars = pull_var_clause((Node *) sortexpr,
+											   PVC_INCLUDE_AGGREGATES,
 											   PVC_INCLUDE_PLACEHOLDERS);
 					foreach(k, exprvars)
 					{
@@ -5323,7 +5332,9 @@ findReferencedVars(List *parent_vars, Plan *plan, List **out_tlist, Relids *out_
 	ListCell *l;
 
 	/* Pull vars from both the targetlist and the clauses attached to this plan */
-	vars = pull_var_clause((Node *)plan->targetlist, PVC_REJECT_PLACEHOLDERS);
+	vars = pull_var_clause((Node *)plan->targetlist,
+						   PVC_RECURSE_AGGREGATES,
+						   PVC_REJECT_PLACEHOLDERS);
 
 	foreach(l, vars)
 	{
@@ -5337,7 +5348,7 @@ findReferencedVars(List *parent_vars, Plan *plan, List **out_tlist, Relids *out_
 	}
 
 	/* Now consider the local quals */
-	vars = pull_var_clause((Node *)plan->qual, PVC_REJECT_PLACEHOLDERS);
+	vars = pull_var_clause((Node *)plan->qual, PVC_RECURSE_AGGREGATES, PVC_REJECT_PLACEHOLDERS);
 
 	foreach(l, vars)
 	{
@@ -5750,7 +5761,8 @@ create_remotegrouping_plan(PlannerInfo *root, Plan *local_plan)
 
 	/* find all the relations referenced by targetlist of Grouping node */
 	temp_vars = pull_var_clause((Node *)local_plan->targetlist,
-									PVC_REJECT_PLACEHOLDERS);
+								PVC_RECURSE_AGGREGATES,
+								PVC_REJECT_PLACEHOLDERS);
 	findReferencedVars(temp_vars, (Plan *)remote_scan, &temp_vartlist, &in_relids);
 
 	/*

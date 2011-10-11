@@ -17,7 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-AC_INIT([PostgreSQL], [9.1beta2], [pgsql-bugs@postgresql.org])
+AC_INIT([PostgreSQL], [9.1.1], [pgsql-bugs@postgresql.org])
 
 m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.63], [], [m4_fatal([Autoconf version 2.63 is required.
 Untested combinations of 'autoconf' and PostgreSQL versions are not
@@ -1310,16 +1310,20 @@ fi
 pgac_save_LIBS="$LIBS"
 LIBS=`echo "$LIBS" | sed -e 's/-ledit//g' -e 's/-lreadline//g'`
 
-AC_REPLACE_FUNCS([crypt erand48 getopt getpeereid getrusage inet_aton random rint srandom strdup strerror strlcat strlcpy strtol strtoul])
+AC_REPLACE_FUNCS([crypt erand48 getopt getrusage inet_aton random rint srandom strdup strerror strlcat strlcpy strtol strtoul])
 
 case $host_os in
 
         # Windows uses a specialised env handler
+        # and doesn't need a replacement getpeereid because it doesn't use
+        # Unix sockets.
         mingw*)
                 AC_DEFINE(HAVE_UNSETENV, 1, [Define to 1 because replacement version used.])
-                ac_cv_func_unsetenv=yes;;
+                AC_DEFINE(HAVE_GETPEEREID, 1, [Define to 1 because function not required.])
+                ac_cv_func_unsetenv=yes
+                ac_cv_func_getpeereid=yes;;
         *)
-                AC_REPLACE_FUNCS([unsetenv])
+                AC_REPLACE_FUNCS([unsetenv getpeereid])
 		;;
 esac
 
@@ -1370,6 +1374,7 @@ if test "$PORTNAME" = "win32"; then
   AC_LIBOBJ(open)
   AC_LIBOBJ(win32env)
   AC_LIBOBJ(win32error)
+  AC_LIBOBJ(win32setlocale)
   AC_DEFINE([HAVE_SYMLINK], 1,
             [Define to 1 if you have the `symlink' function.])
   AC_CHECK_TYPES(MINIDUMP_TYPE, [pgac_minidump_type=yes], [pgac_minidump_type=no], [

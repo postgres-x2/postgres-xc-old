@@ -489,7 +489,7 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	SharedInvalBackendInit(false);
 
 	if (MyBackendId > MaxBackends || MyBackendId <= 0)
-		elog(FATAL, "bad backend id: %d", MyBackendId);
+		elog(FATAL, "bad backend ID: %d", MyBackendId);
 
 	/* Now that we have a BackendId, we can participate in ProcSignal */
 	ProcSignalInit(MyBackendId);
@@ -571,6 +571,8 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	 */
 	if (!bootstrap)
 	{
+		/* statement_timestamp must be set for timeouts to work correctly */
+		SetCurrentStatementStartTimestamp();
 		StartTransactionCommand();
 		(void) GetTransactionSnapshot();
 	}

@@ -265,7 +265,7 @@ static void AlterIndexNamespaces(Relation classRel, Relation rel,
 static void AlterSeqNamespaces(Relation classRel, Relation rel,
 				   Oid oldNspOid, Oid newNspOid,
 				   const char *newNspName, LOCKMODE lockmode);
-static void ATExecValidateConstraint(Relation rel, const char *constrName);
+static void ATExecValidateConstraint(Relation rel, char *constrName);
 static int transformColumnNameList(Oid relId, List *colList,
 						int16 *attnums, Oid *atttypids);
 static int transformFkeyGetPrimaryKey(Relation pkrel, Oid *indexOid,
@@ -436,6 +436,13 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId)
 				 errmsg("constraints on foreign tables are not supported")));
 
 	/*
+	 * Look up the namespace in which we are supposed to create the relation,
+	 * and check we have permission to create there.
+	 */
+	namespaceId = RangeVarGetAndCheckCreationNamespace(stmt->relation);
+	RangeVarAdjustRelationPersistence(stmt->relation, namespaceId);
+
+	/*
 	 * Security check: disallow creating temp tables from security-restricted
 	 * code.  This is needed because calling code might not expect untrusted
 	 * tables to appear in pg_temp at the front of its search path.
@@ -445,12 +452,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("cannot create temporary table within security-restricted operation")));
-
-	/*
-	 * Look up the namespace in which we are supposed to create the relation,
-	 * and check we have permission to create there.
-	 */
-	namespaceId = RangeVarGetAndCheckCreationNamespace(stmt->relation);
 
 	/*
 	 * Select tablespace to use.  If not specified, use default tablespace
@@ -2613,6 +2614,31 @@ AlterTableInternal(Oid relid, List *cmds, bool recurse)
 LOCKMODE
 AlterTableGetLockLevel(List *cmds)
 {
+	/*
+	 * Late in 9.1 dev cycle a number of issues were uncovered with access
+	 * to catalog relations, leading to the decision to re-enforce all DDL
+	 * at AccessExclusiveLock level by default.
+	 *
+	 * The issues are that there is a pervasive assumption in the code that
+	 * the catalogs will not be read unless an AccessExclusiveLock is held.
+	 * If that rule is relaxed, we must protect against a number of potential
+	 * effects - infrequent, but proven possible with test cases where
+	 * multiple DDL operations occur in a stream against frequently accessed
+	 * tables.
+	 *
+	 * 1. Catalog tables are read using SnapshotNow, which has a race bug
+	 * that allows a scan to return no valid rows even when one is present
+	 * in the case of a commit of a concurrent update of the catalog table.
+	 * SnapshotNow also ignores transactions in progress, so takes the
+	 * latest committed version without waiting for the latest changes.
+	 *
+	 * 2. Relcache needs to be internally consistent, so unless we lock the
+	 * definition during reads we have no way to guarantee that.
+	 *
+	 * 3. Catcache access isn't coordinated at all so refreshes can occur at
+	 * any time.
+	 */
+#ifdef REDUCED_ALTER_TABLE_LOCK_LEVELS
 	ListCell   *lcmd;
 	LOCKMODE	lockmode = ShareUpdateExclusiveLock;
 
@@ -2761,6 +2787,9 @@ AlterTableGetLockLevel(List *cmds)
 		if (cmd_lockmode > lockmode)
 			lockmode = cmd_lockmode;
 	}
+#else
+	LOCKMODE	lockmode = AccessExclusiveLock;
+#endif
 
 	return lockmode;
 }
@@ -3435,14 +3464,12 @@ ATRewriteTables(List **wqueue, LOCKMODE lockmode)
 				Relation	refrel;
 
 				if (rel == NULL)
+				{
 					/* Long since locked, no need for another */
 					rel = heap_open(tab->relid, NoLock);
+				}
 
-				/*
-				 * We're adding a trigger to both tables, so the lock level
-				 * here should sensibly reflect that.
-				 */
-				refrel = heap_open(con->refrelid, ShareRowExclusiveLock);
+				refrel = heap_open(con->refrelid, RowShareLock);
 
 				validateForeignKeyConstraint(fkconstraint->conname, rel, refrel,
 											 con->refindid,
@@ -4021,28 +4048,28 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 			if (origTypeName)
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter type \"%s\" because column \"%s\".\"%s\" uses it",
+						 errmsg("cannot alter type \"%s\" because column \"%s.%s\" uses it",
 								origTypeName,
 								RelationGetRelationName(rel),
 								NameStr(att->attname))));
 			else if (origRelation->rd_rel->relkind == RELKIND_COMPOSITE_TYPE)
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter type \"%s\" because column \"%s\".\"%s\" uses it",
+						 errmsg("cannot alter type \"%s\" because column \"%s.%s\" uses it",
 								RelationGetRelationName(origRelation),
 								RelationGetRelationName(rel),
 								NameStr(att->attname))));
 			else if (origRelation->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter foreign table \"%s\" because column \"%s\".\"%s\" uses its rowtype",
+						 errmsg("cannot alter foreign table \"%s\" because column \"%s.%s\" uses its row type",
 								RelationGetRelationName(origRelation),
 								RelationGetRelationName(rel),
 								NameStr(att->attname))));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot alter table \"%s\" because column \"%s\".\"%s\" uses its rowtype",
+						 errmsg("cannot alter table \"%s\" because column \"%s.%s\" uses its row type",
 								RelationGetRelationName(origRelation),
 								RelationGetRelationName(rel),
 								NameStr(att->attname))));
@@ -5534,7 +5561,14 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 	Oid			indexOid;
 	Oid			constrOid;
 
-	pkrel = heap_openrv(fkconstraint->pktable, lockmode);
+	/*
+	 * Grab an exclusive lock on the pk table, so that someone doesn't delete
+	 * rows out from under us. (Although a lesser lock would do for that
+	 * purpose, we'll need exclusive lock anyway to add triggers to the pk
+	 * table; trying to start with a lesser lock will just create a risk of
+	 * deadlock.)
+	 */
+	pkrel = heap_openrv(fkconstraint->pktable, AccessExclusiveLock);
 
 	/*
 	 * Validity checks (permission checks wait till we have the column
@@ -5781,9 +5815,9 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 	createForeignKeyTriggers(rel, fkconstraint, constrOid, indexOid);
 
 	/*
-	 * Tell Phase 3 to check that the constraint is satisfied by existing rows
-	 * We can skip this during table creation or if requested explicitly by
-	 * specifying NOT VALID on an alter table statement.
+	 * Tell Phase 3 to check that the constraint is satisfied by existing rows.
+	 * We can skip this during table creation, or if requested explicitly by
+	 * specifying NOT VALID in an ADD FOREIGN KEY command.
 	 */
 	if (!fkconstraint->skip_validation)
 	{
@@ -5810,7 +5844,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
  * ALTER TABLE VALIDATE CONSTRAINT
  */
 static void
-ATExecValidateConstraint(Relation rel, const char *constrName)
+ATExecValidateConstraint(Relation rel, char *constrName)
 {
 	Relation	conrel;
 	SysScanDesc scan;
@@ -5865,7 +5899,7 @@ ATExecValidateConstraint(Relation rel, const char *constrName)
 		 */
 		refrel = heap_open(con->confrelid, RowShareLock);
 
-		validateForeignKeyConstraint((char *) constrName, rel, refrel,
+		validateForeignKeyConstraint(constrName, rel, refrel,
 									 con->conindid,
 									 conid);
 
@@ -5884,6 +5918,7 @@ ATExecValidateConstraint(Relation rel, const char *constrName)
 
 	heap_close(conrel, RowExclusiveLock);
 }
+
 
 /*
  * transformColumnNameList - transform list of column names
@@ -6702,7 +6737,7 @@ ATPrepAlterColumnType(List **wqueue,
 		 * expression, else just take the old value and try to coerce it.  We
 		 * do this first so that type incompatibility can be detected before
 		 * we waste effort, and because we need the expression to be parsed
-		 * against the original table rowtype.
+		 * against the original table row type.
 		 */
 		if (transform)
 		{
@@ -6776,7 +6811,8 @@ ATPrepAlterColumnType(List **wqueue,
 	else if (transform)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-			  errmsg("ALTER TYPE USING is only supported on plain tables")));
+				 errmsg("\"%s\" is not a table",
+						RelationGetRelationName(rel))));
 
 	if (tab->relkind == RELKIND_COMPOSITE_TYPE ||
 		tab->relkind == RELKIND_FOREIGN_TABLE)
@@ -7547,7 +7583,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing, LOCKMODE lock
 									newOwnerId);
 
 		/*
-		 * Also change the ownership of the table's rowtype, if it has one
+		 * Also change the ownership of the table's row type, if it has one
 		 */
 		if (tuple_class->relkind != RELKIND_INDEX)
 			AlterTypeOwnerInternal(tuple_class->reltype, newOwnerId,
@@ -9059,7 +9095,7 @@ AlterTableNamespace(RangeVar *relation, const char *newschema,
 
 	AlterRelationNamespaceInternal(classRel, relid, oldNspOid, nspOid, true);
 
-	/* Fix the table's rowtype too */
+	/* Fix the table's row type too */
 	AlterTypeNamespaceInternal(rel->rd_rel->reltype, nspOid, false, false);
 
 	/* Fix other dependent stuff */
@@ -9164,7 +9200,7 @@ AlterIndexNamespaces(Relation classRel, Relation rel,
 		/*
 		 * Note: currently, the index will not have its own dependency on the
 		 * namespace, so we don't need to do changeDependencyFor(). There's no
-		 * rowtype in pg_type, either.
+		 * row type in pg_type, either.
 		 */
 		AlterRelationNamespaceInternal(classRel, indexOid,
 									   oldNspOid, newNspOid,

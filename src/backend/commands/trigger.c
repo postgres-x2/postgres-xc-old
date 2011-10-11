@@ -143,14 +143,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 	ObjectAddress myself,
 				referenced;
 
-	/*
-	 * ShareRowExclusiveLock is sufficient to prevent concurrent write
-	 * activity to the relation, and thus to lock out any operations that
-	 * might want to fire triggers on the relation.  If we had ON SELECT
-	 * triggers we would need to take an AccessExclusiveLock to add one of
-	 * those, just as we do with ON SELECT rules.
-	 */
-	rel = heap_openrv(stmt->relation, ShareRowExclusiveLock);
+	rel = heap_openrv(stmt->relation, AccessExclusiveLock);
 
 	/*
 	 * Triggers must be on tables or views, and there are additional
@@ -309,7 +302,9 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 		 * subselects in WHEN clauses; it would fail to examine the contents
 		 * of subselects.
 		 */
-		varList = pull_var_clause(whenClause, PVC_REJECT_PLACEHOLDERS);
+		varList = pull_var_clause(whenClause,
+								  PVC_REJECT_AGGREGATES,
+								  PVC_REJECT_PLACEHOLDERS);
 		foreach(lc, varList)
 		{
 			Var		   *var = (Var *) lfirst(lc);
@@ -480,7 +475,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 	 * can skip this for internally generated triggers, since the name
 	 * modification above should be sufficient.
 	 *
-	 * NOTE that this is cool only because we have ShareRowExclusiveLock on
+	 * NOTE that this is cool only because we have AccessExclusiveLock on
 	 * the relation, so the trigger set won't be changing underneath us.
 	 */
 	if (!isInternal)
@@ -896,7 +891,7 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		ereport(NOTICE,
 		(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
 				constr_name, buf.data),
-		 errdetail("%s", _(funcdescr[funcnum]))));
+		 errdetail_internal("%s", _(funcdescr[funcnum]))));
 		oldContext = MemoryContextSwitchTo(TopMemoryContext);
 		info = (OldTriggerInfo *) palloc0(sizeof(OldTriggerInfo));
 		info->args = copyObject(stmt->args);
@@ -912,7 +907,7 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		ereport(NOTICE,
 		(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
 				constr_name, buf.data),
-		 errdetail("%s", _(funcdescr[funcnum]))));
+		 errdetail_internal("%s", _(funcdescr[funcnum]))));
 	}
 	else
 	{
@@ -924,7 +919,7 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		ereport(NOTICE,
 				(errmsg("converting trigger group into constraint \"%s\" %s",
 						constr_name, buf.data),
-				 errdetail("%s", _(funcdescr[funcnum]))));
+				 errdetail_internal("%s", _(funcdescr[funcnum]))));
 		fkcon->contype = CONSTR_FOREIGN;
 		fkcon->location = -1;
 		if (funcnum == 2)
@@ -1006,6 +1001,8 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		}
 		fkcon->deferrable = stmt->deferrable;
 		fkcon->initdeferred = stmt->initdeferred;
+		fkcon->skip_validation = false;
+		fkcon->initially_valid = true;
 
 		/* ... and execute it */
 		ProcessUtility((Node *) atstmt,
@@ -1082,14 +1079,11 @@ RemoveTriggerById(Oid trigOid)
 		elog(ERROR, "could not find tuple for trigger %u", trigOid);
 
 	/*
-	 * Open and lock the relation the trigger belongs to.  As in
-	 * CreateTrigger, this is sufficient to lock out all operations that could
-	 * fire or add triggers; but it would need to be revisited if we had ON
-	 * SELECT triggers.
+	 * Open and exclusive-lock the relation the trigger belongs to.
 	 */
 	relid = ((Form_pg_trigger) GETSTRUCT(tup))->tgrelid;
 
-	rel = heap_open(relid, ShareRowExclusiveLock);
+	rel = heap_open(relid, AccessExclusiveLock);
 
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
 		rel->rd_rel->relkind != RELKIND_VIEW)
@@ -2761,13 +2755,13 @@ TriggerEnabled(EState *estate, ResultRelInfo *relinfo,
 		}
 		if (HeapTupleIsValid(newtup))
 		{
-			if (estate->es_trig_tuple_slot == NULL)
+			if (estate->es_trig_newtup_slot == NULL)
 			{
 				oldContext = MemoryContextSwitchTo(estate->es_query_cxt);
-				estate->es_trig_tuple_slot = ExecInitExtraTupleSlot(estate);
+				estate->es_trig_newtup_slot = ExecInitExtraTupleSlot(estate);
 				MemoryContextSwitchTo(oldContext);
 			}
-			newslot = estate->es_trig_tuple_slot;
+			newslot = estate->es_trig_newtup_slot;
 			if (newslot->tts_tupleDescriptor != tupdesc)
 				ExecSetSlotDescriptor(newslot, tupdesc);
 			ExecStoreTuple(newtup, newslot, InvalidBuffer, false);
