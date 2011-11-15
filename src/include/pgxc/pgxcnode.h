@@ -67,7 +67,6 @@ struct pgxc_node_handle
 #ifdef DN_CONNECTION_DEBUG
 	bool		have_row_desc;
 #endif
-	char	   *barrier_id;
 	char	   *error;
 	/* Output buffer */
 	char	   *outBuffer;
@@ -105,6 +104,8 @@ extern int	PGXCNodeConnClean(NODE_CONNECTION * conn);
 extern void PGXCNodeCleanAndRelease(int code, Datum arg);
 
 extern PGXCNodeAllHandles *get_handles(List *datanodelist, List *coordlist, bool is_query_coord_only);
+extern void pfree_pgxc_all_handles(PGXCNodeAllHandles *handles);
+
 extern void release_handles(void);
 extern void cancel_query(void);
 extern void clear_all_data(void);

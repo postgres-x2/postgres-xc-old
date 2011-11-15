@@ -505,6 +505,7 @@ ReadCommand(StringInfo inBuf)
 		result = SocketBackend(inBuf);
 	else
 		result = InteractiveBackend(inBuf);
+
 	return result;
 }
 

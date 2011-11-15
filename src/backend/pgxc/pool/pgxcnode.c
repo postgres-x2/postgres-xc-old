@@ -1618,13 +1618,9 @@ get_handles(List *datanodelist, List *coordlist, bool is_coord_only_query)
 	ListCell   *node_list_item;
 	List	   *dn_allocate = NIL;
 	List	   *co_allocate = NIL;
-	MemoryContext old_context;
 
 	/* index of the result array */
 	int			i = 0;
-
-	/* Handles should be there while transaction lasts */
-	old_context = MemoryContextSwitchTo(TopTransactionContext);
 
 	result = (PGXCNodeAllHandles *) palloc(sizeof(PGXCNodeAllHandles));
 	if (!result)
@@ -1841,11 +1837,26 @@ get_handles(List *datanodelist, List *coordlist, bool is_coord_only_query)
 			list_free(dn_allocate);
 	}
 
-	/* restore context */
-	MemoryContextSwitchTo(old_context);
-
 	return result;
 }
+
+/* Free PGXCNodeAllHandles structure */
+void
+pfree_pgxc_all_handles(PGXCNodeAllHandles *pgxc_handles)
+{
+	if (!pgxc_handles)
+		return;
+
+	if (pgxc_handles->primary_handle)
+		pfree(pgxc_handles->primary_handle);
+	if (pgxc_handles->datanode_handles && pgxc_handles->dn_conn_count != 0)
+		pfree(pgxc_handles->datanode_handles);
+	if (pgxc_handles->coord_handles && pgxc_handles->co_conn_count != 0)
+		pfree(pgxc_handles->coord_handles);
+
+	pfree(pgxc_handles);
+}
+
 
 /*
  * Return handles involved into current transaction, to run commit or rollback
