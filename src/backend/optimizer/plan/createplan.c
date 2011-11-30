@@ -819,8 +819,8 @@ create_remotejoin_plan(PlannerInfo *root, JoinPath *best_path, Plan *parent, Pla
 										  PVC_RECURSE_AGGREGATES,
 										  PVC_REJECT_PLACEHOLDERS);
 
-			findReferencedVars(parent_vars, outer_plan, &out_tlist, &out_relids);
-			findReferencedVars(parent_vars, inner_plan, &in_tlist, &in_relids);
+			findReferencedVars(parent_vars, &outer->scan.plan, &out_tlist, &out_relids);
+			findReferencedVars(parent_vars, &inner->scan.plan, &in_tlist, &in_relids);
 
 			/*
 			 * If the JOIN ON clause has a local dependency then we cannot ship
@@ -1021,6 +1021,7 @@ create_remotejoin_plan(PlannerInfo *root, JoinPath *best_path, Plan *parent, Pla
 
 
 			/* set_plan_refs needs this later */
+			result->base_tlist		= base_tlist;
 			result->relname			= "__FOREIGN_QUERY__";
 			result->partitioned_replicated = join_info.partitioned_replicated;
 
@@ -1032,8 +1033,8 @@ create_remotejoin_plan(PlannerInfo *root, JoinPath *best_path, Plan *parent, Pla
 			 * local ones and hence can be stuck without checking for
 			 * remoteness again here into result_plan->qual
 			 */
-			result_plan->qual = list_concat(result_plan->qual, outer_plan->qual);
-			result_plan->qual = list_concat(result_plan->qual, inner_plan->qual);
+			result_plan->qual = list_concat(result_plan->qual, outer->scan.plan.qual);
+			result_plan->qual = list_concat(result_plan->qual, inner->scan.plan.qual);
 			result_plan->qual = list_concat(result_plan->qual, local_scan_clauses);
 
 			/* we actually need not worry about costs since this is the final plan */
@@ -5937,8 +5938,6 @@ create_remotegrouping_plan(PlannerInfo *root, Plan *local_plan)
 	remote_group->scan.scanrelid 	= dummy_rtindex;
 	remote_group->sql_statement = remote_sql_stmt->data;
 
-	/* set_plan_refs needs this later */
-	remote_group->base_tlist		= base_tlist;
 	remote_group->relname			= "__FOREIGN_QUERY__";
 	remote_group->partitioned_replicated = remote_scan->partitioned_replicated;
 	remote_group->read_only = query->commandType == CMD_SELECT;
