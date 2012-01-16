@@ -1603,7 +1603,7 @@ heap_create_with_catalog(const char *relname,
 
 		recordDependencyOnOwner(RelationRelationId, relid, ownerid);
 
-		recordDependencyOnCurrentExtension(&myself);
+		recordDependencyOnCurrentExtension(&myself, false);
 
 		if (reloftypeid)
 		{
@@ -1647,7 +1647,7 @@ heap_create_with_catalog(const char *relname,
 	/*
 	 * If this is an unlogged relation, it needs an init fork so that it can
 	 * be correctly reinitialized on restart.  Since we're going to do an
-	 * immediate sync, we ony need to xlog this if archiving or streaming is
+	 * immediate sync, we only need to xlog this if archiving or streaming is
 	 * enabled.  And the immediate sync is required, because otherwise there's
 	 * no guarantee that this will hit the disk before the next checkpoint
 	 * moves the redo pointer.
@@ -1656,6 +1656,7 @@ heap_create_with_catalog(const char *relname,
 	{
 		Assert(relkind == RELKIND_RELATION || relkind == RELKIND_TOASTVALUE);
 
+		RelationOpenSmgr(new_rel_desc);
 		smgrcreate(new_rel_desc->rd_smgr, INIT_FORKNUM, false);
 		if (XLogIsNeeded())
 			log_smgrcreate(&new_rel_desc->rd_smgr->smgr_rnode.node,
@@ -2234,7 +2235,9 @@ StoreRelCheck(Relation rel, char *ccname, Node *expr,
 	 * in check constraints; it would fail to examine the contents of
 	 * subselects.
 	 */
-	varList = pull_var_clause(expr, PVC_REJECT_PLACEHOLDERS);
+	varList = pull_var_clause(expr,
+							  PVC_REJECT_AGGREGATES,
+							  PVC_REJECT_PLACEHOLDERS);
 	keycount = list_length(varList);
 
 	if (keycount > 0)
@@ -2530,7 +2533,9 @@ AddRelationNewConstraints(Relation rel,
 			List	   *vars;
 			char	   *colname;
 
-			vars = pull_var_clause(expr, PVC_REJECT_PLACEHOLDERS);
+			vars = pull_var_clause(expr,
+								   PVC_REJECT_AGGREGATES,
+								   PVC_REJECT_PLACEHOLDERS);
 
 			/* eliminate duplicates */
 			vars = list_union(NIL, vars);

@@ -880,6 +880,7 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	estate->es_tupleTable = NIL;
 	estate->es_trig_tuple_slot = NULL;
 	estate->es_trig_oldtup_slot = NULL;
+	estate->es_trig_newtup_slot = NULL;
 
 	/* mark EvalPlanQual not active */
 	estate->es_epqTuple = NULL;
@@ -2386,6 +2387,7 @@ typedef struct
 {
 	DestReceiver pub;			/* publicly-known function pointers */
 	EState	   *estate;			/* EState we are working with */
+	DestReceiver *origdest;		/* QueryDesc's original receiver */
 	Relation	rel;			/* Relation to write to */
 	int			hi_options;		/* heap_insert performance options */
 	BulkInsertState bistate;	/* bulk insert state */
@@ -2430,6 +2432,13 @@ OpenIntoRel(QueryDesc *queryDesc)
 				 errmsg("ON COMMIT can only be used on temporary tables")));
 
 	/*
+	 * Find namespace to create in, check its permissions
+	 */
+	intoName = into->rel->relname;
+	namespaceId = RangeVarGetAndCheckCreationNamespace(into->rel);
+	RangeVarAdjustRelationPersistence(into->rel, namespaceId);
+
+	/*
 	 * Security check: disallow creating temp tables from security-restricted
 	 * code.  This is needed because calling code might not expect untrusted
 	 * tables to appear in pg_temp at the front of its search path.
@@ -2439,12 +2448,6 @@ OpenIntoRel(QueryDesc *queryDesc)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("cannot create temporary table within security-restricted operation")));
-
-	/*
-	 * Find namespace to create in, check its permissions
-	 */
-	intoName = into->rel->relname;
-	namespaceId = RangeVarGetAndCheckCreationNamespace(into->rel);
 
 	/*
 	 * Select tablespace to use.  If not specified, use default tablespace
@@ -2539,11 +2542,13 @@ OpenIntoRel(QueryDesc *queryDesc)
 	/*
 	 * Now replace the query's DestReceiver with one for SELECT INTO
 	 */
-	queryDesc->dest = CreateDestReceiver(DestIntoRel);
-	myState = (DR_intorel *) queryDesc->dest;
+	myState = (DR_intorel *) CreateDestReceiver(DestIntoRel);
 	Assert(myState->pub.mydest == DestIntoRel);
 	myState->estate = estate;
+	myState->origdest = queryDesc->dest;
 	myState->rel = intoRelationDesc;
+
+	queryDesc->dest = (DestReceiver *) myState;
 
 	/*
 	 * We can skip WAL-logging the insertions, unless PITR or streaming
@@ -2565,8 +2570,11 @@ CloseIntoRel(QueryDesc *queryDesc)
 {
 	DR_intorel *myState = (DR_intorel *) queryDesc->dest;
 
-	/* OpenIntoRel might never have gotten called */
-	if (myState && myState->pub.mydest == DestIntoRel && myState->rel)
+	/*
+	 * OpenIntoRel might never have gotten called, and we also want to guard
+	 * against double destruction.
+	 */
+	if (myState && myState->pub.mydest == DestIntoRel)
 	{
 		FreeBulkInsertState(myState->bistate);
 
@@ -2577,7 +2585,11 @@ CloseIntoRel(QueryDesc *queryDesc)
 		/* close rel, but keep lock until commit */
 		heap_close(myState->rel, NoLock);
 
-		myState->rel = NULL;
+		/* restore the receiver belonging to executor's caller */
+		queryDesc->dest = myState->origdest;
+
+		/* might as well invoke my destructor */
+		intorel_destroy((DestReceiver *) myState);
 	}
 }
 

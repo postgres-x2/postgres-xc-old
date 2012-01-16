@@ -644,7 +644,7 @@ tmp_dh_cb(SSL *s, int is_export, int keylength)
 	if (r == NULL || 8 * DH_size(r) < keylength)
 	{
 		ereport(DEBUG2,
-				(errmsg_internal("DH: generating parameters (%d bits)....",
+				(errmsg_internal("DH: generating parameters (%d bits)",
 								 keylength)));
 		r = DH_generate_parameters(keylength, DH_GENERATOR_2, NULL, NULL);
 	}
@@ -735,6 +735,12 @@ initialize_SSL(void)
 			ereport(FATAL,
 					(errmsg("could not create SSL context: %s",
 							SSLerrmessage())));
+
+		/*
+		 * Disable OpenSSL's moving-write-buffer sanity check, because it
+		 * causes unnecessary failures in nonblocking send cases.
+		 */
+		SSL_CTX_set_mode(SSL_context, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 		/*
 		 * Load and verify server's certificate and private key

@@ -27,6 +27,7 @@
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
 #include "optimizer/paths.h"
+#include "optimizer/placeholder.h"
 #include "optimizer/plancat.h"
 #include "optimizer/planmain.h"
 #include "optimizer/predtest.h"
@@ -818,7 +819,9 @@ create_remotejoin_plan(PlannerInfo *root, JoinPath *best_path, Plan *parent, Pla
 			 * intermediate, the children vars may or may not be referenced
 			 * multiple times in it.
 			 */
-			parent_vars = pull_var_clause((Node *)parent->targetlist, PVC_REJECT_PLACEHOLDERS);
+			parent_vars = pull_var_clause((Node *)parent->targetlist,
+										  PVC_RECURSE_AGGREGATES,
+										  PVC_REJECT_PLACEHOLDERS);
 
 			findReferencedVars(parent_vars, outer_plan, &out_tlist, &out_relids);
 			findReferencedVars(parent_vars, inner_plan, &in_tlist, &in_relids);
@@ -2684,7 +2687,20 @@ create_nestloop_plan(PlannerInfo *root,
 		NestLoopParam *nlp = (NestLoopParam *) lfirst(cell);
 
 		next = lnext(cell);
-		if (bms_is_member(nlp->paramval->varno, outerrelids))
+		if (IsA(nlp->paramval, Var) &&
+			bms_is_member(nlp->paramval->varno, outerrelids))
+		{
+			root->curOuterParams = list_delete_cell(root->curOuterParams,
+													cell, prev);
+			nestParams = lappend(nestParams, nlp);
+		}
+		else if (IsA(nlp->paramval, PlaceHolderVar) &&
+				 bms_overlap(((PlaceHolderVar *) nlp->paramval)->phrels,
+							 outerrelids) &&
+				 bms_is_subset(find_placeholder_info(root,
+													 (PlaceHolderVar *) nlp->paramval,
+													 false)->ph_eval_at,
+							   outerrelids))
 		{
 			root->curOuterParams = list_delete_cell(root->curOuterParams,
 													cell, prev);
@@ -3112,11 +3128,12 @@ create_hashjoin_plan(PlannerInfo *root,
 
 /*
  * replace_nestloop_params
- *	  Replace outer-relation Vars in the given expression with nestloop Params
+ *	  Replace outer-relation Vars and PlaceHolderVars in the given expression
+ *	  with nestloop Params
  *
- * All Vars belonging to the relation(s) identified by root->curOuterRels
- * are replaced by Params, and entries are added to root->curOuterParams if
- * not already present.
+ * All Vars and PlaceHolderVars belonging to the relation(s) identified by
+ * root->curOuterRels are replaced by Params, and entries are added to
+ * root->curOuterParams if not already present.
  */
 static Node *
 replace_nestloop_params(PlannerInfo *root, Node *expr)
@@ -3143,7 +3160,7 @@ replace_nestloop_params_mutator(Node *node, PlannerInfo *root)
 		if (!bms_is_member(var->varno, root->curOuterRels))
 			return node;
 		/* Create a Param representing the Var */
-		param = assign_nestloop_param(root, var);
+		param = assign_nestloop_param_var(root, var);
 		/* Is this param already listed in root->curOuterParams? */
 		foreach(lc, root->curOuterParams)
 		{
@@ -3163,6 +3180,48 @@ replace_nestloop_params_mutator(Node *node, PlannerInfo *root)
 		/* And return the replacement Param */
 		return (Node *) param;
 	}
+	if (IsA(node, PlaceHolderVar))
+	{
+		PlaceHolderVar *phv = (PlaceHolderVar *) node;
+		Param	   *param;
+		NestLoopParam *nlp;
+		ListCell   *lc;
+
+		/* Upper-level PlaceHolderVars should be long gone at this point */
+		Assert(phv->phlevelsup == 0);
+
+		/*
+		 * If not to be replaced, just return the PlaceHolderVar unmodified.
+		 * We use bms_overlap as a cheap/quick test to see if the PHV might
+		 * be evaluated in the outer rels, and then grab its PlaceHolderInfo
+		 * to tell for sure.
+		 */
+		if (!bms_overlap(phv->phrels, root->curOuterRels))
+			return node;
+		if (!bms_is_subset(find_placeholder_info(root, phv, false)->ph_eval_at,
+						   root->curOuterRels))
+			return node;
+		/* Create a Param representing the PlaceHolderVar */
+		param = assign_nestloop_param_placeholdervar(root, phv);
+		/* Is this param already listed in root->curOuterParams? */
+		foreach(lc, root->curOuterParams)
+		{
+			nlp = (NestLoopParam *) lfirst(lc);
+			if (nlp->paramno == param->paramid)
+			{
+				Assert(equal(phv, nlp->paramval));
+				/* Present, so we can just return the Param */
+				return (Node *) param;
+			}
+		}
+		/* No, so add it */
+		nlp = makeNode(NestLoopParam);
+		nlp->paramno = param->paramid;
+		nlp->paramval = (Var *) phv;
+		root->curOuterParams = lappend(root->curOuterParams, nlp);
+		/* And return the replacement Param */
+		return (Node *) param;
+	}
 	return expression_tree_mutator(node,
 								   replace_nestloop_params_mutator,
 								   (void *) root);
@@ -3175,7 +3234,7 @@ replace_nestloop_params_mutator(Node *node, PlannerInfo *root)
  *
  * We have four tasks here:
  *	* Remove RestrictInfo nodes from the input clauses.
- *	* Replace any outer-relation Var nodes with nestloop Params.
+ *	* Replace any outer-relation Var or PHV nodes with nestloop Params.
  *	  (XXX eventually, that responsibility should go elsewhere?)
  *	* Index keys must be represented by Var nodes with varattno set to the
  *	  index's attribute number, not the attribute number in the original rel.
@@ -4359,7 +4418,13 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 
 			if (!tle)
 			{
-				/* No matching tlist item; look for a computable expression */
+				/*
+				 * No matching tlist item; look for a computable expression.
+				 * Note that we treat Aggrefs as if they were variables; this
+				 * is necessary when attempting to sort the output from an Agg
+				 * node for use in a WindowFunc (since grouping_planner will
+				 * have treated the Aggrefs as variables, too).
+				 */
 				Expr	   *sortexpr = NULL;
 
 				foreach(j, ec->ec_members)
@@ -4372,6 +4437,7 @@ prepare_sort_from_pathkeys(PlannerInfo *root, Plan *lefttree, List *pathkeys,
 						continue;
 					sortexpr = em->em_expr;
 					exprvars = pull_var_clause((Node *) sortexpr,
+											   PVC_INCLUDE_AGGREGATES,
 											   PVC_INCLUDE_PLACEHOLDERS);
 					foreach(k, exprvars)
 					{
@@ -5237,7 +5303,9 @@ findReferencedVars(List *parent_vars, Plan *plan, List **out_tlist, Relids *out_
 	ListCell *l;
 
 	/* Pull vars from both the targetlist and the clauses attached to this plan */
-	vars = pull_var_clause((Node *)plan->targetlist, PVC_REJECT_PLACEHOLDERS);
+	vars = pull_var_clause((Node *)plan->targetlist,
+						   PVC_RECURSE_AGGREGATES,
+						   PVC_REJECT_PLACEHOLDERS);
 
 	foreach(l, vars)
 	{
@@ -5251,7 +5319,9 @@ findReferencedVars(List *parent_vars, Plan *plan, List **out_tlist, Relids *out_
 	}
 
 	/* Now consider the local quals */
-	vars = pull_var_clause((Node *)plan->qual, PVC_REJECT_PLACEHOLDERS);
+	vars = pull_var_clause((Node *)plan->qual,
+						   PVC_RECURSE_AGGREGATES,
+						   PVC_REJECT_PLACEHOLDERS);
 
 	foreach(l, vars)
 	{
@@ -5887,7 +5957,8 @@ create_remotegrouping_plan(PlannerInfo *root, Plan *local_plan)
 
 	/* find all the relations referenced by targetlist of Grouping node */
 	temp_vars = pull_var_clause((Node *)local_plan->targetlist,
-									PVC_REJECT_PLACEHOLDERS);
+								PVC_RECURSE_AGGREGATES,
+								PVC_REJECT_PLACEHOLDERS);
 	findReferencedVars(temp_vars, (Plan *)remote_scan, &temp_vartlist, &in_relids);
 
 	/*

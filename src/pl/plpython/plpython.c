@@ -343,7 +343,7 @@ static char *PLy_procedure_name(PLyProcedure *);
 static void
 PLy_elog(int, const char *,...)
 __attribute__((format(PG_PRINTF_ATTRIBUTE, 2, 3)));
-static void PLy_get_spi_error_data(PyObject *exc, char **detail, char **hint, char **query, int *position);
+static void PLy_get_spi_error_data(PyObject *exc, int *sqlerrcode, char **detail, char **hint, char **query, int *position);
 static void PLy_traceback(char **, char **, int *);
 
 static void *PLy_malloc(size_t);
@@ -1450,6 +1450,44 @@ PLy_function_delete_args(PLyProcedure *proc)
 }
 
 /*
+ * Check if our cached information about a datatype is still valid
+ */
+static bool
+PLy_procedure_argument_valid(PLyTypeInfo *arg)
+{
+	HeapTuple	relTup;
+	bool		valid;
+
+	/* Nothing to cache unless type is composite */
+	if (arg->is_rowtype != 1)
+		return true;
+
+	/*
+	 * Zero typ_relid means that we got called on an output argument of a
+	 * function returning a unnamed record type; the info for it can't change.
+	 */
+	if (!OidIsValid(arg->typ_relid))
+		return true;
+
+	/* Else we should have some cached data */
+	Assert(TransactionIdIsValid(arg->typrel_xmin));
+	Assert(ItemPointerIsValid(&arg->typrel_tid));
+
+	/* Get the pg_class tuple for the data type */
+	relTup = SearchSysCache1(RELOID, ObjectIdGetDatum(arg->typ_relid));
+	if (!HeapTupleIsValid(relTup))
+		elog(ERROR, "cache lookup failed for relation %u", arg->typ_relid);
+
+	/* If it has changed, the cached data is not valid */
+	valid = (arg->typrel_xmin == HeapTupleHeaderGetXmin(relTup->t_data) &&
+			 ItemPointerEquals(&arg->typrel_tid, &relTup->t_self));
+
+	ReleaseSysCache(relTup);
+
+	return valid;
+}
+
+/*
  * Decide whether a cached PLyProcedure struct is still valid
  */
 static bool
@@ -1465,38 +1503,20 @@ PLy_procedure_valid(PLyProcedure *proc, HeapTuple procTup)
 		  ItemPointerEquals(&proc->fn_tid, &procTup->t_self)))
 		return false;
 
+	/* Else check the input argument datatypes */
 	valid = true;
-	/* If there are composite input arguments, they might have changed */
 	for (i = 0; i < proc->nargs; i++)
 	{
-		Oid			relid;
-		HeapTuple	relTup;
+		valid = PLy_procedure_argument_valid(&proc->args[i]);
 
 		/* Short-circuit on first changed argument */
 		if (!valid)
 			break;
-
-		/* Only check input arguments that are composite */
-		if (proc->args[i].is_rowtype != 1)
-			continue;
-
-		Assert(OidIsValid(proc->args[i].typ_relid));
-		Assert(TransactionIdIsValid(proc->args[i].typrel_xmin));
-		Assert(ItemPointerIsValid(&proc->args[i].typrel_tid));
-
-		/* Get the pg_class tuple for the argument type */
-		relid = proc->args[i].typ_relid;
-		relTup = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
-		if (!HeapTupleIsValid(relTup))
-			elog(ERROR, "cache lookup failed for relation %u", relid);
-
-		/* If it has changed, the function is not valid */
-		if (!(proc->args[i].typrel_xmin == HeapTupleHeaderGetXmin(relTup->t_data) &&
-			  ItemPointerEquals(&proc->args[i].typrel_tid, &relTup->t_self)))
-			valid = false;
-
-		ReleaseSysCache(relTup);
 	}
+
+	/* if the output type is composite, it might have changed */
+	if (valid)
+		valid = PLy_procedure_argument_valid(&proc->result);
 
 	return valid;
 }
@@ -1661,10 +1681,9 @@ PLy_procedure_create(HeapTuple procTup, Oid fn_oid, bool is_trigger)
 
 		/*
 		 * Now get information required for input conversion of the
-		 * procedure's arguments.  Note that we ignore output arguments here
-		 * --- since we don't support returning record, and that was already
-		 * checked above, there's no need to worry about multiple output
-		 * arguments.
+		 * procedure's arguments.  Note that we ignore output arguments here.
+		 * If the function returns record, those I/O functions will be set up
+		 * when the function is first called.
 		 */
 		if (procStruct->pronargs)
 		{
@@ -1926,7 +1945,7 @@ PLy_input_tuple_funcs(PLyTypeInfo *arg, TupleDesc desc)
 	 * RECORDOID means we got called to create input functions for a tuple
 	 * fetched by plpy.execute or for an anonymous record type
 	 */
-	if (desc->tdtypeid != RECORDOID && !TransactionIdIsValid(arg->typrel_xmin))
+	if (desc->tdtypeid != RECORDOID)
 	{
 		HeapTuple	relTup;
 
@@ -1936,7 +1955,7 @@ PLy_input_tuple_funcs(PLyTypeInfo *arg, TupleDesc desc)
 		if (!HeapTupleIsValid(relTup))
 			elog(ERROR, "cache lookup failed for relation %u", arg->typ_relid);
 
-		/* Extract the XMIN value to later use it in PLy_procedure_valid */
+		/* Remember XMIN and TID for later validation if cache is still OK */
 		arg->typrel_xmin = HeapTupleHeaderGetXmin(relTup->t_data);
 		arg->typrel_tid = relTup->t_self;
 
@@ -2008,6 +2027,29 @@ PLy_output_tuple_funcs(PLyTypeInfo *arg, TupleDesc desc)
 			PLy_free(arg->out.r.atts);
 		arg->out.r.natts = desc->natts;
 		arg->out.r.atts = PLy_malloc0(desc->natts * sizeof(PLyDatumToOb));
+	}
+
+	Assert(OidIsValid(desc->tdtypeid));
+
+	/*
+	 * RECORDOID means we got called to create output functions for an
+	 * anonymous record type
+	 */
+	if (desc->tdtypeid != RECORDOID)
+	{
+		HeapTuple	relTup;
+
+		/* Get the pg_class tuple corresponding to the type of the output */
+		arg->typ_relid = typeidTypeRelid(desc->tdtypeid);
+		relTup = SearchSysCache1(RELOID, ObjectIdGetDatum(arg->typ_relid));
+		if (!HeapTupleIsValid(relTup))
+			elog(ERROR, "cache lookup failed for relation %u", arg->typ_relid);
+
+		/* Remember XMIN and TID for later validation if cache is still OK */
+		arg->typrel_xmin = HeapTupleHeaderGetXmin(relTup->t_data);
+		arg->typrel_tid = relTup->t_self;
+
+		ReleaseSysCache(relTup);
 	}
 
 	for (i = 0; i < desc->natts; i++)
@@ -2630,7 +2672,11 @@ PLyMapping_ToTuple(PLyTypeInfo *info, TupleDesc desc, PyObject *mapping)
 		PLyObToDatum *att;
 
 		if (desc->attrs[i]->attisdropped)
+		{
+			values[i] = (Datum) 0;
+			nulls[i] = true;
 			continue;
+		}
 
 		key = NameStr(desc->attrs[i]->attname);
 		value = NULL;
@@ -2716,7 +2762,11 @@ PLySequence_ToTuple(PLyTypeInfo *info, TupleDesc desc, PyObject *sequence)
 		PLyObToDatum *att;
 
 		if (desc->attrs[i]->attisdropped)
+		{
+			values[i] = (Datum) 0;
+			nulls[i] = true;
 			continue;
+		}
 
 		value = NULL;
 		att = &info->out.r.atts[i];
@@ -2779,7 +2829,11 @@ PLyGenericObject_ToTuple(PLyTypeInfo *info, TupleDesc desc, PyObject *object)
 		PLyObToDatum *att;
 
 		if (desc->attrs[i]->attisdropped)
+		{
+			values[i] = (Datum) 0;
+			nulls[i] = true;
 			continue;
+		}
 
 		key = NameStr(desc->attrs[i]->attname);
 		value = NULL;
@@ -3972,7 +4026,13 @@ PLy_add_exceptions(PyObject *plpy)
 }
 
 #if PY_MAJOR_VERSION >= 3
-static PyMODINIT_FUNC
+/*
+ * Must have external linkage, because PyMODINIT_FUNC does dllexport on
+ * Windows-like platforms.
+ */
+PyMODINIT_FUNC PyInit_plpy(void);
+
+PyMODINIT_FUNC
 PyInit_plpy(void)
 {
 	PyObject   *m;
@@ -4344,7 +4404,7 @@ PLy_spi_exception_set(PyObject *excclass, ErrorData *edata)
 	if (!spierror)
 		goto failure;
 
-	spidata = Py_BuildValue("(zzzi)", edata->detail, edata->hint,
+	spidata = Py_BuildValue("(izzzi)", edata->sqlerrcode, edata->detail, edata->hint,
 							edata->internalquery, edata->internalpos);
 	if (!spidata)
 		goto failure;
@@ -4384,6 +4444,7 @@ PLy_elog(int elevel, const char *fmt,...)
 			   *val,
 			   *tb;
 	const char *primary = NULL;
+	int        sqlerrcode = 0;
 	char	   *detail = NULL;
 	char	   *hint = NULL;
 	char	   *query = NULL;
@@ -4393,7 +4454,7 @@ PLy_elog(int elevel, const char *fmt,...)
 	if (exc != NULL)
 	{
 		if (PyErr_GivenExceptionMatches(val, PLy_exc_spi_error))
-			PLy_get_spi_error_data(val, &detail, &hint, &query, &position);
+			PLy_get_spi_error_data(val, &sqlerrcode, &detail, &hint, &query, &position);
 		else if (PyErr_GivenExceptionMatches(val, PLy_exc_fatal))
 			elevel = FATAL;
 	}
@@ -4434,8 +4495,9 @@ PLy_elog(int elevel, const char *fmt,...)
 	PG_TRY();
 	{
 		ereport(elevel,
-				(errmsg("%s", primary ? primary : "no exception data"),
-				 (detail) ? errdetail("%s", detail) : 0,
+				(errcode(sqlerrcode ? sqlerrcode : ERRCODE_INTERNAL_ERROR),
+				 errmsg_internal("%s", primary ? primary : "no exception data"),
+				 (detail) ? errdetail_internal("%s", detail) : 0,
 				 (tb_depth > 0 && tbmsg) ? errcontext("%s", tbmsg) : 0,
 				 (hint) ? errhint("%s", hint) : 0,
 				 (query) ? internalerrquery(query) : 0,
@@ -4465,7 +4527,7 @@ PLy_elog(int elevel, const char *fmt,...)
  * Extract the error data from a SPIError
  */
 static void
-PLy_get_spi_error_data(PyObject *exc, char **detail, char **hint, char **query, int *position)
+PLy_get_spi_error_data(PyObject *exc, int* sqlerrcode, char **detail, char **hint, char **query, int *position)
 {
 	PyObject   *spidata = NULL;
 
@@ -4473,7 +4535,7 @@ PLy_get_spi_error_data(PyObject *exc, char **detail, char **hint, char **query, 
 	if (!spidata)
 		goto cleanup;
 
-	if (!PyArg_ParseTuple(spidata, "zzzi", detail, hint, query, position))
+	if (!PyArg_ParseTuple(spidata, "izzzi", sqlerrcode, detail, hint, query, position))
 		goto cleanup;
 
 cleanup:

@@ -187,7 +187,7 @@ typedef struct remoteConnHashEnt
 					ereport(ERROR, \
 							(errcode(ERRCODE_SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION), \
 							 errmsg("could not establish connection"), \
-							 errdetail("%s", msg))); \
+							 errdetail_internal("%s", msg))); \
 				} \
 				dblink_security_check(conn, rconn); \
 				PQsetClientEncoding(conn, GetDatabaseEncodingName()); \
@@ -263,7 +263,7 @@ dblink_connect(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION),
 				 errmsg("could not establish connection"),
-				 errdetail("%s", msg)));
+				 errdetail_internal("%s", msg)));
 	}
 
 	/* check password actually used if not superuser */
@@ -613,16 +613,13 @@ Datum
 dblink_send_query(PG_FUNCTION_ARGS)
 {
 	PGconn	   *conn = NULL;
-	char	   *connstr = NULL;
 	char	   *sql = NULL;
 	remoteConn *rconn = NULL;
-	char	   *msg;
-	bool		freeconn = false;
 	int			retval;
 
 	if (PG_NARGS() == 2)
 	{
-		DBLINK_GET_CONN;
+		DBLINK_GET_NAMED_CONN;
 		sql = text_to_cstring(PG_GETARG_TEXT_PP(1));
 	}
 	else
@@ -711,13 +708,13 @@ dblink_record_internal(FunctionCallInfo fcinfo, bool is_async)
 		if (PG_NARGS() == 2)
 		{
 			/* text,bool */
-			DBLINK_GET_CONN;
+			DBLINK_GET_NAMED_CONN;
 			fail = PG_GETARG_BOOL(1);
 		}
 		else if (PG_NARGS() == 1)
 		{
 			/* text */
-			DBLINK_GET_CONN;
+			DBLINK_GET_NAMED_CONN;
 		}
 		else
 			/* shouldn't happen */
@@ -2264,8 +2261,9 @@ dblink_res_error(const char *conname, PGresult *res, const char *dblink_context_
 
 	ereport(level,
 			(errcode(sqlstate),
-	message_primary ? errmsg("%s", message_primary) : errmsg("unknown error"),
-			 message_detail ? errdetail("%s", message_detail) : 0,
+			 message_primary ? errmsg_internal("%s", message_primary) :
+			 errmsg("unknown error"),
+			 message_detail ? errdetail_internal("%s", message_detail) : 0,
 			 message_hint ? errhint("%s", message_hint) : 0,
 			 message_context ? errcontext("%s", message_context) : 0,
 		  errcontext("Error occurred on dblink connection named \"%s\": %s.",

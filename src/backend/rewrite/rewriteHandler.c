@@ -1192,7 +1192,9 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 	 * vars using Coordinator Quals.
 	 */
 	if (IS_PGXC_COORDINATOR && parsetree->jointree)
-		var_list = pull_var_clause((Node *) parsetree->jointree, PVC_REJECT_PLACEHOLDERS);
+		var_list = pull_var_clause((Node *) parsetree->jointree,
+								   PVC_RECURSE_AGGREGATES,
+								   PVC_REJECT_PLACEHOLDERS);
 
 	foreach(elt, var_list)
 	{
@@ -1235,7 +1237,8 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 		 */
 		var = makeWholeRowVar(target_rte,
 							  parsetree->resultRelation,
-							  0);
+							  0,
+							  false);
 
 		attrname = "wholerow";
 	}

@@ -457,6 +457,7 @@ typedef struct
 	TimestampTz PgStartTime;
 	TimestampTz PgReloadTime;
 	bool		redirection_done;
+	bool		IsBinaryUpgrade;
 #ifdef WIN32
 	HANDLE		PostmasterHandle;
 	HANDLE		initial_signal_pipe;
@@ -819,7 +820,7 @@ PostmasterMain(int argc, char *argv[])
 		char	  **p;
 
 		ereport(DEBUG3,
-				(errmsg_internal("%s: PostmasterMain: initial environ dump:",
+				(errmsg_internal("%s: PostmasterMain: initial environment dump:",
 								 progname)));
 		ereport(DEBUG3,
 			 (errmsg_internal("-----------------------------------------")));
@@ -4911,6 +4912,7 @@ save_backend_variables(BackendParameters *param, Port *port,
 	param->PgReloadTime = PgReloadTime;
 
 	param->redirection_done = redirection_done;
+	param->IsBinaryUpgrade = IsBinaryUpgrade;
 
 #ifdef WIN32
 	param->PostmasterHandle = PostmasterHandle;
@@ -5129,6 +5131,7 @@ restore_backend_variables(BackendParameters *param, Port *port)
 	PgReloadTime = param->PgReloadTime;
 
 	redirection_done = param->redirection_done;
+	IsBinaryUpgrade = param->IsBinaryUpgrade;
 
 #ifdef WIN32
 	PostmasterHandle = param->PostmasterHandle;

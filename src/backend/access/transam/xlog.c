@@ -558,7 +558,13 @@ static TimeLineID lastPageTLI = 0;
 static XLogRecPtr minRecoveryPoint;		/* local copy of
 										 * ControlFile->minRecoveryPoint */
 static bool updateMinRecoveryPoint = true;
-static bool reachedMinRecoveryPoint = false;
+
+/*
+ * Have we reached a consistent database state? In crash recovery, we have
+ * to replay all the WAL, so reachedConsistency is never set. During archive
+ * recovery, the database is consistent once minRecoveryPoint is reached.
+ */
+static bool reachedConsistency = false;
 
 static bool InRedo = false;
 
@@ -663,7 +669,8 @@ static bool CheckForStandbyTrigger(void);
 static void xlog_outrec(StringInfo buf, XLogRecord *record);
 #endif
 static void pg_start_backup_callback(int code, Datum arg);
-static bool read_backup_label(XLogRecPtr *checkPointLoc);
+static bool read_backup_label(XLogRecPtr *checkPointLoc,
+				  bool *backupEndRequired);
 static void rm_redo_error_callback(void *arg);
 static int	get_sync_bit(int method);
 
@@ -3225,11 +3232,10 @@ ExecuteRecoveryCommand(char *command, char *commandName, bool failOnSignal)
 		 */
 		signaled = WIFSIGNALED(rc) || WEXITSTATUS(rc) > 125;
 
-		/*
-		 * translator: First %s represents a recovery.conf parameter name like
-		 * "recovery_end_command", and the 2nd is the value of that parameter.
-		 */
 		ereport((signaled && failOnSignal) ? FATAL : WARNING,
+		/*------
+		   translator: First %s represents a recovery.conf parameter name like
+		  "recovery_end_command", and the 2nd is the value of that parameter. */
 				(errmsg("%s \"%s\": return code %d", commandName,
 						command, rc)));
 	}
@@ -5272,22 +5278,22 @@ readRecoveryCommandFile(void)
 		{
 			recoveryRestoreCommand = pstrdup(item->value);
 			ereport(DEBUG2,
-					(errmsg("restore_command = '%s'",
-							recoveryRestoreCommand)));
+					(errmsg_internal("restore_command = '%s'",
+									 recoveryRestoreCommand)));
 		}
 		else if (strcmp(item->name, "recovery_end_command") == 0)
 		{
 			recoveryEndCommand = pstrdup(item->value);
 			ereport(DEBUG2,
-					(errmsg("recovery_end_command = '%s'",
-							recoveryEndCommand)));
+					(errmsg_internal("recovery_end_command = '%s'",
+									 recoveryEndCommand)));
 		}
 		else if (strcmp(item->name, "archive_cleanup_command") == 0)
 		{
 			archiveCleanupCommand = pstrdup(item->value);
 			ereport(DEBUG2,
-					(errmsg("archive_cleanup_command = '%s'",
-							archiveCleanupCommand)));
+					(errmsg_internal("archive_cleanup_command = '%s'",
+									 archiveCleanupCommand)));
 		}
 		else if (strcmp(item->name, "pause_at_recovery_target") == 0)
 		{
@@ -5296,7 +5302,8 @@ readRecoveryCommandFile(void)
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("parameter \"%s\" requires a Boolean value", "pause_at_recovery_target")));
 			ereport(DEBUG2,
-					(errmsg("pause_at_recovery_target = '%s'", item->value)));
+					(errmsg_internal("pause_at_recovery_target = '%s'",
+									 item->value)));
 		}
 		else if (strcmp(item->name, "recovery_target_timeline") == 0)
 		{
@@ -5314,10 +5321,10 @@ readRecoveryCommandFile(void)
 			}
 			if (rtli)
 				ereport(DEBUG2,
-						(errmsg("recovery_target_timeline = %u", rtli)));
+						(errmsg_internal("recovery_target_timeline = %u", rtli)));
 			else
 				ereport(DEBUG2,
-						(errmsg("recovery_target_timeline = latest")));
+						(errmsg_internal("recovery_target_timeline = latest")));
 		}
 		else if (strcmp(item->name, "recovery_target_xid") == 0)
 		{
@@ -5328,8 +5335,8 @@ readRecoveryCommandFile(void)
 				 (errmsg("recovery_target_xid is not a valid number: \"%s\"",
 						 item->value)));
 			ereport(DEBUG2,
-					(errmsg("recovery_target_xid = %u",
-							recoveryTargetXid)));
+					(errmsg_internal("recovery_target_xid = %u",
+							 		 recoveryTargetXid)));
 			recoveryTarget = RECOVERY_TARGET_XID;
 		}
 		else if (strcmp(item->name, "recovery_target_time") == 0)
@@ -5352,8 +5359,8 @@ readRecoveryCommandFile(void)
 												ObjectIdGetDatum(InvalidOid),
 														Int32GetDatum(-1)));
 			ereport(DEBUG2,
-					(errmsg("recovery_target_time = '%s'",
-							timestamptz_to_str(recoveryTargetTime))));
+					(errmsg_internal("recovery_target_time = '%s'",
+							 		 timestamptz_to_str(recoveryTargetTime))));
 		}
 #ifdef PGXC
 		else if (strcmp(item->name, "recovery_target_barrier") == 0)
@@ -5376,11 +5383,12 @@ readRecoveryCommandFile(void)
 			if (strlen(recoveryTargetName) >= MAXFNAMELEN)
 				ereport(FATAL,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("recovery_target_name is too long (maximum %d characters)", MAXFNAMELEN - 1)));
+						 errmsg("recovery_target_name is too long (maximum %d characters)",
+								MAXFNAMELEN - 1)));
 
 			ereport(DEBUG2,
-					(errmsg("recovery_target_name = '%s'",
-							recoveryTargetName)));
+					(errmsg_internal("recovery_target_name = '%s'",
+									 recoveryTargetName)));
 		}
 		else if (strcmp(item->name, "recovery_target_inclusive") == 0)
 		{
@@ -5390,32 +5398,35 @@ readRecoveryCommandFile(void)
 			if (!parse_bool(item->value, &recoveryTargetInclusive))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" requires a Boolean value", "recovery_target_inclusive")));
+						 errmsg("parameter \"%s\" requires a Boolean value",
+								"recovery_target_inclusive")));
 			ereport(DEBUG2,
-					(errmsg("recovery_target_inclusive = %s", item->value)));
+					(errmsg_internal("recovery_target_inclusive = %s",
+									 item->value)));
 		}
 		else if (strcmp(item->name, "standby_mode") == 0)
 		{
 			if (!parse_bool(item->value, &StandbyMode))
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" requires a Boolean value", "standby_mode")));
+						 errmsg("parameter \"%s\" requires a Boolean value",
+								"standby_mode")));
 			ereport(DEBUG2,
-					(errmsg("standby_mode = '%s'", item->value)));
+					(errmsg_internal("standby_mode = '%s'", item->value)));
 		}
 		else if (strcmp(item->name, "primary_conninfo") == 0)
 		{
 			PrimaryConnInfo = pstrdup(item->value);
 			ereport(DEBUG2,
-					(errmsg("primary_conninfo = '%s'",
-							PrimaryConnInfo)));
+					(errmsg_internal("primary_conninfo = '%s'",
+									 PrimaryConnInfo)));
 		}
 		else if (strcmp(item->name, "trigger_file") == 0)
 		{
 			TriggerFile = pstrdup(item->value);
 			ereport(DEBUG2,
-					(errmsg("trigger_file = '%s'",
-							TriggerFile)));
+					(errmsg_internal("trigger_file = '%s'",
+									 TriggerFile)));
 		}
 		else
 			ereport(FATAL,
@@ -6070,6 +6081,7 @@ StartupXLOG(void)
 	XLogRecord *record;
 	uint32		freespace;
 	TransactionId oldestActiveXID;
+	bool		backupEndRequired = false;
 
 	/*
 	 * Read control file and check XLOG status looks valid.
@@ -6209,7 +6221,7 @@ StartupXLOG(void)
 	if (StandbyMode)
 		OwnLatch(&XLogCtl->recoveryWakeupLatch);
 
-	if (read_backup_label(&checkPointLoc))
+	if (read_backup_label(&checkPointLoc, &backupEndRequired))
 	{
 		/*
 		 * When a backup_label file is present, we want to roll forward from
@@ -6385,10 +6397,17 @@ StartupXLOG(void)
 		}
 
 		/*
-		 * set backupStartPoint if we're starting recovery from a base backup
+		 * Set backupStartPoint if we're starting recovery from a base backup.
+		 * However, if there was no recovery.conf, and the backup was taken
+		 * with pg_start_backup(), we don't know if the server crashed before
+		 * the backup was finished and we're doing crash recovery on the
+		 * original server, or if we're restoring from the base backup. We
+		 * have to assume we're doing crash recovery in that case, or the
+		 * database would refuse to start up after a crash.
 		 */
-		if (haveBackupLabel)
+		if ((InArchiveRecovery && haveBackupLabel) || backupEndRequired)
 			ControlFile->backupStartPoint = checkPoint.redo;
+
 		ControlFile->time = (pg_time_t) time(NULL);
 		/* No need to hold ControlFileLock yet, we aren't up far enough */
 		UpdateControlFile();
@@ -6452,10 +6471,12 @@ StartupXLOG(void)
 				oldestActiveXID = checkPoint.oldestActiveXid;
 			Assert(TransactionIdIsValid(oldestActiveXID));
 
-			/* Startup commit log and related stuff */
+			/*
+			 * Startup commit log and subtrans only. Other SLRUs are not
+			 * maintained during recovery and need not be started yet.
+			 */
 			StartupCLOG();
 			StartupSUBTRANS(oldestActiveXID);
-			StartupMultiXact();
 
 			/*
 			 * If we're beginning at a shutdown checkpoint, we know that
@@ -6751,23 +6772,15 @@ StartupXLOG(void)
 
 		/*
 		 * Ran off end of WAL before reaching end-of-backup WAL record, or
-		 * minRecoveryPoint. That's usually a bad sign, indicating that you
-		 * tried to recover from an online backup but never called
-		 * pg_stop_backup(), or you didn't archive all the WAL up to that
-		 * point. However, this also happens in crash recovery, if the system
-		 * crashes while an online backup is in progress. We must not treat
-		 * that as an error, or the database will refuse to start up.
+		 * minRecoveryPoint.
 		 */
-		if (InArchiveRecovery)
-		{
-			if (!XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
-				ereport(FATAL,
-						(errmsg("WAL ends before end of online backup"),
-						 errhint("Online backup started with pg_start_backup() must be ended with pg_stop_backup(), and all WAL up to that point must be available at recovery.")));
-			else
-				ereport(FATAL,
-					  (errmsg("WAL ends before consistent recovery point")));
-		}
+		if (!XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
+			ereport(FATAL,
+					(errmsg("WAL ends before end of online backup"),
+					 errhint("Online backup started with pg_start_backup() must be ended with pg_stop_backup(), and all WAL up to that point must be available at recovery.")));
+		else
+			ereport(FATAL,
+					(errmsg("WAL ends before consistent recovery point")));
 	}
 
 	/*
@@ -6952,15 +6965,20 @@ StartupXLOG(void)
 	TransactionIdRetreat(ShmemVariableCache->latestCompletedXid);
 
 	/*
-	 * Start up the commit log and related stuff, too. In hot standby mode we
-	 * did this already before WAL replay.
+	 * Start up the commit log and subtrans, if not already done for
+	 * hot standby.
 	 */
 	if (standbyState == STANDBY_DISABLED)
 	{
 		StartupCLOG();
 		StartupSUBTRANS(oldestActiveXID);
-		StartupMultiXact();
 	}
+
+	/*
+	 * Perform end of recovery actions for any SLRUs that need it.
+	 */
+	StartupMultiXact();
+	TrimCLOG();
 
 	/* Reload shared-memory state for prepared transactions */
 	RecoverPreparedTransactions();
@@ -7022,13 +7040,20 @@ static void
 CheckRecoveryConsistency(void)
 {
 	/*
+	 * During crash recovery, we don't reach a consistent state until we've
+	 * replayed all the WAL.
+	 */
+	if (XLogRecPtrIsInvalid(minRecoveryPoint))
+		return;
+
+	/*
 	 * Have we passed our safe starting point?
 	 */
-	if (!reachedMinRecoveryPoint &&
+	if (!reachedConsistency &&
 		XLByteLE(minRecoveryPoint, EndRecPtr) &&
 		XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
 	{
-		reachedMinRecoveryPoint = true;
+		reachedConsistency = true;
 		ereport(LOG,
 				(errmsg("consistent recovery state reached at %X/%X",
 						EndRecPtr.xlogid, EndRecPtr.xrecoff)));
@@ -7041,7 +7066,7 @@ CheckRecoveryConsistency(void)
 	 */
 	if (standbyState == STANDBY_SNAPSHOT_READY &&
 		!LocalHotStandbyActive &&
-		reachedMinRecoveryPoint &&
+		reachedConsistency &&
 		IsUnderPostmaster)
 	{
 		/* use volatile pointer to prevent code rearrangement */
@@ -7668,6 +7693,16 @@ CreateCheckPoint(int flags)
 	checkPoint.time = (pg_time_t) time(NULL);
 
 	/*
+	 * For Hot Standby, derive the oldestActiveXid before we fix the redo pointer.
+	 * This allows us to begin accumulating changes to assemble our starting
+	 * snapshot of locks and transactions.
+	 */
+	if (!shutdown && XLogStandbyInfoActive())
+		checkPoint.oldestActiveXid = GetOldestActiveTransactionId();
+	else
+		checkPoint.oldestActiveXid = InvalidTransactionId;
+
+	/*
 	 * We must hold WALInsertLock while examining insert state to determine
 	 * the checkpoint REDO pointer.
 	 */
@@ -7853,9 +7888,7 @@ CreateCheckPoint(int flags)
 	 * Update checkPoint.nextXid since we have a later value
 	 */
 	if (!shutdown && XLogStandbyInfoActive())
-		LogStandbySnapshot(&checkPoint.oldestActiveXid, &checkPoint.nextXid);
-	else
-		checkPoint.oldestActiveXid = InvalidTransactionId;
+		LogStandbySnapshot(&checkPoint.nextXid);
 
 	START_CRIT_SECTION();
 
@@ -8068,7 +8101,8 @@ RecoveryRestartPoint(const CheckPoint *checkPoint)
 		if (RmgrTable[rmid].rm_safe_restartpoint != NULL)
 			if (!(RmgrTable[rmid].rm_safe_restartpoint()))
 			{
-				elog(trace_recovery(DEBUG2), "RM %d not safe to record restart point at %X/%X",
+				elog(trace_recovery(DEBUG2),
+					 "RM %d not safe to record restart point at %X/%X",
 					 rmid,
 					 checkPoint->redo.xlogid,
 					 checkPoint->redo.xrecoff);
@@ -8456,13 +8490,13 @@ xlog_redo(XLogRecPtr lsn, XLogRecord *record)
 
 		/*
 		 * If we see a shutdown checkpoint while waiting for an end-of-backup
-		 * record, the backup was cancelled and the end-of-backup record will
+		 * record, the backup was canceled and the end-of-backup record will
 		 * never arrive.
 		 */
 		if (InArchiveRecovery &&
 			!XLogRecPtrIsInvalid(ControlFile->backupStartPoint))
 			ereport(ERROR,
-					(errmsg("online backup was cancelled, recovery cannot continue")));
+					(errmsg("online backup was canceled, recovery cannot continue")));
 
 		/*
 		 * If we see a shutdown checkpoint, we know that nothing was running
@@ -9071,6 +9105,8 @@ do_pg_start_backup(const char *backupidstr, bool fast, char **labelfile)
 						 startpoint.xlogid, startpoint.xrecoff, xlogfilename);
 		appendStringInfo(&labelfbuf, "CHECKPOINT LOCATION: %X/%X\n",
 						 checkpointloc.xlogid, checkpointloc.xrecoff);
+		appendStringInfo(&labelfbuf, "BACKUP METHOD: %s\n",
+						 exclusive ? "pg_start_backup" : "streamed");
 		appendStringInfo(&labelfbuf, "START TIME: %s\n", strfbuf);
 		appendStringInfo(&labelfbuf, "LABEL: %s\n", backupidstr);
 
@@ -9418,7 +9454,7 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive)
 						(errmsg("pg_stop_backup still waiting for all required WAL segments to be archived (%d seconds elapsed)",
 								waits),
 						 errhint("Check that your archive_command is executing properly.  "
-								 "pg_stop_backup can be cancelled safely, "
+								 "pg_stop_backup can be canceled safely, "
 								 "but the database backup will not be usable without all the WAL segments.")));
 			}
 		}
@@ -9800,15 +9836,19 @@ pg_xlogfile_name(PG_FUNCTION_ARGS)
  *
  * Returns TRUE if a backup_label was found (and fills the checkpoint
  * location and its REDO location into *checkPointLoc and RedoStartLSN,
- * respectively); returns FALSE if not.
+ * respectively); returns FALSE if not. If this backup_label came from a
+ * streamed backup, *backupEndRequired is set to TRUE.
  */
 static bool
-read_backup_label(XLogRecPtr *checkPointLoc)
+read_backup_label(XLogRecPtr *checkPointLoc, bool *backupEndRequired)
 {
 	char		startxlogfilename[MAXFNAMELEN];
 	TimeLineID	tli;
 	FILE	   *lfp;
 	char		ch;
+	char		backuptype[20];
+
+	*backupEndRequired = false;
 
 	/*
 	 * See if label file is present
@@ -9841,6 +9881,16 @@ read_backup_label(XLogRecPtr *checkPointLoc)
 		ereport(FATAL,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("invalid data in file \"%s\"", BACKUP_LABEL_FILE)));
+	/*
+	 * BACKUP METHOD line didn't exist in 9.1beta3 and earlier, so don't
+	 * error out if it doesn't exist.
+	 */
+	if (fscanf(lfp, "BACKUP METHOD: %19s", backuptype) == 1)
+	{
+		if (strcmp(backuptype, "streamed") == 0)
+			*backupEndRequired = true;
+	}
+
 	if (ferror(lfp) || FreeFile(lfp))
 		ereport(FATAL,
 				(errcode_for_file_access(),
@@ -9900,13 +9950,13 @@ CancelBackup(void)
 	if (stat(BACKUP_LABEL_FILE, &stat_buf) < 0)
 		return;
 
-	/* remove leftover file from previously cancelled backup if it exists */
+	/* remove leftover file from previously canceled backup if it exists */
 	unlink(BACKUP_LABEL_OLD);
 
 	if (rename(BACKUP_LABEL_FILE, BACKUP_LABEL_OLD) == 0)
 	{
 		ereport(LOG,
-				(errmsg("online backup mode cancelled"),
+				(errmsg("online backup mode canceled"),
 				 errdetail("\"%s\" was renamed to \"%s\".",
 						   BACKUP_LABEL_FILE, BACKUP_LABEL_OLD)));
 	}
@@ -9914,7 +9964,7 @@ CancelBackup(void)
 	{
 		ereport(WARNING,
 				(errcode_for_file_access(),
-				 errmsg("online backup mode was not cancelled"),
+				 errmsg("online backup mode was not canceled"),
 				 errdetail("Could not rename \"%s\" to \"%s\": %m.",
 						   BACKUP_LABEL_FILE, BACKUP_LABEL_OLD)));
 	}
@@ -9962,34 +10012,50 @@ startupproc_quickdie(SIGNAL_ARGS)
 static void
 StartupProcSigUsr1Handler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	latch_sigusr1_handler();
+
+	errno = save_errno;
 }
 
 /* SIGUSR2: set flag to finish recovery */
 static void
 StartupProcTriggerHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	promote_triggered = true;
 	WakeupRecovery();
+
+	errno = save_errno;
 }
 
 /* SIGHUP: set flag to re-read config file at next convenient time */
 static void
 StartupProcSigHupHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	got_SIGHUP = true;
 	WakeupRecovery();
+
+	errno = save_errno;
 }
 
 /* SIGTERM: set flag to abort redo and exit */
 static void
 StartupProcShutdownHandler(SIGNAL_ARGS)
 {
+	int			save_errno = errno;
+
 	if (in_restore_command)
 		proc_exit(1);
 	else
 		shutdown_requested = true;
 	WakeupRecovery();
+
+	errno = save_errno;
 }
 
 /* Handle SIGHUP and SIGTERM signals of startup process */
@@ -10242,7 +10308,7 @@ retry:
 					/*
 					 * Wait for more WAL to arrive, or timeout to be reached
 					 */
-					WaitLatch(&XLogCtl->recoveryWakeupLatch, 5000000L);
+					WaitLatch(&XLogCtl->recoveryWakeupLatch, 5000L);
 					ResetLatch(&XLogCtl->recoveryWakeupLatch);
 				}
 				else
