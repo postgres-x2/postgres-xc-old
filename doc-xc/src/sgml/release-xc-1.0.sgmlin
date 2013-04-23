@@ -38,6 +38,7 @@
     Fixed behavior of <literal>gtm_ctl -w start</literal> command behavior to be
     the same as those of <literal>pg_ctl</literal>.  Nikhil Sontakke provided the
     original fix.
+   </para>
   </listitem>
 
   <listitem>
