@@ -1,7 +1,11 @@
 Postgres-XC Cluster Database Management System
 
+<<<<<<< HEAD
 Portions Copyright (c) 2010-2012, Postgres-XC Development Group
 Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
+=======
+Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
+>>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 
 Portions Copyright (c) 1994, The Regents of the University of California
 

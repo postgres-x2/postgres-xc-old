@@ -1462,24 +1462,12 @@ standard_ProcessUtility(Node *parsetree,
 				stmt = transformIndexStmt(stmt, queryString);
 
 				/* ... and do it */
-				DefineIndex(stmt->relation,		/* relation */
-							stmt->idxname,		/* index name */
+				DefineIndex(stmt,
 							InvalidOid, /* no predefined OID */
-							InvalidOid, /* no previous storage */
-							stmt->accessMethod, /* am name */
-							stmt->tableSpace,
-							stmt->indexParams,	/* parameters */
-							(Expr *) stmt->whereClause,
-							stmt->options,
-							stmt->excludeOpNames,
-							stmt->unique,
-							stmt->primary,
-							stmt->isconstraint,
-							stmt->deferrable,
-							stmt->initdeferred,
 							false,		/* is_alter_table */
 							true,		/* check_rights */
 							false,		/* skip_build */
+<<<<<<< HEAD
 							false,		/* quiet */
 							stmt->concurrent);	/* concurrent */
 #ifdef PGXC
@@ -1487,6 +1475,9 @@ standard_ProcessUtility(Node *parsetree,
 					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
 										   stmt->concurrent, exec_type, is_temp);
 #endif
+=======
+							false);		/* quiet */
+>>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 			}
 			break;
 
@@ -1685,6 +1676,7 @@ standard_ProcessUtility(Node *parsetree,
 			break;
 
 		case T_VacuumStmt:
+<<<<<<< HEAD
 			/* we choose to allow this during "read only" transactions */
 			PreventCommandDuringRecovery("VACUUM");
 #ifdef PGXC
@@ -1697,6 +1689,16 @@ standard_ProcessUtility(Node *parsetree,
 #endif
 			vacuum((VacuumStmt *) parsetree, InvalidOid, true, NULL, false,
 				   isTopLevel);
+=======
+			{
+				VacuumStmt *stmt = (VacuumStmt *) parsetree;
+
+				/* we choose to allow this during "read only" transactions */
+				PreventCommandDuringRecovery((stmt->options & VACOPT_VACUUM) ?
+											 "VACUUM" : "ANALYZE");
+				vacuum(stmt, InvalidOid, true, NULL, false, isTopLevel);
+			}
+>>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 			break;
 
 		case T_ExplainStmt:
@@ -2460,26 +2462,35 @@ QueryReturnsTuples(Query *parsetree)
  * UtilityContainsQuery
  *		Return the contained Query, or NULL if there is none
  *
- * Certain utility statements, such as EXPLAIN, contain a Query.
+ * Certain utility statements, such as EXPLAIN, contain a plannable Query.
  * This function encapsulates knowledge of exactly which ones do.
  * We assume it is invoked only on already-parse-analyzed statements
  * (else the contained parsetree isn't a Query yet).
+ *
+ * In some cases (currently, only EXPLAIN of CREATE TABLE AS/SELECT INTO),
+ * potentially Query-containing utility statements can be nested.  This
+ * function will drill down to a non-utility Query, or return NULL if none.
  */
 Query *
 UtilityContainsQuery(Node *parsetree)
 {
+	Query	   *qry;
+
 	switch (nodeTag(parsetree))
 	{
 		case T_ExplainStmt:
-			Assert(IsA(((ExplainStmt *) parsetree)->query, Query));
-			return (Query *) ((ExplainStmt *) parsetree)->query;
+			qry = (Query *) ((ExplainStmt *) parsetree)->query;
+			Assert(IsA(qry, Query));
+			if (qry->commandType == CMD_UTILITY)
+				return UtilityContainsQuery(qry->utilityStmt);
+			return qry;
 
 		case T_CreateTableAsStmt:
-			/* might or might not contain a Query ... */
-			if (IsA(((CreateTableAsStmt *) parsetree)->query, Query))
-				return (Query *) ((CreateTableAsStmt *) parsetree)->query;
-			Assert(IsA(((CreateTableAsStmt *) parsetree)->query, ExecuteStmt));
-			return NULL;
+			qry = (Query *) ((CreateTableAsStmt *) parsetree)->query;
+			Assert(IsA(qry, Query));
+			if (qry->commandType == CMD_UTILITY)
+				return UtilityContainsQuery(qry->utilityStmt);
+			return qry;
 
 		default:
 			return NULL;
