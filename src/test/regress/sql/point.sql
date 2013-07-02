@@ -103,4 +103,3 @@ SELECT COUNT(*) FROM point_gist_tbl WHERE f1 ~= '(0.0000018,0.0000018)'::point;
 RESET enable_seqscan;
 RESET enable_indexscan;
 RESET enable_bitmapscan;
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
