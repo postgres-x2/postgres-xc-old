@@ -551,11 +551,7 @@
 #define PACKAGE_NAME "Postgres-XC"
 
 /* Define to the full name and version of this package. */
-<<<<<<< HEAD
-#define PACKAGE_STRING "Postgres-XC 1.1devel"
-=======
-#define PACKAGE_STRING "PostgreSQL 9.2.4"
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
+#define PACKAGE_STRING "Postgres-XC 1.1beta"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "9.2.4"

@@ -13572,54 +13572,6 @@ dumpSequence(Archive *fout, TableInfo *tbinfo)
 		}
 	}
 
-<<<<<<< HEAD
-	if (!schemaOnly)
-	{
-#ifdef PGXC
-		/*
-		 * In Postgres-XC it is possible that the current value of a
-		 * sequence cached on each node is different as several sessions
-		 * might use the sequence on different nodes. So what we do here
-		 * to get a consistent dump is to get the next value of sequence.
-		 * This insures that sequence value is unique as nextval is directly
-		 * obtained from GTM.
-		 */
-		resetPQExpBuffer(query);
-		appendPQExpBuffer(query, "SELECT pg_catalog.nextval(");
-		appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
-		appendPQExpBuffer(query, ");\n");
-		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
-
-		if (PQntuples(res) != 1)
-		{
-			write_msg(NULL, ngettext("query to get nextval of sequence \"%s\" "
-									 "returned %d rows (expected 1)\n",
-									 "query to get nextval of sequence \"%s\" "
-									 "returned %d rows (expected 1)\n",
-									 PQntuples(res)),
-					  tbinfo->dobj.name, PQntuples(res));
-			exit_nicely(1);
-		}
-
-		last = PQgetvalue(res, 0, 0);
-#endif
-		resetPQExpBuffer(query);
-		appendPQExpBuffer(query, "SELECT pg_catalog.setval(");
-		appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
-		appendPQExpBuffer(query, ", %s, %s);\n",
-						  last, (called ? "true" : "false"));
-
-		ArchiveEntry(fout, nilCatalogId, createDumpId(),
-					 tbinfo->dobj.name,
-					 tbinfo->dobj.namespace->dobj.name,
-					 NULL,
-					 tbinfo->rolname,
-					 false, "SEQUENCE SET", SECTION_PRE_DATA,
-					 query->data, "", NULL,
-					 &(tbinfo->dobj.dumpId), 1,
-					 NULL, NULL);
-	}
-=======
 	/* Dump Sequence Comments and Security Labels */
 	dumpComment(fout, labelq->data,
 				tbinfo->dobj.namespace->dobj.name, tbinfo->rolname,
@@ -13627,7 +13579,6 @@ dumpSequence(Archive *fout, TableInfo *tbinfo)
 	dumpSecLabel(fout, labelq->data,
 				 tbinfo->dobj.namespace->dobj.name, tbinfo->rolname,
 				 tbinfo->dobj.catId, 0, tbinfo->dobj.dumpId);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 
 	PQclear(res);
 
@@ -13669,6 +13620,34 @@ dumpSequenceData(Archive *fout, TableDataInfo *tdinfo)
 
 	last = PQgetvalue(res, 0, 0);
 	called = (strcmp(PQgetvalue(res, 0, 1), "t") == 0);
+#ifdef PGXC
+		/*
+		 * In Postgres-XC it is possible that the current value of a
+		 * sequence cached on each node is different as several sessions
+		 * might use the sequence on different nodes. So what we do here
+		 * to get a consistent dump is to get the next value of sequence.
+		 * This insures that sequence value is unique as nextval is directly
+		 * obtained from GTM.
+		 */
+		resetPQExpBuffer(query);
+		appendPQExpBuffer(query, "SELECT pg_catalog.nextval(");
+		appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
+		appendPQExpBuffer(query, ");\n");
+		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
+
+		if (PQntuples(res) != 1)
+		{
+			write_msg(NULL, ngettext("query to get nextval of sequence \"%s\" "
+									 "returned %d rows (expected 1)\n",
+									 "query to get nextval of sequence \"%s\" "
+									 "returned %d rows (expected 1)\n",
+									 PQntuples(res)),
+					  tbinfo->dobj.name, PQntuples(res));
+			exit_nicely(1);
+		}
+
+		last = PQgetvalue(res, 0, 0);
+#endif
 
 	resetPQExpBuffer(query);
 	appendPQExpBuffer(query, "SELECT pg_catalog.setval(");

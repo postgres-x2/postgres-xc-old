@@ -212,16 +212,12 @@ static void make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 static void make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 			 int prettyFlags, int wrapColumn);
 static void get_query_def(Query *query, StringInfo buf, List *parentnamespace,
-<<<<<<< HEAD
-			  TupleDesc resultDesc, int prettyFlags, int startIndent
+			  TupleDesc resultDesc,
+			  int prettyFlags, int wrapColumn, int startIndent
 #ifdef PGXC
 			  , bool finalise_aggregates, bool sortgroup_colno
 #endif /* PGXC */
 				);
-=======
-			  TupleDesc resultDesc,
-			  int prettyFlags, int wrapColumn, int startIndent);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 static void get_values_def(List *values_lists, deparse_context *context);
 static void get_with_clause(Query *query, deparse_context *context);
 static void get_select_query_def(Query *query, deparse_context *context,
@@ -733,13 +729,10 @@ pg_get_triggerdef_worker(Oid trigid, bool pretty)
 		context.windowTList = NIL;
 		context.varprefix = true;
 		context.prettyFlags = pretty ? PRETTYFLAG_PAREN : 0;
-<<<<<<< HEAD
 #ifdef PGXC
 		context.finalise_aggs = false;
 #endif /* PGXC */
-=======
 		context.wrapColumn = WRAP_COLUMN_DEFAULT;
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 		context.indentLevel = PRETTYINDENT_STD;
 
 		get_rule_expr(qual, &context, false);
@@ -2186,13 +2179,10 @@ deparse_expression_pretty(Node *expr, List *dpcontext,
 	context.windowTList = NIL;
 	context.varprefix = forceprefix;
 	context.prettyFlags = prettyFlags;
-<<<<<<< HEAD
 #ifdef PGXC
 	context.finalise_aggs = false;
 #endif /* PGXC */
-=======
 	context.wrapColumn = WRAP_COLUMN_DEFAULT;
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	context.indentLevel = startIndent;
 
 	get_rule_expr(expr, &context, showimplicit);
@@ -2704,16 +2694,12 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		foreach(action, actions)
 		{
 			query = (Query *) lfirst(action);
-<<<<<<< HEAD
-			get_query_def(query, buf, NIL, NULL, prettyFlags, 0
+			get_query_def(query, buf, NIL, NULL,
+						  prettyFlags, WRAP_COLUMN_DEFAULT, 0
 #ifdef PGXC
 			, false, false
 #endif /* PGXC */
 			);
-=======
-			get_query_def(query, buf, NIL, NULL,
-						  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 			if (prettyFlags)
 				appendStringInfo(buf, ";\n");
 			else
@@ -2730,16 +2716,12 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		Query	   *query;
 
 		query = (Query *) linitial(actions);
-<<<<<<< HEAD
-		get_query_def(query, buf, NIL, NULL, prettyFlags, 0
+		get_query_def(query, buf, NIL, NULL,
+					  prettyFlags, WRAP_COLUMN_DEFAULT, 0
 #ifdef PGXC
 						, false, false
 #endif /* PGXC */
 		);
-=======
-		get_query_def(query, buf, NIL, NULL,
-					  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 		appendStringInfo(buf, ";");
 	}
 }
@@ -2807,15 +2789,11 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	ev_relation = heap_open(ev_class, AccessShareLock);
 
 	get_query_def(query, buf, NIL, RelationGetDescr(ev_relation),
-<<<<<<< HEAD
-				  prettyFlags, 0
+				  prettyFlags, wrapColumn, 0
 #ifdef PGXC
 				  , false, false
 #endif /* PGXC */
 				  );
-=======
-				  prettyFlags, wrapColumn, 0);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	appendStringInfo(buf, ";");
 
 	heap_close(ev_relation, AccessShareLock);
@@ -2879,8 +2857,8 @@ deparse_query(Query *query, StringInfo buf, List *parentnamespace,
 	tmp_search_path->schemas = NIL;
 	PushOverrideSearchPath(tmp_search_path);
 
-	get_query_def(query, buf, parentnamespace, NULL, 0, 0, finalise_aggs,
-					sortgroup_colno);
+	get_query_def(query, buf, parentnamespace, NULL, 0, WRAP_COLUMN_DEFAULT,
+					0, finalise_aggs, sortgroup_colno);
 
 	PopOverrideSearchPath();
 }
@@ -2894,16 +2872,12 @@ deparse_query(Query *query, StringInfo buf, List *parentnamespace,
  */
 static void
 get_query_def(Query *query, StringInfo buf, List *parentnamespace,
-<<<<<<< HEAD
-			  TupleDesc resultDesc, int prettyFlags, int startIndent
+			  TupleDesc resultDesc,
+			  int prettyFlags, int wrapColumn, int startIndent
 #ifdef PGXC
 				, bool finalise_aggs, bool sortgroup_colno
 #endif /* PGXC */
 			  )
-=======
-			  TupleDesc resultDesc,
-			  int prettyFlags, int wrapColumn, int startIndent)
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 {
 	deparse_context context;
 	deparse_namespace dpns;
@@ -3066,16 +3040,12 @@ get_with_clause(Query *query, deparse_context *context)
 		if (PRETTY_INDENT(context))
 			appendContextKeyword(context, "", 0, 0, 0);
 		get_query_def((Query *) cte->ctequery, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 		if (PRETTY_INDENT(context))
 			appendContextKeyword(context, "", 0, 0, 0);
 		appendStringInfoChar(buf, ')');
@@ -3310,16 +3280,12 @@ get_target_list(List *targetList, deparse_context *context,
 	char	   *sep;
 	int			colno;
 	ListCell   *l;
-<<<<<<< HEAD
-	bool		last_was_multiline = false;
 #ifdef PGXC
 	bool no_targetlist = true;
 #endif
-=======
 
 	/* we use targetbuf to hold each TLE's text temporarily */
 	initStringInfo(&targetbuf);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 
 	sep = " ";
 	colno = 0;
@@ -3439,7 +3405,6 @@ get_target_list(List *targetList, deparse_context *context,
 		appendStringInfoString(buf, targetbuf.data);
 	}
 
-<<<<<<< HEAD
 #ifdef PGXC
 	/*
 	 * Because the empty target list can generate invalid SQL
@@ -3450,10 +3415,8 @@ get_target_list(List *targetList, deparse_context *context,
 	if (no_targetlist)
 		appendStringInfo(buf, " *");
 #endif
-=======
 	/* clean up */
 	pfree(targetbuf.data);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 }
 
 static void
@@ -3480,16 +3443,12 @@ get_setop_query(Node *setOp, Query *query, deparse_context *context,
 		if (need_paren)
 			appendStringInfoChar(buf, '(');
 		get_query_def(subquery, buf, context->namespaces, resultDesc,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 		if (need_paren)
 			appendStringInfoChar(buf, ')');
 	}
@@ -3943,16 +3902,12 @@ get_insert_query_def(Query *query, deparse_context *context)
 	{
 		/* Add the SELECT */
 		get_query_def(select_rte->subquery, buf, NIL, NULL,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	}
 	else if (values_rte)
 	{
@@ -7123,16 +7078,12 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 		appendStringInfoChar(buf, '(');
 
 	get_query_def(query, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-				  context->prettyFlags, context->indentLevel
+				  context->prettyFlags, context->wrapColumn,
+				  context->indentLevel
 #ifdef PGXC
 				  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 				  );
-=======
-				  context->prettyFlags, context->wrapColumn,
-				  context->indentLevel);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 
 	if (need_paren)
 		appendStringInfo(buf, "))");
@@ -7256,16 +7207,12 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 				/* Subquery RTE */
 				appendStringInfoChar(buf, '(');
 				get_query_def(rte->subquery, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-							  context->prettyFlags, context->indentLevel,
+							  context->prettyFlags, context->wrapColumn,
+							  context->indentLevel
 #ifdef PGXC
-							  context->finalise_aggs, context->sortgroup_colno
+							  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 							  );
-=======
-							  context->prettyFlags, context->wrapColumn,
-							  context->indentLevel);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 				appendStringInfoChar(buf, ')');
 				break;
 			case RTE_FUNCTION:

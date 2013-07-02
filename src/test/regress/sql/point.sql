@@ -81,10 +81,7 @@ SELECT '' AS fifteen, p1.f1 AS point1, p2.f1 AS point2, (p1.f1 <-> p2.f1) AS dis
 SELECT '' AS three, p1.f1 AS point1, p2.f1 AS point2, (p1.f1 <-> p2.f1) AS distance
    FROM POINT_TBL p1, POINT_TBL p2
    WHERE (p1.f1 <-> p2.f1) > 3 and p1.f1 << p2.f1 and p1.f1 >^ p2.f1
-<<<<<<< HEAD
    ORDER BY distance, p1.f1[0], p1.f1[1], p2.f1[0], p2.f1[1];
-=======
-   ORDER BY distance;
 
 -- Test that GiST indexes provide same behavior as sequential scan
 CREATE TEMP TABLE point_gist_tbl(f1 point);

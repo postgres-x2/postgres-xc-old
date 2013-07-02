@@ -370,14 +370,6 @@ typedef struct StdRdOptions
 #define RelationUsesLocalBuffers(relation) \
 	((relation)->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
 
-/*
-<<<<<<< HEAD
- * RelationUsesTempNamespace
- *		True if relation's catalog entries live in a private namespace.
- */
-#define RelationUsesTempNamespace(relation) \
-	((relation)->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
-
 #ifdef PGXC
 /*
  * RelationGetLocInfo
@@ -387,8 +379,6 @@ typedef struct StdRdOptions
 #endif
 
 /*
-=======
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
  * RELATION_IS_LOCAL
  *		If a rel is either temp or newly created in the current transaction,
  *		it can be assumed to be accessible only to the current backend.

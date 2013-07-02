@@ -1467,17 +1467,12 @@ standard_ProcessUtility(Node *parsetree,
 							false,		/* is_alter_table */
 							true,		/* check_rights */
 							false,		/* skip_build */
-<<<<<<< HEAD
-							false,		/* quiet */
-							stmt->concurrent);	/* concurrent */
+							false);		/* quiet */
 #ifdef PGXC
 				if (IS_PGXC_COORDINATOR && !stmt->isconstraint && !IsConnFromCoord())
 					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
 										   stmt->concurrent, exec_type, is_temp);
 #endif
-=======
-							false);		/* quiet */
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 			}
 			break;
 
@@ -1676,9 +1671,12 @@ standard_ProcessUtility(Node *parsetree,
 			break;
 
 		case T_VacuumStmt:
-<<<<<<< HEAD
-			/* we choose to allow this during "read only" transactions */
-			PreventCommandDuringRecovery("VACUUM");
+			{
+				VacuumStmt *stmt = (VacuumStmt *) parsetree;
+
+				/* we choose to allow this during "read only" transactions */
+				PreventCommandDuringRecovery((stmt->options & VACOPT_VACUUM) ?
+											 "VACUUM" : "ANALYZE");
 #ifdef PGXC
 			/*
 			 * We have to run the command on nodes before Coordinator because
@@ -1687,18 +1685,8 @@ standard_ProcessUtility(Node *parsetree,
 			if (IS_PGXC_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_DATANODES, false);
 #endif
-			vacuum((VacuumStmt *) parsetree, InvalidOid, true, NULL, false,
-				   isTopLevel);
-=======
-			{
-				VacuumStmt *stmt = (VacuumStmt *) parsetree;
-
-				/* we choose to allow this during "read only" transactions */
-				PreventCommandDuringRecovery((stmt->options & VACOPT_VACUUM) ?
-											 "VACUUM" : "ANALYZE");
 				vacuum(stmt, InvalidOid, true, NULL, false, isTopLevel);
 			}
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 			break;
 
 		case T_ExplainStmt:

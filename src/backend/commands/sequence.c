@@ -119,16 +119,12 @@ static void fill_seq_with_data(Relation rel, HeapTuple tuple);
 static int64 nextval_internal(Oid relid);
 static Relation open_share_lock(SeqTable seq);
 static void init_sequence(Oid relid, SeqTable *p_elm, Relation *p_rel);
-<<<<<<< HEAD
-static Form_pg_sequence read_info(SeqTable elm, Relation rel, Buffer *buf);
+static Form_pg_sequence read_seq_tuple(SeqTable elm, Relation rel,
+			   Buffer *buf, HeapTuple seqtuple);
 #ifdef PGXC
 static void init_params(List *options, bool isInit,
 						Form_pg_sequence new, List **owned_by, bool *is_restart);
 #else
-=======
-static Form_pg_sequence read_seq_tuple(SeqTable elm, Relation rel,
-			   Buffer *buf, HeapTuple seqtuple);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 static void init_params(List *options, bool isInit,
 						Form_pg_sequence new, List **owned_by);
 #endif
@@ -542,6 +538,13 @@ AlterSequence(AlterSeqStmt *stmt)
 	/* Check and set new values */
 #ifdef PGXC
 	init_params(stmt->options, false, &new, &owned_by, &is_restart);
+
+	increment = new.increment_by;
+	min_value = new.min_value;
+	max_value = new.max_value;
+	start_value = new.start_value;
+	last_value = new.last_value;
+	cycle = new.is_cycled;
 #else
 	init_params(stmt->options, false, &new, &owned_by);
 #endif
@@ -551,20 +554,6 @@ AlterSequence(AlterSeqStmt *stmt)
 	elm->cached = elm->last;
 
 	/* Now okay to update the on-disk tuple */
-<<<<<<< HEAD
-	memcpy(seq, &new, sizeof(FormData_pg_sequence));
-
-#ifdef PGXC
-	increment = new.increment_by;
-	min_value = new.min_value;
-	max_value = new.max_value;
-	start_value = new.start_value;
-	last_value = new.last_value;
-	cycle = new.is_cycled;
-#endif
-
-=======
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	START_CRIT_SECTION();
 
 	memcpy(seq, &new, sizeof(FormData_pg_sequence));

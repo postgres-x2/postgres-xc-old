@@ -47,19 +47,18 @@ static int	_SPI_curid = -1;
 
 static Portal SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 						 ParamListInfo paramLI, bool read_only);
-
-<<<<<<< HEAD
-static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan,
-				  ParamListInfo boundParams);
+/*
+ * PGXC_TODO PG924Merge FIXME:
+ * boundParams is no more part of prepare_plan(). Do we want to do the same with
+ * pgxc_prepare_plan variant?
+ */
 #ifdef PGXC
 static void _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
                   SPIPlanPtr plan, ParamListInfo boundParams);
 #endif
-=======
 static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan);
 
 static void _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 
 static int _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				  Snapshot snapshot, Snapshot crosscheck_snapshot,
@@ -1789,7 +1788,7 @@ static void
 _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 {
 #ifdef PGXC
-	_SPI_pgxc_prepare_plan(src, NULL, plan, boundParams);
+	_SPI_pgxc_prepare_plan(src, NULL, plan, NULL);
 }
 
 /*

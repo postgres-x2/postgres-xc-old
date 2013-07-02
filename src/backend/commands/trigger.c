@@ -2937,14 +2937,11 @@ ltrmark:;
 		tuple.t_len = ItemIdGetLength(lp);
 		tuple.t_self = *tid;
 		tuple.t_tableOid = RelationGetRelid(relation);
-<<<<<<< HEAD
 #ifdef PGXC
 		tuple.t_xc_node_id = PGXCNodeIdentifier;
 #endif
-=======
 
 		LockBuffer(buffer, BUFFER_LOCK_UNLOCK);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	}
 
 	result = heap_copytuple(&tuple);

@@ -722,8 +722,6 @@ GetCurrentSubTransactionId(void)
 	return s->subTransactionId;
 }
 
-<<<<<<< HEAD
-=======
 /*
  *	SubTransactionIsActive
  *
@@ -746,7 +744,6 @@ SubTransactionIsActive(SubTransactionId subxid)
 }
 
 
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 /*
  *	GetCurrentCommandId
  *

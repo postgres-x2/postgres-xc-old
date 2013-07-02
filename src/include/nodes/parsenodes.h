@@ -1250,19 +1250,15 @@ typedef enum AlterTableType
 	AT_DropInherit,				/* NO INHERIT parent */
 	AT_AddOf,					/* OF <type_name> */
 	AT_DropOf,					/* NOT OF */
-<<<<<<< HEAD
 #ifdef PGXC
 	AT_DistributeBy,			/* DISTRIBUTE BY ... */
 	AT_SubCluster,				/* TO [ NODE nodelist | GROUP groupname ] */
 	AT_AddNodeList,				/* ADD NODE nodelist */
 	AT_DeleteNodeList,			/* DELETE NODE nodelist */
 #endif
-	AT_GenericOptions			/* OPTIONS (...) */
-=======
 	AT_GenericOptions,			/* OPTIONS (...) */
 	/* this will be in a more natural position in 9.3: */
 	AT_ReAddConstraint			/* internal to commands/tablecmds.c */
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 } AlterTableType;
 
 typedef struct AlterTableCmd	/* one subcommand of an ALTER TABLE */

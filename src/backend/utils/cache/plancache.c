@@ -1258,16 +1258,12 @@ ReleaseCachedPlan(CachedPlan *plan, bool useResOwner)
 	plan->refcount--;
 	if (plan->refcount == 0)
 	{
-<<<<<<< HEAD
-		MemoryContextDelete(plan->context);
-=======
 		/* Mark it no longer valid */
 		plan->magic = 0;
 
 		/* One-shot plans do not own their context, so we can't free them */
 		if (!plan->is_oneshot)
 			MemoryContextDelete(plan->context);
->>>>>>> 73c122769ca1f49c451e315d476c80fdcf9f20cc
 	}
 }
 
