@@ -1678,12 +1678,14 @@ standard_ProcessUtility(Node *parsetree,
 				PreventCommandDuringRecovery((stmt->options & VACOPT_VACUUM) ?
 											 "VACUUM" : "ANALYZE");
 #ifdef PGXC
-			/*
-			 * We have to run the command on nodes before Coordinator because
-			 * vacuum() pops active snapshot and we can not send it to nodes
-			 */
-			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_DATANODES, false);
+				/*
+				 * We have to run the command on nodes before Coordinator
+				 * because vacuum() pops active snapshot and we can not
+				 * send it to nodes.
+				 */
+				if (IS_PGXC_COORDINATOR)
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+											true, EXEC_ON_DATANODES, false);
 #endif
 				vacuum(stmt, InvalidOid, true, NULL, false, isTopLevel);
 			}
