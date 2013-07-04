@@ -10612,7 +10612,7 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 	if (IS_PGXC_COORDINATOR &&
 		!IsConnFromCoord() &&
 		rel->rd_rel->relkind == RELKIND_SEQUENCE &&
-		!RelationGetRelid(rel))
+		!IsTempSequence(RelationGetRelid(rel)))
 	{
 		char *seqname = GetGlobalSeqName(rel, NULL, NULL);
 		char *newseqname = GetGlobalSeqName(rel, NULL,
