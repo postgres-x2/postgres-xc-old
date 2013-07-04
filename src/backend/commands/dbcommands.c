@@ -688,11 +688,6 @@ createdb(const CreatedbStmt *stmt)
 	}
 	PG_END_ENSURE_ERROR_CLEANUP(createdb_failure_callback,
 								PointerGetDatum(&fparms));
-	/*
-	 * PGXC_TODO PG924Merge FIXME:
-	 * Will unregistering snapshot here, will have any problem when the callback
-	 * function is executed later?
-	 */
 	/* Free our snapshot */
 	UnregisterSnapshot(snapshot);
 #ifdef PGXC
@@ -700,6 +695,9 @@ createdb(const CreatedbStmt *stmt)
 	 * Even if we are successful, ultimately this transaction can be aborted
 	 * because some other node failed. So arrange for cleanup on transaction
 	 * abort.
+	 * Unregistering snapshot above, will not have any problem when the
+	 * callback function is executed because the callback register's its
+	 * own snapshot in function remove_dbtablespaces
 	 */
 	set_dbcleanup_callback(createdb_xact_callback, &fparms.dest_dboid,
 	                      sizeof(fparms.dest_dboid));
