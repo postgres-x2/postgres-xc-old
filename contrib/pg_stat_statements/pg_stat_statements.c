@@ -34,7 +34,7 @@
  * disappear!) and also take the entry's mutex spinlock.
  *
  *
- * Copyright (c) 2008-2012, PostgreSQL Global Development Group
+ * Copyright (c) 2008-2013, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *	  contrib/pg_stat_statements/pg_stat_statements.c
@@ -239,6 +239,7 @@ static void pgss_ExecutorRun(QueryDesc *queryDesc,
 				 long count);
 static void pgss_ExecutorFinish(QueryDesc *queryDesc);
 static void pgss_ExecutorEnd(QueryDesc *queryDesc);
+<<<<<<< HEAD
 static void pgss_ProcessUtility(Node *parsetree,
 			  const char *queryString, ParamListInfo params, bool isTopLevel,
 					DestReceiver *dest,
@@ -246,6 +247,11 @@ static void pgss_ProcessUtility(Node *parsetree,
 					bool sentToRemote,
 #endif /* PGXC */
 					char *completionTag);
+=======
+static void pgss_ProcessUtility(Node *parsetree, const char *queryString,
+					ProcessUtilityContext context, ParamListInfo params,
+					DestReceiver *dest, char *completionTag);
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 static uint32 pgss_hash_fn(const void *key, Size keysize);
 static int	pgss_match_fn(const void *key1, const void *key2, Size keysize);
 static uint32 pgss_hash_string(const char *str);
@@ -789,12 +795,17 @@ pgss_ExecutorEnd(QueryDesc *queryDesc)
  */
 static void
 pgss_ProcessUtility(Node *parsetree, const char *queryString,
+<<<<<<< HEAD
 					ParamListInfo params, bool isTopLevel,
 					DestReceiver *dest,
 #ifdef PGXC
 					bool sentToRemote,
 #endif /* PGXC */
 					char *completionTag)
+=======
+					ProcessUtilityContext context, ParamListInfo params,
+					DestReceiver *dest, char *completionTag)
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 {
 	/*
 	 * If it's an EXECUTE statement, we don't track it and don't increment the
@@ -826,6 +837,7 @@ pgss_ProcessUtility(Node *parsetree, const char *queryString,
 		PG_TRY();
 		{
 			if (prev_ProcessUtility)
+<<<<<<< HEAD
 				prev_ProcessUtility(parsetree, queryString, params,
 									isTopLevel, dest,
 #ifdef PGXC
@@ -839,6 +851,15 @@ pgss_ProcessUtility(Node *parsetree, const char *queryString,
 										sentToRemote,
 #endif /* PGXC */
 										completionTag);
+=======
+				prev_ProcessUtility(parsetree, queryString,
+									context, params,
+									dest, completionTag);
+			else
+				standard_ProcessUtility(parsetree, queryString,
+										context, params,
+										dest, completionTag);
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 			nested_level--;
 		}
 		PG_CATCH();
@@ -895,6 +916,7 @@ pgss_ProcessUtility(Node *parsetree, const char *queryString,
 	else
 	{
 		if (prev_ProcessUtility)
+<<<<<<< HEAD
 			prev_ProcessUtility(parsetree, queryString, params,
 								isTopLevel, dest,
 #ifdef PGXC
@@ -908,6 +930,15 @@ pgss_ProcessUtility(Node *parsetree, const char *queryString,
 									sentToRemote,
 #endif /* PGXC */
 									completionTag);
+=======
+			prev_ProcessUtility(parsetree, queryString,
+								context, params,
+								dest, completionTag);
+		else
+			standard_ProcessUtility(parsetree, queryString,
+									context, params,
+									dest, completionTag);
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 	}
 }
 

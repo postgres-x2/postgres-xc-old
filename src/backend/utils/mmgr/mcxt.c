@@ -9,7 +9,7 @@
  * context's MemoryContextMethods struct.
  *
  *
- * Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -18,6 +18,9 @@
  *
  *-------------------------------------------------------------------------
  */
+
+/* see palloc.h.  Must be before postgres.h */
+#define MCXT_INCLUDE_DEFINITIONS
 
 #include "postgres.h"
 
@@ -634,6 +637,42 @@ MemoryContextAllocZeroAligned(MemoryContext context, Size size)
 	return ret;
 }
 
+void *
+palloc(Size size)
+{
+	/* duplicates MemoryContextAlloc to avoid increased overhead */
+	AssertArg(MemoryContextIsValid(CurrentMemoryContext));
+
+	if (!AllocSizeIsValid(size))
+		elog(ERROR, "invalid memory alloc request size %lu",
+			 (unsigned long) size);
+
+	CurrentMemoryContext->isReset = false;
+
+	return (*CurrentMemoryContext->methods->alloc) (CurrentMemoryContext, size);
+}
+
+void *
+palloc0(Size size)
+{
+	/* duplicates MemoryContextAllocZero to avoid increased overhead */
+	void	   *ret;
+
+	AssertArg(MemoryContextIsValid(CurrentMemoryContext));
+
+	if (!AllocSizeIsValid(size))
+		elog(ERROR, "invalid memory alloc request size %lu",
+			 (unsigned long) size);
+
+	CurrentMemoryContext->isReset = false;
+
+	ret = (*CurrentMemoryContext->methods->alloc) (CurrentMemoryContext, size);
+
+	MemSetAligned(ret, 0, size);
+
+	return ret;
+}
+
 /*
  * pfree
  *		Release an allocated chunk.
@@ -699,28 +738,6 @@ repalloc(void *pointer, Size size)
 }
 
 /*
- * MemoryContextSwitchTo
- *		Returns the current context; installs the given context.
- *
- * palloc.h defines an inline version of this function if allowed by the
- * compiler; in which case the definition below is skipped.
- */
-#ifndef USE_INLINE
-
-MemoryContext
-MemoryContextSwitchTo(MemoryContext context)
-{
-	MemoryContext old;
-
-	AssertArg(MemoryContextIsValid(context));
-
-	old = CurrentMemoryContext;
-	CurrentMemoryContext = context;
-	return old;
-}
-#endif   /* ! USE_INLINE */
-
-/*
  * MemoryContextStrdup
  *		Like strdup(), but allocate from the specified context
  */
@@ -737,6 +754,12 @@ MemoryContextStrdup(MemoryContext context, const char *string)
 	return nstr;
 }
 
+char *
+pstrdup(const char *in)
+{
+	return MemoryContextStrdup(CurrentMemoryContext, in);
+}
+
 /*
  * pnstrdup
  *		Like pstrdup(), but append null byte to a
@@ -751,6 +774,7 @@ pnstrdup(const char *in, Size len)
 	out[len] = '\0';
 	return out;
 }
+<<<<<<< HEAD
 
 
 #if defined(WIN32) || defined(__CYGWIN__)
@@ -811,3 +835,5 @@ Gen_Alloc genAlloc_class = {(void *)MemoryContextAlloc,
 							(void *)allocTopCxt};
 
 #endif
+=======
+>>>>>>> e472b921406407794bab911c64655b8b82375196

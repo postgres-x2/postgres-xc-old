@@ -2,7 +2,7 @@
 #
 # Makefile for the postgres backend
 #
-# Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
+# Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 #
 # src/backend/Makefile
@@ -39,6 +39,7 @@ LOCALOBJS += utils/probes.o
 endif
 endif
 
+<<<<<<< HEAD
 OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
 	$(top_builddir)/src/interfaces/libpq/fe-connect.o \
 	$(top_builddir)/src/interfaces/libpq/fe-secure.o \
@@ -52,9 +53,14 @@ OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
 	$(top_builddir)/src/gtm/client/libgtmclient.a \
 	$(top_builddir)/src/gtm/common/libgtmcommon.a \
 	$(top_builddir)/src/interfaces/libpq/libpq.a
+=======
+OBJS = $(SUBDIROBJS) $(LOCALOBJS) $(top_builddir)/src/port/libpgport_srv.a \
+       $(top_builddir)/src/common/libpgcommon_srv.a
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 
-# We put libpgport into OBJS, so remove it from LIBS; also add libldap
-LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE)
+# We put libpgport and libpgcommon into OBJS, so remove it from LIBS; also add
+# libldap
+LIBS := $(filter-out -lpgport -lpgcommon, $(LIBS)) $(LDAP_LIBS_BE)
 
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lz -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
@@ -262,6 +268,7 @@ else
 endif
 ifeq ($(MAKE_EXPORTS), true)
 	$(INSTALL_DATA) $(POSTGRES_IMP) '$(DESTDIR)$(pkglibdir)/$(POSTGRES_IMP)'
+	$(INSTALL_PROGRAM) $(MKLDEXPORT) '$(DESTDIR)$(pgxsdir)/$(MKLDEXPORT_DIR)/mkldexport.sh'
 endif
 
 .PHONY: install-bin
@@ -280,6 +287,7 @@ endif
 endif
 ifeq ($(MAKE_EXPORTS), true)
 	$(MKDIR_P) '$(DESTDIR)$(pkglibdir)'
+	$(MKDIR_P) '$(DESTDIR)$(pgxsdir)/$(MKLDEXPORT_DIR)'
 endif
 
 
@@ -289,6 +297,7 @@ uninstall:
 	rm -f '$(DESTDIR)$(bindir)/postgres$(X)' '$(DESTDIR)$(bindir)/postmaster'
 ifeq ($(MAKE_EXPORTS), true)
 	rm -f '$(DESTDIR)$(pkglibdir)/$(POSTGRES_IMP)'
+	rm -f '$(DESTDIR)$(pgxsdir)/$(MKLDEXPORT_DIR)/mkldexport.sh'
 endif
 ifeq ($(PORTNAME), cygwin)
 ifeq ($(MAKE_DLL), true)
@@ -338,7 +347,6 @@ maintainer-clean: distclean
 	      catalog/postgres.description \
 	      catalog/postgres.shdescription \
 	      replication/repl_gram.c \
-	      replication/repl_gram.h \
 	      replication/repl_scanner.c \
 	      utils/fmgroids.h \
 	      utils/fmgrtab.c \

@@ -13,9 +13,13 @@ typedef uint8 RmgrId;
 /*
  * Built-in resource managers
  *
- * Note: RM_MAX_ID could be as much as 255 without breaking the XLOG file
- * format, but we keep it small to minimize the size of RmgrTable[].
+ * The actual numerical values for each rmgr ID are defined by the order
+ * of entries in rmgrlist.h.
+ *
+ * Note: RM_MAX_ID must fit in RmgrId; widening that type will affect the XLOG
+ * file format.
  */
+<<<<<<< HEAD
 #define RM_XLOG_ID				0
 #define RM_XACT_ID				1
 #define RM_SMGR_ID				2
@@ -39,5 +43,19 @@ typedef uint8 RmgrId;
 #else
 #define RM_MAX_ID				RM_SPGIST_ID
 #endif
+=======
+#define PG_RMGR(symname,name,redo,desc,startup,cleanup,restartpoint) \
+	symname,
+
+typedef enum RmgrIds
+{
+#include "access/rmgrlist.h"
+	RM_NEXT_ID
+}	RmgrIds;
+
+#undef PG_RMGR
+
+#define RM_MAX_ID				(RM_NEXT_ID - 1)
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 
 #endif   /* RMGR_H */

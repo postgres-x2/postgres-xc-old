@@ -5,7 +5,7 @@
  *		bits of hard-wired knowledge
  *
  *
- * Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -37,8 +37,12 @@
 #include "catalog/pg_shseclabel.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/toasting.h"
+<<<<<<< HEAD
 #include "catalog/pgxc_node.h"
 #include "catalog/pgxc_group.h"
+=======
+#include "common/relpath.h"
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 #include "miscadmin.h"
 #include "storage/fd.h"
 #include "utils/fmgroids.h"
@@ -49,21 +53,6 @@
 #endif
 
 
-#define FORKNAMECHARS	4		/* max chars for a fork name */
-
-/*
- * Lookup table of fork name by fork number.
- *
- * If you add a new entry, remember to update the errhint below, and the
- * documentation for pg_relation_size(). Also keep FORKNAMECHARS above
- * up-to-date.
- */
-const char *forkNames[] = {
-	"main",						/* MAIN_FORKNUM */
-	"fsm",						/* FSM_FORKNUM */
-	"vm",						/* VISIBILITYMAP_FORKNUM */
-	"init"						/* INIT_FORKNUM */
-};
 
 /*
  * forkname_to_number - look up fork number by name
@@ -85,6 +74,7 @@ forkname_to_number(char *forkName)
 }
 
 /*
+<<<<<<< HEAD
  * forkname_chars
  *		We use this to figure out whether a filename could be a relation
  *		fork (as opposed to an oddly named stray file that somehow ended
@@ -244,6 +234,8 @@ relpathbackend(RelFileNode rnode, BackendId backend, ForkNumber forknum)
 }
 
 /*
+=======
+>>>>>>> e472b921406407794bab911c64655b8b82375196
  * GetDatabasePath			- construct path to a database dir
  *
  * Result is a palloc'd string.
@@ -532,10 +524,10 @@ GetNewOid(Relation relation)
  *
  * This is exported separately because there are cases where we want to use
  * an index that will not be recognized by RelationGetOidIndex: TOAST tables
- * and pg_largeobject have indexes that are usable, but have multiple columns
- * and are on ordinary columns rather than a true OID column.  This code
- * will work anyway, so long as the OID is the index's first column.  The
- * caller must pass in the actual heap attnum of the OID column, however.
+ * have indexes that are usable, but have multiple columns and are on
+ * ordinary columns rather than a true OID column.	This code will work
+ * anyway, so long as the OID is the index's first column.  The caller must
+ * pass in the actual heap attnum of the OID column, however.
  *
  * Caller must have a suitable lock on the relation.
  */

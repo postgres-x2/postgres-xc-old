@@ -4,7 +4,7 @@
  *
  *	  Routines for aggregate-manipulation commands
  *
- * Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -23,11 +23,13 @@
 #include "postgres.h"
 
 #include "access/heapam.h"
+#include "access/htup_details.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
+#include "commands/alter.h"
 #include "commands/defrem.h"
 #include "miscadmin.h"
 #include "parser/parse_func.h"
@@ -45,7 +47,7 @@
  * is specified by a BASETYPE element in the parameters.  Otherwise,
  * "args" defines the input type(s).
  */
-void
+Oid
 DefineAggregate(List *name, List *args, bool oldstyle, List *parameters)
 {
 	char	   *aggName;
@@ -64,6 +66,7 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters)
 	Oid		   *aggArgTypes;
 	int			numArgs;
 	Oid			transTypeId;
+	char		transTypeType;
 	ListCell   *pl;
 
 	/* Convert list of names to a name and namespace */
@@ -190,7 +193,8 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters)
 	 * aggregate.
 	 */
 	transTypeId = typenameTypeId(NULL, transType);
-	if (get_typtype(transTypeId) == TYPTYPE_PSEUDO &&
+	transTypeType = get_typtype(transTypeId);
+	if (transTypeType == TYPTYPE_PSEUDO &&
 		!IsPolymorphicType(transTypeId))
 	{
 		if (transTypeId == INTERNALOID && superuser())
@@ -203,8 +207,15 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters)
 	}
 
 	/*
-	 * Most of the argument-checking is done inside of AggregateCreate
+	 * If we have an initval, and it's not for a pseudotype (particularly a
+	 * polymorphic type), make sure it's acceptable to the type's input
+	 * function.  We will store the initval as text, because the input
+	 * function isn't necessarily immutable (consider "now" for timestamp),
+	 * and we want to use the runtime not creation-time interpretation of the
+	 * value.  However, if it's an incorrect value it seems much more
+	 * user-friendly to complain at CREATE AGGREGATE time.
 	 */
+<<<<<<< HEAD
 	AggregateCreate(aggName,	/* aggregate name */
 					aggNamespace,		/* namespace */
 					aggArgTypes,	/* input data type(s) */
@@ -292,10 +303,27 @@ void
 AlterAggregateOwner(List *name, List *args, Oid newOwnerId)
 {
 	Oid			procOid;
+=======
+	if (initval && transTypeType != TYPTYPE_PSEUDO)
+	{
+		Oid			typinput,
+					typioparam;
+>>>>>>> e472b921406407794bab911c64655b8b82375196
 
-	/* Look up function and make sure it's an aggregate */
-	procOid = LookupAggNameTypeNames(name, args, false);
+		getTypeInputInfo(transTypeId, &typinput, &typioparam);
+		(void) OidInputFunctionCall(typinput, initval, typioparam, -1);
+	}
 
-	/* The rest is just like a function */
-	AlterFunctionOwner_oid(procOid, newOwnerId);
+	/*
+	 * Most of the argument-checking is done inside of AggregateCreate
+	 */
+	return AggregateCreate(aggName,		/* aggregate name */
+						   aggNamespace,		/* namespace */
+						   aggArgTypes, /* input data type(s) */
+						   numArgs,
+						   transfuncName,		/* step function name */
+						   finalfuncName,		/* final function name */
+						   sortoperatorName,	/* sort operator name */
+						   transTypeId, /* transition data type */
+						   initval);	/* initial condition */
 }
