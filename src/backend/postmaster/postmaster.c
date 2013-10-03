@@ -459,6 +459,9 @@ static bool CreateOptsFile(int argc, char *argv[], char *fullprogname);
 static pid_t StartChildProcess(AuxProcType type);
 static void StartAutovacuumWorker(void);
 static void InitPostmasterDeathWatchHandle(void);
+#ifdef PGXC
+static void PGXC_StartChildProcess(void);
+#endif
 
 #ifdef EXEC_BACKEND
 
@@ -5200,6 +5203,9 @@ StartChildProcess(AuxProcType type)
 		MemoryContextSwitchTo(TopMemoryContext);
 		MemoryContextDelete(PostmasterContext);
 		PostmasterContext = NULL;
+#ifdef PGXC
+		PGXC_StartChildProcess();
+#endif
 
 		AuxiliaryProcessMain(ac, av);
 		ExitPostmaster(0);
@@ -6537,3 +6543,10 @@ InitPostmasterDeathWatchHandle(void)
 								 GetLastError())));
 #endif   /* WIN32 */
 }
+
+#ifdef PGXC
+static void PGXC_StartChildProcess(void)
+{
+	PGXC_init_lock_files();
+}
+#endif

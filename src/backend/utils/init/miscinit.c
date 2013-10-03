@@ -1338,3 +1338,11 @@ pg_bindtextdomain(const char *domain)
 	}
 #endif
 }
+
+#ifdef PGXC
+void
+PGXC_init_lock_files(void)
+{
+	lock_files = NIL;
+}
+#endif
