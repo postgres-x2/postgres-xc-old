@@ -1032,16 +1032,12 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		/* ... and execute it */
 		ProcessUtility((Node *) atstmt,
 					   "(generated ALTER TABLE ADD FOREIGN KEY command)",
-<<<<<<< HEAD
-					   NULL, false, None_Receiver,
+					   PROCESS_UTILITY_SUBCOMMAND, NULL,
+					   None_Receiver,
 #ifdef PGXC
 					   false,
 #endif /* PGXC */
 					   NULL);
-=======
-					   PROCESS_UTILITY_SUBCOMMAND, NULL,
-					   None_Receiver, NULL);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 		/* Remove the matched item from the list */
 		info_list = list_delete_ptr(info_list, info);
@@ -2270,15 +2266,11 @@ ExecBRDeleteTriggers(EState *estate, EPQState *epqstate,
 	{
 #endif
 	trigtuple = GetTupleForTrigger(estate, epqstate, relinfo, tupleid,
-<<<<<<< HEAD
-								   &newSlot);
+								   LockTupleExclusive, &newSlot);
 #ifdef PGXC
 	}
 #endif
 
-=======
-								   LockTupleExclusive, &newSlot);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	if (trigtuple == NULL)
 		return false;
 
@@ -2340,10 +2332,9 @@ ExecARDeleteTriggers(EState *estate, ResultRelInfo *relinfo,
 
 	if (trigdesc && trigdesc->trig_delete_after_row)
 	{
-<<<<<<< HEAD
-#ifdef PGXC
 		HeapTuple	trigtuple;
 
+#ifdef PGXC
 		if (IS_PGXC_COORDINATOR && RelationGetLocInfo(relinfo->ri_RelationDesc))
 		{
 			/* No OLD tuple means triggers are to be run on datanode */
@@ -2354,20 +2345,22 @@ ExecARDeleteTriggers(EState *estate, ResultRelInfo *relinfo,
 		else /* Do the usual PG-way for datanode */
 		{
 #endif
-			trigtuple = GetTupleForTrigger(estate, NULL, relinfo,
-												   tupleid, NULL);
+		/* 
+		 * Memo, K.Suzuki, Sep.2nd, 2013
+		 *
+		 * GetTuplleForTrigger() added 5th argument to specify the lock, which is not
+		 * considered in pgxc_get_trigger_tuple().
+		 * Don't we need to consider this?
+		 */
+		trigtuple = GetTupleForTrigger(estate,
+									   NULL,
+									   relinfo,
+									   tupleid,
+									   LockTupleExclusive,
+									   NULL);
 #ifdef PGXC
 		}
 #endif
-=======
-		HeapTuple	trigtuple = GetTupleForTrigger(estate,
-												   NULL,
-												   relinfo,
-												   tupleid,
-												   LockTupleExclusive,
-												   NULL);
->>>>>>> e472b921406407794bab911c64655b8b82375196
-
 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_DELETE,
 							  true, trigtuple, NULL, NIL, NULL);
 		heap_freetuple(trigtuple);
@@ -2526,6 +2519,10 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 	Bitmapset  *modifiedCols;
 	Bitmapset  *keyCols;
 	LockTupleMode lockmode;
+#ifdef PGXC
+	bool			exec_all_triggers;
+	RelationLocInfo	*rel_locinfo = RelationGetLocInfo(relinfo->ri_RelationDesc);
+#endif
 
 	/*
 	 * Compute lock mode to use.  If columns that are part of the key have not
@@ -2540,9 +2537,6 @@ ExecBRUpdateTriggers(EState *estate, EPQState *epqstate,
 		lockmode = LockTupleNoKeyExclusive;
 
 #ifdef PGXC
-	bool			exec_all_triggers;
-	RelationLocInfo	*rel_locinfo = RelationGetLocInfo(relinfo->ri_RelationDesc);
-
 	/*
 	 * Know whether we should fire triggers on this node. But since internal
 	 * triggers are an exception, we cannot bail out here.
@@ -2681,9 +2675,8 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 
 	if (trigdesc && trigdesc->trig_update_after_row)
 	{
-<<<<<<< HEAD
-#ifdef PGXC
 		HeapTuple trigtuple;
+#ifdef PGXC
 		if (IS_PGXC_COORDINATOR && RelationGetLocInfo(relinfo->ri_RelationDesc))
 		{
 			/* No OLD tuple means triggers are to be run on datanode */
@@ -2695,20 +2688,23 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 		{
 			/* Do the usual PG-way for datanode */
 #endif
-		trigtuple = GetTupleForTrigger(estate, NULL, relinfo,
-									   tupleid, NULL);
+		/* 
+		 * Memo, K.Suzuki, Sep.2nd, 2013
+		 *
+		 * GetTuplleForTrigger() added 5th argument to specify the lock, which is not
+		 * considered in pgxc_get_trigger_tuple().
+		 * Don't we need to consider this?
+		 */
+		trigtuple = GetTupleForTrigger(estate,
+									   NULL,
+									   relinfo,
+									   tupleid,
+									   LockTupleExclusive,
+									   NULL);
+
 #ifdef PGXC
 		}
 #endif
-=======
-		HeapTuple	trigtuple = GetTupleForTrigger(estate,
-												   NULL,
-												   relinfo,
-												   tupleid,
-												   LockTupleExclusive,
-												   NULL);
-
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		AfterTriggerSaveEvent(estate, relinfo, TRIGGER_EVENT_UPDATE,
 							  true, trigtuple, newtuple, recheckIndexes,
 							  GetModifiedColumns(relinfo, estate));
@@ -2993,14 +2989,10 @@ ltrmark:;
 		tuple.t_len = ItemIdGetLength(lp);
 		tuple.t_self = *tid;
 		tuple.t_tableOid = RelationGetRelid(relation);
-<<<<<<< HEAD
 #ifdef PGXC
 		tuple.t_xc_node_id = PGXCNodeIdentifier;
 #endif
-=======
-
 		LockBuffer(buffer, BUFFER_LOCK_UNLOCK);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	}
 
 	result = heap_copytuple(&tuple);
@@ -6007,6 +5999,16 @@ pgxc_is_internal_trig_firable(Relation rel, Trigger *trigger)
 	return !RelationGetLocInfo(rel);
 }
 
+/*
+ * Memo, K.Suzuki, Sep.2nd, 2013
+ *
+ * This function is called from ExecARDeleteTriggers(), ExecBRUpdateTriggers(),
+ * and ExecARUpdateTriggers(), as replacement of GetTupleForTrigger() where
+ * the lock mode for the tuple is specified, which this function does not
+ * take care of.
+ *
+ * Should we take care of it?
+ */
 /*
  * Convenience function to form a heaptuple out of a heaptuple header.
  * PGXCTO: Though this is a convenience function now, it would possibly serve the

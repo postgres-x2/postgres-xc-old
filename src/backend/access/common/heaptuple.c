@@ -63,6 +63,7 @@
 #include "access/sysattr.h"
 #include "access/tuptoaster.h"
 #include "executor/tuptable.h"
+#include "lib/stringinfo.h"
 
 
 /* Does att's datatype allow packing into the 1-byte-header varlena format? */

@@ -1018,16 +1018,13 @@ inheritance_planner(PlannerInfo *root)
 		rowMarks = root->rowMarks;
 
 	/* And last, tack on a ModifyTable node to do the UPDATE/DELETE work */
-<<<<<<< HEAD
 #ifdef PGXC
-	mtplan = make_modifytable(parse->commandType,
+	mtplan = make_modifytable(root,
+							  parse->commandType,
 #else
-	return (Plan *) make_modifytable(parse->commandType,
-#endif
-=======
 	return (Plan *) make_modifytable(root,
 									 parse->commandType,
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#endif
 									 parse->canSetTag,
 									 resultRelations,
 									 subplans,

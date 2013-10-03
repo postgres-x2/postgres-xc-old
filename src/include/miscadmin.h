@@ -346,18 +346,11 @@ typedef enum ProcessingMode
 
 extern ProcessingMode Mode;
 
-<<<<<<< HEAD
-
-#define IsBootstrapProcessingMode() ((bool)(Mode == BootstrapProcessing))
-#define IsInitProcessingMode() ((bool)(Mode == InitProcessing))
-#define IsNormalProcessingMode() ((bool)(Mode == NormalProcessing))
-=======
 #define IsBootstrapProcessingMode() (Mode == BootstrapProcessing)
 #define IsInitProcessingMode()		(Mode == InitProcessing)
 #define IsNormalProcessingMode()	(Mode == NormalProcessing)
 
 #define GetProcessingMode() Mode
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 #define SetProcessingMode(mode) \
 	do { \
@@ -384,6 +377,9 @@ typedef enum
 	CheckpointerProcess,
 	WalWriterProcess,
 	WalReceiverProcess,
+#ifdef PGXC
+	PoolerProcess,
+#endif
 
 	NUM_AUXPROCTYPES			/* Must be last! */
 } AuxProcType;

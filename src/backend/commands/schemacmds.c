@@ -43,14 +43,10 @@ static void AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerI
 /*
  * CREATE SCHEMA
  */
-<<<<<<< HEAD
-void
+Oid
 #ifdef PGXC
 CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString, bool sentToRemote)
 #else
-=======
-Oid
->>>>>>> e472b921406407794bab911c64655b8b82375196
 CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 #endif
 {
@@ -266,7 +262,6 @@ RenameSchema(const char *oldname, const char *newname)
 	simple_heap_update(rel, &tup->t_self, tup);
 	CatalogUpdateIndexes(rel, tup);
 
-<<<<<<< HEAD
 #ifdef PGXC
 	if (IS_PGXC_COORDINATOR)
 	{
@@ -286,9 +281,7 @@ RenameSchema(const char *oldname, const char *newname)
 		performRename(&object, oldname, newname);
 	}
 #endif
-=======
 	InvokeObjectPostAlterHook(NamespaceRelationId, HeapTupleGetOid(tup), 0);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	heap_close(rel, NoLock);
 	heap_freetuple(tup);

@@ -229,15 +229,11 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.blist = NIL;
 	cxt.alist = NIL;
 	cxt.pkey = NULL;
-<<<<<<< HEAD
-	cxt.hasoids = interpretOidsOption(stmt->options);
+	cxt.hasoids = interpretOidsOption(stmt->options, true);
 #ifdef PGXC
 	cxt.fallback_dist_col = NULL;
 	cxt.distributeby = stmt->distributeby;
 #endif
-=======
-	cxt.hasoids = interpretOidsOption(stmt->options, true);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	Assert(!stmt->ofTypename || !stmt->inhRelations);	/* grammar enforces */
 

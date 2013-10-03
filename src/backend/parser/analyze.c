@@ -64,7 +64,12 @@
 #include "access/xact.h"
 #endif
 #include "utils/rel.h"
-
+/* Added these header file to resolve conflicts, K.Suzuki */
+#include "access/genam.h"
+#include "access/heapam.h"
+#include "access/htup_details.h"
+#include "miscadmin.h"
+/* End of addition */
 
 /* Hook for plugins to get control at end of parse analysis */
 post_parse_analyze_hook_type post_parse_analyze_hook = NULL;

@@ -122,16 +122,12 @@ static void fill_seq_with_data(Relation rel, HeapTuple tuple);
 static int64 nextval_internal(Oid relid);
 static Relation open_share_lock(SeqTable seq);
 static void init_sequence(Oid relid, SeqTable *p_elm, Relation *p_rel);
-<<<<<<< HEAD
-static Form_pg_sequence read_info(SeqTable elm, Relation rel, Buffer *buf);
+static Form_pg_sequence read_seq_tuple(SeqTable elm, Relation rel,
+			   Buffer *buf, HeapTuple seqtuple);
 #ifdef PGXC
 static void init_params(List *options, bool isInit,
 						Form_pg_sequence new, List **owned_by, bool *is_restart);
 #else
-=======
-static Form_pg_sequence read_seq_tuple(SeqTable elm, Relation rel,
-			   Buffer *buf, HeapTuple seqtuple);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 static void init_params(List *options, bool isInit,
 						Form_pg_sequence new, List **owned_by);
 #endif
@@ -296,7 +292,6 @@ DefineSequence(CreateSeqStmt *seq)
 
 	heap_close(rel, NoLock);
 
-<<<<<<< HEAD
 #ifdef PGXC  /* PGXC_COORD */
 	/*
 	 * Remote Coordinator is in charge of creating sequence in GTM.
@@ -327,9 +322,7 @@ DefineSequence(CreateSeqStmt *seq)
 		pfree(seqname);
 	}
 #endif
-=======
 	return seqoid;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 /*
@@ -559,7 +552,8 @@ AlterSequence(AlterSeqStmt *stmt)
 	elm->cached = elm->last;
 
 	/* Now okay to update the on-disk tuple */
-<<<<<<< HEAD
+	START_CRIT_SECTION();
+
 	memcpy(seq, &new, sizeof(FormData_pg_sequence));
 
 #ifdef PGXC
@@ -570,12 +564,6 @@ AlterSequence(AlterSeqStmt *stmt)
 	last_value = new.last_value;
 	cycle = new.is_cycled;
 #endif
-
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196
-	START_CRIT_SECTION();
-
-	memcpy(seq, &new, sizeof(FormData_pg_sequence));
 
 	MarkBufferDirty(buf);
 
@@ -615,7 +603,6 @@ AlterSequence(AlterSeqStmt *stmt)
 
 	relation_close(seqrel, NoLock);
 
-<<<<<<< HEAD
 #ifdef PGXC
 	/*
 	 * Remote Coordinator is in charge of create sequence in GTM
@@ -642,9 +629,7 @@ AlterSequence(AlterSeqStmt *stmt)
 		pfree(seqname);
 	}
 #endif
-=======
 	return relid;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 
@@ -1943,26 +1928,6 @@ seq_redo(XLogRecPtr lsn, XLogRecord *record)
 
 	pfree(localpage);
 }
-<<<<<<< HEAD
-
-void
-seq_desc(StringInfo buf, uint8 xl_info, char *rec)
-{
-	uint8		info = xl_info & ~XLR_INFO_MASK;
-	xl_seq_rec *xlrec = (xl_seq_rec *) rec;
-
-	if (info == XLOG_SEQ_LOG)
-		appendStringInfo(buf, "log: ");
-	else
-	{
-		appendStringInfo(buf, "UNKNOWN");
-		return;
-	}
-
-	appendStringInfo(buf, "rel %u/%u/%u",
-			   xlrec->node.spcNode, xlrec->node.dbNode, xlrec->node.relNode);
-}
-
 #ifdef PGXC
 /*
  * Register a callback for a sequence rename drop on GTM
@@ -2093,5 +2058,3 @@ drop_sequence_cb(GTMEvent event, void *args)
 				 errmsg("GTM error, could not drop sequence")));
 }
 #endif
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196

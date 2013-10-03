@@ -3436,53 +3436,7 @@ rescanLatestTimeLine(void)
 	 * next timeline was forked off from it *after* the current recovery
 	 * location.
 	 */
-<<<<<<< HEAD
-	if (recoveryTarget == RECOVERY_TARGET_XID)
-		snprintf(buffer, sizeof(buffer),
-				 "%s%u\t%s\t%s transaction %u\n",
-				 (srcfd < 0) ? "" : "\n",
-				 parentTLI,
-				 xlogfname,
-				 recoveryStopAfter ? "after" : "before",
-				 recoveryStopXid);
-	else if (recoveryTarget == RECOVERY_TARGET_TIME)
-		snprintf(buffer, sizeof(buffer),
-				 "%s%u\t%s\t%s %s\n",
-				 (srcfd < 0) ? "" : "\n",
-				 parentTLI,
-				 xlogfname,
-				 recoveryStopAfter ? "after" : "before",
-				 timestamptz_to_str(recoveryStopTime));
-#ifdef PGXC
-	else if (recoveryTarget == RECOVERY_TARGET_BARRIER)
-		snprintf(buffer, sizeof(buffer),
-				 "%s%u\t%s\t%s %s\n",
-				 (srcfd < 0) ? "" : "\n",
-				 parentTLI,
-				 xlogfname,
-				 recoveryStopAfter ? "after" : "before",
-				 recoveryTargetBarrierId);
-#endif
-	else if (recoveryTarget == RECOVERY_TARGET_NAME)
-		snprintf(buffer, sizeof(buffer),
-				 "%s%u\t%s\tat restore point \"%s\"\n",
-				 (srcfd < 0) ? "" : "\n",
-				 parentTLI,
-				 xlogfname,
-				 recoveryStopName);
-	else
-		snprintf(buffer, sizeof(buffer),
-				 "%s%u\t%s\tno recovery target specified\n",
-				 (srcfd < 0) ? "" : "\n",
-				 parentTLI,
-				 xlogfname);
-
-	nbytes = strlen(buffer);
-	errno = 0;
-	if ((int) write(fd, buffer, nbytes) != nbytes)
-=======
 	if (currentTle->end < EndRecPtr)
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	{
 		ereport(LOG,
 				(errmsg("new timeline %u forked off current database system timeline %u before current recovery point %X/%X",

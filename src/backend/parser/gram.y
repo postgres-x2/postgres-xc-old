@@ -54,11 +54,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_trigger.h"
 #include "commands/defrem.h"
-<<<<<<< HEAD
-#include "miscadmin.h"
-=======
 #include "commands/trigger.h"
->>>>>>> e472b921406407794bab911c64655b8b82375196
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/gramparse.h"
@@ -257,12 +253,9 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 		DeallocateStmt PrepareStmt ExecuteStmt
 		DropOwnedStmt ReassignOwnedStmt
 		AlterTSConfigurationStmt AlterTSDictionaryStmt
-<<<<<<< HEAD
 		BarrierStmt AlterNodeStmt CreateNodeStmt DropNodeStmt
 		CreateNodeGroupStmt DropNodeGroupStmt
-=======
 		CreateMatViewStmt RefreshMatViewStmt
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 %type <node>	select_no_parens select_with_parens select_clause
 				simple_select values_clause
@@ -398,13 +391,10 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <boolean> opt_freeze opt_default opt_recheck
 %type <defelt>	opt_binary opt_oids copy_delimiter
 
-<<<<<<< HEAD
+/* PGEXC_BEGIN */
 %type <str>		DirectStmt CleanConnDbName CleanConnUserName
 /* PGXC_END */
-%type <boolean> copy_from
-=======
 %type <boolean> copy_from opt_program
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 %type <ival>	opt_column event cursor_options opt_hold opt_set_data
 %type <objtype>	reindex_type drop_type comment_type security_label_type
@@ -513,16 +503,14 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <windef>	window_definition over_clause window_specification
 				opt_frame_clause frame_extent frame_bound
 %type <str>		opt_existing_window_name
-<<<<<<< HEAD
+
 /* PGXC_BEGIN */
 %type <str>		opt_barrier_id OptDistributeType
 %type <distby>	OptDistributeBy OptDistributeByInternal
 %type <subclus> OptSubCluster OptSubClusterInternal
 /* PGXC_END */
 
-=======
 %type <boolean> opt_if_not_exists
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 /*
  * Non-keyword token types.  These are hard-wired into the "flex" lexer.
@@ -589,38 +577,27 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 	KEY
 
-<<<<<<< HEAD
-	LABEL LANGUAGE LARGE_P LAST_P LC_COLLATE_P LC_CTYPE_P LEADING LEAKPROOF
-	LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL LOCALTIME LOCALTIMESTAMP
-	LOCATION LOCK_P
-	MAPPING MATCH MAXVALUE MINUTE_P MINVALUE MODE MONTH_P MOVE
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NODE NONE
-	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF NULLS_P NUMERIC
-=======
 	LABEL LANGUAGE LARGE_P LAST_P LATERAL_P LC_COLLATE_P LC_CTYPE_P
 	LEADING LEAKPROOF LEAST LEFT LEVEL LIKE LIMIT LISTEN LOAD LOCAL
 	LOCALTIME LOCALTIMESTAMP LOCATION LOCK_P
 
 	MAPPING MATCH MATERIALIZED MAXVALUE MINUTE_P MINVALUE MODE MONTH_P MOVE
 
-	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NONE
+ /* PGXC added NODE token */
+	NAME_P NAMES NATIONAL NATURAL NCHAR NEXT NO NODE NONE
 	NOT NOTHING NOTIFY NOTNULL NOWAIT NULL_P NULLIF
 	NULLS_P NUMERIC
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	OBJECT_P OF OFF OFFSET OIDS ON ONLY OPERATOR OPTION OPTIONS OR
 	ORDER OUT_P OUTER_P OVER OVERLAPS OVERLAY OWNED OWNER
 
 	PARSER PARTIAL PARTITION PASSING PASSWORD PLACING PLANS POSITION
-<<<<<<< HEAD
+
 /* PGXC_BEGIN */
 	PRECEDING PRECISION PREFERRED PRESERVE PREPARE PREPARED PRIMARY
 /* PGXC_END */
-	PRIOR PRIVILEGES PROCEDURAL PROCEDURE
-=======
-	PRECEDING PRECISION PRESERVE PREPARE PREPARED PRIMARY
+
 	PRIOR PRIVILEGES PROCEDURAL PROCEDURE PROGRAM
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	QUOTE
 
@@ -800,12 +777,9 @@ stmt :
 			| CreateForeignTableStmt
 			| CreateFunctionStmt
 			| CreateGroupStmt
-<<<<<<< HEAD
 			| CreateNodeGroupStmt
 			| CreateNodeStmt
-=======
 			| CreateMatViewStmt
->>>>>>> e472b921406407794bab911c64655b8b82375196
 			| CreateOpClassStmt
 			| CreateOpFamilyStmt
 			| AlterOpFamilyStmt

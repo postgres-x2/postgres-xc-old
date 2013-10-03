@@ -391,7 +391,7 @@ AuxiliaryProcessMain(int argc, char *argv[])
 	{
 #ifdef PGXC
 		/* Initialize pooler flag before creating PGPROC structure */
-		if (auxType == PoolerProcess)
+		if (MyAuxProcType == PoolerProcess)
 				PGXCPoolerProcessIam();			
 #endif
 

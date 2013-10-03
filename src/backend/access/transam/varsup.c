@@ -3,12 +3,8 @@
  * varsup.c
  *	  postgres OID & XID variables support routines
  *
-<<<<<<< HEAD
- * Copyright (c) 2000-2012, PostgreSQL Global Development Group
- * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
-=======
  * Copyright (c) 2000-2013, PostgreSQL Global Development Group
->>>>>>> e472b921406407794bab911c64655b8b82375196
+ * Portions Copyright (c) 2010-2013 Postgres-XC Development Group
  *
  * IDENTIFICATION
  *	  src/backend/access/transam/varsup.c

@@ -27,6 +27,7 @@
 #include "pgxc/locator.h"
 #include "pgxc/nodemgr.h"
 #include "pgxc/pgxc.h"
+#include "access/htup_details.h"
 
 /*
  * How many times should we try to find a unique indetifier

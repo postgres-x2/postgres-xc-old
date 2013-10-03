@@ -1253,7 +1253,6 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 	const char *attrname;
 	TargetEntry *tle;
 
-<<<<<<< HEAD
 #ifdef PGXC
 	List *var_list = NIL;
 	ListCell *elt;
@@ -1293,11 +1292,8 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 	}
 #endif
 
-	if (target_relation->rd_rel->relkind == RELKIND_RELATION)
-=======
 	if (target_relation->rd_rel->relkind == RELKIND_RELATION ||
 		target_relation->rd_rel->relkind == RELKIND_MATVIEW)
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	{
 		/*
 		 * Emit CTID so that executor can find the row to update or delete.
@@ -2907,7 +2903,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 			rt_entry_relation->rd_rel->relkind == RELKIND_VIEW &&
 			!view_has_instead_trigger(rt_entry_relation, event))
 		{
-<<<<<<< HEAD
 #ifdef PGXC
 			List	   *product_queries = NIL;
 
@@ -2915,14 +2910,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 #else
 			List	   *product_queries;
 #endif
-			product_queries = fireRules(parsetree,
-										result_relation,
-										event,
-										locks,
-										&instead,
-										&returning,
-										&qual_product);
-=======
 			/*
 			 * This throws an error if the view can't be automatically
 			 * updated, but that's OK since the query would fail at runtime
@@ -2940,7 +2927,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 				product_queries = lcons(parsetree, product_queries);
 			else
 				product_queries = lappend(product_queries, parsetree);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 			/*
 			 * Set the "instead" flag, as if there had been an unqualified
@@ -3479,7 +3465,7 @@ QueryRewriteCTAS(Query *parsetree)
 	deparse_query(cparsetree, &cquery, NIL, false, false);
 
 	/* Finally, fire off the query to run the DDL */
-	ProcessUtility(cparsetree->utilityStmt, cquery.data, NULL, true, NULL,
+	ProcessUtility(cparsetree->utilityStmt, cquery.data, PROCESS_UTILITY_TOPLEVEL, NULL, NULL,  /* Tentative fix.  Nedd a review.  K.Suzuki */
 					false,
 					NULL);
 

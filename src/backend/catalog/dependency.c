@@ -163,15 +163,11 @@ static const Oid object_classes[MAX_OCLASS] = {
 	ForeignServerRelationId,	/* OCLASS_FOREIGN_SERVER */
 	UserMappingRelationId,		/* OCLASS_USER_MAPPING */
 	DefaultAclRelationId,		/* OCLASS_DEFACL */
-<<<<<<< HEAD
-	ExtensionRelationId			/* OCLASS_EXTENSION */
+	ExtensionRelationId,		/* OCLASS_EXTENSION */
+	EventTriggerRelationId		/* OCLASS_EVENT_TRIGGER */
 #ifdef PGXC
 	,PgxcClassRelationId		/* OCLASS_PGXCCLASS */
 #endif
-=======
-	ExtensionRelationId,		/* OCLASS_EXTENSION */
-	EventTriggerRelationId		/* OCLASS_EVENT_TRIGGER */
->>>>>>> e472b921406407794bab911c64655b8b82375196
 };
 
 
@@ -2484,16 +2480,13 @@ getObjectClass(const ObjectAddress *object)
 		case ExtensionRelationId:
 			return OCLASS_EXTENSION;
 
-<<<<<<< HEAD
+		case EventTriggerRelationId:
+			return OCLASS_EVENT_TRIGGER;
 #ifdef PGXC
 		case PgxcClassRelationId:
 			Assert(object->objectSubId == 0);
 			return OCLASS_PGXC_CLASS;
 #endif
-=======
-		case EventTriggerRelationId:
-			return OCLASS_EVENT_TRIGGER;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	}
 
 	/* shouldn't get here */

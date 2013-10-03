@@ -54,6 +54,7 @@
 #include "utils/syscache.h"
 #include "utils/fmgroids.h"
 #include "utils/tqual.h"
+#include "access/htup_details.h"
 
 /* Context for collecting range tables in a Query tree */
 typedef struct
@@ -389,7 +390,7 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 													&left_rep_tlist);
 	left_colnames = pgxc_generate_colnames("a", list_length(left_rep_tlist));
 	left_alias = makeAlias(left_aname, left_colnames);
-	left_rte = addRangeTableEntryForSubquery(NULL, left_query, left_alias, true);
+	left_rte = addRangeTableEntryForSubquery(NULL, left_query, left_alias, true, false); /* Tentative fix.   Need Ashutosh's review (K.Suzuki) */
 	rtable = lappend(rtable, left_rte);
 	left_rtr = makeNode(RangeTblRef);
 	left_rtr->rtindex = list_length(rtable);
@@ -403,7 +404,7 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	right_colnames = pgxc_generate_colnames("a", list_length(right_rep_tlist));
 	right_alias = makeAlias(right_aname, right_colnames);
 	right_rte = addRangeTableEntryForSubquery(NULL, right_query, right_alias,
-												true);
+											  true, false); /* Tentative fix.   Need Ashutosh's review (K.Suzuki) */
 	rtable = lappend(rtable, right_rte);
 	right_rtr = makeNode(RangeTblRef);
 	right_rtr->rtindex = list_length(rtable);
@@ -2210,7 +2211,7 @@ fetch_ctid_of(Plan *subtree, Query *query)
 			TargetEntry		*te2;
 
 			/* create a function expression */
-			func_expr = makeFuncExpr(funcid, rettype, NULL, InvalidOid, InvalidOid, COERCE_DONTCARE);
+			func_expr = makeFuncExpr(funcid, rettype, NULL, InvalidOid, InvalidOid, COERCION_IMPLICIT); /* Just a tentative fix.  Need Ashutosh's review. K.Suzuki */
 			/* make a target entry for function call */
 			te2 = makeTargetEntry((Expr *)func_expr, resno+2, NULL, false);
 			/* add the target entry to the query target list */

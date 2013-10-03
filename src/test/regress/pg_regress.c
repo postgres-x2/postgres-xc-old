@@ -2640,18 +2640,6 @@ help(void)
 int
 regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc)
 {
-<<<<<<< HEAD
-	_stringlist *sl;
-	int			c;
-	int			i;
-	int			option_index;
-	char		buf[MAXPGPATH * 4];
-#ifndef PGXC
-	char		buf2[MAXPGPATH * 4];
-#endif
-
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"version", no_argument, NULL, 'V'},
@@ -2685,7 +2673,9 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 	int			i;
 	int			option_index;
 	char		buf[MAXPGPATH * 4];
+#ifndef PGXC
 	char		buf2[MAXPGPATH * 4];
+#endif
 
 	progname = get_progname(argv[0]);
 	set_pglocale_pgservice(argv[0], PG_TEXTDOMAIN("pg_regress"));

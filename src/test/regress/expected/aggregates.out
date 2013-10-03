@@ -673,17 +673,6 @@ insert into minmaxtest2 values(15), (16);
 insert into minmaxtest3 values(17), (18);
 explain (costs off, nodes off)
   select min(f1), max(f1) from minmaxtest;
-<<<<<<< HEAD
-                            QUERY PLAN                            
-------------------------------------------------------------------
- Aggregate
-   ->  Append
-         ->  Data Node Scan on minmaxtest "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on minmaxtest1 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on minmaxtest2 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on minmaxtest3 "_REMOTE_TABLE_QUERY_"
-(6 rows)
-=======
                                           QUERY PLAN                                          
 ----------------------------------------------------------------------------------------------
  Result
@@ -712,7 +701,6 @@ explain (costs off, nodes off)
                  ->  Index Only Scan Backward using minmaxtest3i on minmaxtest3 minmaxtest3_1
                        Index Cond: (f1 IS NOT NULL)
 (25 rows)
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 select min(f1), max(f1) from minmaxtest;
  min | max 

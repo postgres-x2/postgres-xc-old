@@ -574,9 +574,9 @@ DefineIndex(IndexStmt *stmt,
 
 		/* Finalize check */
 		if (!pgxc_check_index_shippability(GetRelationLocInfo(relationId),
-										   primary,
-										   unique,
-										   exclusionOpNames != NULL,
+										   stmt->primary,
+										   stmt->unique,
+										   stmt->excludeOpNames != NULL,
 										   indexAttrs,
 										   indexInfo->ii_Expressions))
 			ereport(ERROR,

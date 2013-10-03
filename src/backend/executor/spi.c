@@ -49,18 +49,13 @@ static int	_SPI_curid = -1;
 static Portal SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 						 ParamListInfo paramLI, bool read_only);
 
-<<<<<<< HEAD
-static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan,
-				  ParamListInfo boundParams);
-#ifdef PGXC
-static void _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
-                  SPIPlanPtr plan, ParamListInfo boundParams);
-#endif
-=======
 static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan);
 
 static void _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan);
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+static void _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
+								   SPIPlanPtr plan);
+#endif
 
 static int _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				  Snapshot snapshot, Snapshot crosscheck_snapshot,
@@ -384,7 +379,7 @@ SPI_execute_direct(const char *remote_sql, char *nodename)
 	plan.cursor_options = 0;
 
 	/* Now pass the ExecDirectStmt parsetree node */
-	_SPI_pgxc_prepare_plan(execdirect.data, list_make1(stmt), &plan, NULL);
+	_SPI_pgxc_prepare_plan(execdirect.data, list_make1(stmt), &plan);
 
 	res = _SPI_execute_plan(&plan, NULL,
 							InvalidSnapshot, InvalidSnapshot, false, true, 0);
@@ -1790,7 +1785,7 @@ static void
 _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 {
 #ifdef PGXC
-	_SPI_pgxc_prepare_plan(src, NULL, plan, boundParams);
+	_SPI_pgxc_prepare_plan(src, NULL, plan);
 }
 
 /*
@@ -1800,7 +1795,7 @@ _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
  * transparent to the user.
  */
 static void
-_SPI_pgxc_prepare_plan(const char *src, List *src_parsetree, SPIPlanPtr plan, ParamListInfo boundParams)
+_SPI_pgxc_prepare_plan(const char *src, List *src_parsetree, SPIPlanPtr plan)
 {
 #endif
 	List	   *raw_parsetree_list;

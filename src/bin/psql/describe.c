@@ -2322,9 +2322,6 @@ describeOneTableDetails(const char *schemaname,
 				const char *dist_by = _("Distribute By");
 				const char *loc_nodes = _("Location Nodes");
 
-				/* Only one tuple should be returned */
-				psql_assert(tuples == 1);
-
 				/* Print distribution method */
 				printfPQExpBuffer(&buf, "%s: %s", dist_by,
 									PQgetvalue(result, 0, 0));

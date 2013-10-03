@@ -128,13 +128,10 @@
 #include "utils/datetime.h"
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
-<<<<<<< HEAD
+#include "utils/timeout.h"
 #ifdef PGXC
 #include "utils/resowner.h"
 #endif
-=======
-#include "utils/timeout.h"
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 #ifdef EXEC_BACKEND
 #include "storage/spin.h"
@@ -1334,8 +1331,16 @@ PostmasterMain(int argc, char *argv[])
 	Assert(StartupPID != 0);
 	pmState = PM_STARTUP;
 
-<<<<<<< HEAD
 #ifdef PGXC /* PGXC_COORD */
+	/*
+	 * K.Suzuki memo, Sep.2nd, 2013.
+	 * PG 9.3 added a call to StartOneBackgroundWorker().  THis should be
+	 * called after XC checks if it is coordinator.
+	 * Although pooler is a kind of background worker, so far it is 
+	 * handled separately.
+	 *
+	 * We may need to clean this up later.
+	 */
 	if (IS_PGXC_COORDINATOR)
 	{
 		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
@@ -1348,10 +1353,8 @@ PostmasterMain(int argc, char *argv[])
 		MemoryContextSwitchTo(oldcontext);
 	}
 #endif
-=======
 	/* Some workers may be scheduled to start now */
 	StartOneBackgroundWorker();
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	status = ServerLoop();
 
@@ -2911,11 +2914,16 @@ reaper(SIGNAL_ARGS)
 			continue;
 		}
 
-<<<<<<< HEAD
 #ifdef PGXC /* PGXC_COORD */
 		/*
 		 * Was it the pool manager?  TODO decide how to handle
 		 * Probably we should restart the system
+		 */
+		/*
+		 * K.Suzuki memo, Sep.2nd, 2013
+		 *
+		 * As the start-up, we handle pooler separately here too.
+		 * We may need this cleanup later.
 		 */
 		if (IS_PGXC_COORDINATOR && pid == PgPoolerPID)
 		{
@@ -2926,7 +2934,6 @@ reaper(SIGNAL_ARGS)
 			continue;
 		}
 #endif
-=======
 		/* Was it one of our background workers? */
 		if (CleanupBackgroundWorker(pid, exitstatus))
 		{
@@ -2934,7 +2941,6 @@ reaper(SIGNAL_ARGS)
 			HaveCrashedWorker = true;
 			continue;
 		}
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 		/*
 		 * Else do standard backend child cleanup.

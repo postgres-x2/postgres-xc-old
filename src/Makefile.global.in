@@ -244,27 +244,15 @@ LD = @LD@
 with_gnu_ld = @with_gnu_ld@
 ld_R_works = @ld_R_works@
 
-<<<<<<< HEAD
-# We want -L for libpgport.a to be first in LDFLAGS.  We also need LDFLAGS
-# to be a "recursively expanded" variable, else adjustments to rpathdir
-# don't work right.  So we must NOT do LDFLAGS := something, meaning this has
-# to be done first and elsewhere we must only do LDFLAGS += something.
-# PGXC_BEGIN
-=======
 # We want -L for libpgport.a and libpgcommon.a to be first in LDFLAGS.  We
 # also need LDFLAGS to be a "recursively expanded" variable, else adjustments
 # to rpathdir don't work right.  So we must NOT do LDFLAGS := something,
 # meaning this has to be done first and elsewhere we must only do LDFLAGS +=
 # something.
->>>>>>> e472b921406407794bab911c64655b8b82375196
 ifdef PGXS
   LDFLAGS = -L$(libdir) -lpthread
 else
-<<<<<<< HEAD
-  LDFLAGS = -L$(top_builddir)/src/port -lpthread
-=======
   LDFLAGS = -L$(top_builddir)/src/port -L$(top_builddir)/src/common
->>>>>>> e472b921406407794bab911c64655b8b82375196
 endif
 # PGXC_END
 LDFLAGS += @LDFLAGS@

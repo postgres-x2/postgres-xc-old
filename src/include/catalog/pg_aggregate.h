@@ -452,7 +452,12 @@ DATA(insert ( 3545	bytea_string_agg_transfn	-	bytea_string_agg_finalfn		0	2281	_
 #endif
 
 /* json */
-DATA(insert ( 3175	json_agg_transfn	json_agg_finalfn		0	2281	_null_ ));
+#ifdef PGXC
+DATA(insert ( 3175	json_agg_transfn	-	json_agg_finalfn		0	2281	_null_ _null_ ));
+#endif
+#ifdef PGXC
+//DATA(insert ( 3175	json_agg_transfn	json_agg_finalfn		0	2281	_null_ ));
+#endif
 
 /*
  * prototypes for functions in pg_aggregate.c

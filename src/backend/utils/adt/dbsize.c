@@ -22,16 +22,13 @@
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/tablespace.h"
-<<<<<<< HEAD
-#include "executor/spi.h"
-=======
 #include "common/relpath.h"
->>>>>>> e472b921406407794bab911c64655b8b82375196
 #include "miscadmin.h"
 #ifdef PGXC
 #include "pgxc/nodemgr.h"
 #include "pgxc/pgxc.h"
 #include "pgxc/pgxcnode.h"
+#include "executor/spi.h"
 #endif
 #include "storage/fd.h"
 #include "utils/acl.h"
@@ -972,7 +969,7 @@ pgxc_database_size(Oid dbOid)
 
 /*
  * pgxc_execute_on_nodes
- * Execute 'query' on all the nodes in 'nodelist', and returns int64 datum
+ * Execute 'query' on all the nodes in 'nodelist', and returns int64 datumpgxc
  * which has the sum of all the results. If multiples nodes are involved, it
  * assumes that the query returns exactly one row with one attribute of type
  * int64. If there is a single node, it just returns the datum as-is without

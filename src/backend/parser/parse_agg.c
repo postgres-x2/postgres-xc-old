@@ -30,6 +30,9 @@
 #include "catalog/pg_aggregate.h"
 #include "utils/syscache.h"
 #endif
+/* Added to resolve conflicts. K.Suzuki */
+#include "access/htup_details.h"
+/* End of addition */
 
 
 typedef struct
@@ -90,15 +93,12 @@ transformAggregateCall(ParseState *pstate, Aggref *agg,
 	int			save_next_resno;
 	int			min_varlevel;
 	ListCell   *lc;
-<<<<<<< HEAD
+	const char *err;
+	bool		errkind;
 #ifdef PGXC
 	HeapTuple	aggTuple;
 	Form_pg_aggregate aggform;
 #endif /* PGXC */
-=======
-	const char *err;
-	bool		errkind;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	/*
 	 * Transform the plain list of Exprs into a targetlist.  We don't bother
@@ -180,6 +180,29 @@ transformAggregateCall(ParseState *pstate, Aggref *agg,
 	while (min_varlevel-- > 0)
 		pstate = pstate->parentParseState;
 	pstate->p_hasAggs = true;
+
+#ifdef PGXC
+	/*
+	 * Return data type of PGXC Datanode's aggregate should always return the
+	 * result of transition function, that is expected by collection function
+	 * on the Coordinator.
+	 * Look up the aggregate definition and replace agg->aggtype
+	 */
+
+	aggTuple = SearchSysCache(AGGFNOID,
+					  ObjectIdGetDatum(agg->aggfnoid),
+					  0, 0, 0);
+	if (!HeapTupleIsValid(aggTuple))
+		elog(ERROR, "cache lookup failed for aggregate %u",
+			 agg->aggfnoid);
+	aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
+	agg->aggtrantype = aggform->aggtranstype;
+	agg->agghas_collectfn = OidIsValid(aggform->aggcollectfn);
+	if (IS_PGXC_DATANODE)
+		agg->aggtype = agg->aggtrantype;
+
+	ReleaseSysCache(aggTuple);
+#endif
 
 	/*
 	 * Check to see if the aggregate function is in an invalid place within
@@ -365,34 +388,6 @@ check_agg_arguments(ParseState *pstate, List *args)
 	return agglevel;
 }
 
-<<<<<<< HEAD
-	/* Mark the correct pstate as having aggregates */
-	while (min_varlevel-- > 0)
-		pstate = pstate->parentParseState;
-	pstate->p_hasAggs = true;
-#ifdef PGXC
-	/*
-	 * Return data type of PGXC Datanode's aggregate should always return the
-	 * result of transition function, that is expected by collection function
-	 * on the Coordinator.
-	 * Look up the aggregate definition and replace agg->aggtype
-	 */
-
-	aggTuple = SearchSysCache(AGGFNOID,
-					  ObjectIdGetDatum(agg->aggfnoid),
-					  0, 0, 0);
-	if (!HeapTupleIsValid(aggTuple))
-		elog(ERROR, "cache lookup failed for aggregate %u",
-			 agg->aggfnoid);
-	aggform = (Form_pg_aggregate) GETSTRUCT(aggTuple);
-	agg->aggtrantype = aggform->aggtranstype;
-	agg->agghas_collectfn = OidIsValid(aggform->aggcollectfn);
-	if (IS_PGXC_DATANODE)
-		agg->aggtype = agg->aggtrantype;
-
-	ReleaseSysCache(aggTuple);
-#endif
-=======
 static bool
 check_agg_arguments_walker(Node *node,
 						   check_agg_arguments_context *context)
@@ -453,7 +448,6 @@ check_agg_arguments_walker(Node *node,
 	return expression_tree_walker(node,
 								  check_agg_arguments_walker,
 								  (void *) context);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 /*

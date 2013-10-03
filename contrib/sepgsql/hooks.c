@@ -365,29 +365,21 @@ sepgsql_utility_command(Node *parsetree,
 		}
 
 		if (next_ProcessUtility_hook)
-<<<<<<< HEAD
-			(*next_ProcessUtility_hook) (parsetree, queryString, params,
-										 isTopLevel, dest,
+			(*next_ProcessUtility_hook) (parsetree, queryString,
+										 context, params,
+										 dest,
 #ifdef PGXC
 										 sentToRemote,
 #endif
 										 completionTag);
 		else
-			standard_ProcessUtility(parsetree, queryString, params,
-									isTopLevel, dest,
+			standard_ProcessUtility(parsetree, queryString,
+									context, params,
+									dest,
 #ifdef PGXC
 									sentToRemote,
 #endif
 									completionTag);
-=======
-			(*next_ProcessUtility_hook) (parsetree, queryString,
-										 context, params,
-										 dest, completionTag);
-		else
-			standard_ProcessUtility(parsetree, queryString,
-									context, params,
-									dest, completionTag);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	}
 	PG_CATCH();
 	{

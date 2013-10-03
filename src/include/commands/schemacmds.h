@@ -17,15 +17,11 @@
 
 #include "nodes/parsenodes.h"
 
-<<<<<<< HEAD
 #ifdef PGXC
-extern void CreateSchemaCommand(CreateSchemaStmt *parsetree,
+extern Oid CreateSchemaCommand(CreateSchemaStmt *parsetree,
 					const char *queryString, bool is_top_level);
 #else
-extern void CreateSchemaCommand(CreateSchemaStmt *parsetree,
-=======
 extern Oid CreateSchemaCommand(CreateSchemaStmt *parsetree,
->>>>>>> e472b921406407794bab911c64655b8b82375196
 					const char *queryString);
 #endif
 extern void RemoveSchemaById(Oid schemaOid);

@@ -818,8 +818,6 @@ vac_update_datfrozenxid(void)
 	 * this action will update that too.
 	 */
 	if (dirty || ForceTransactionIdLimitUpdate())
-<<<<<<< HEAD
-	{
 		/*
 		 * vac_truncate_clog needs a transaction id to detect wrap-arounds. For
 		 * a autovacuum, this would require the Datanode to contact the GTM or
@@ -832,11 +830,7 @@ vac_update_datfrozenxid(void)
 		 * modifying the wrap-around check logic such that it does not need a
 		 * GXID
 		 */
-		vac_truncate_clog(newFrozenXid);
-	}
-=======
 		vac_truncate_clog(newFrozenXid, newFrozenMulti);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 
@@ -928,14 +922,10 @@ vac_truncate_clog(TransactionId frozenXID, MultiXactId frozenMulti)
 #endif
 	}
 
-<<<<<<< HEAD
 #ifdef PGXC
 	if (!frozenAlreadyWrapped)
 #endif
-	/* Truncate CLOG to the oldest frozenxid */
-=======
 	/* Truncate CLOG and Multi to the oldest computed value */
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	TruncateCLOG(frozenXID);
 	TruncateMultiXact(frozenMulti);
 

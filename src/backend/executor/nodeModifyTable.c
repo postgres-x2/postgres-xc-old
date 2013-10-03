@@ -368,17 +368,11 @@ ExecDelete(ItemPointer tupleid,
 	ResultRelInfo *resultRelInfo;
 	Relation	resultRelationDesc;
 	HTSU_Result result;
-<<<<<<< HEAD
-	ItemPointerData update_ctid;
-	TransactionId update_xmax;
-#ifdef PGXC
-	RemoteQueryState  *resultRemoteRel = NULL;
-	TupleTableSlot *slot = NULL;
-#endif
-=======
 	HeapUpdateFailureData hufd;
 	TupleTableSlot *slot = NULL;
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+	RemoteQueryState  *resultRemoteRel = NULL;
+#endif
 
 	/*
 	 * get information on the (current) result relation
@@ -599,18 +593,8 @@ ldelete:;
 
 		if (resultRelInfo->ri_FdwRoutine)
 		{
-<<<<<<< HEAD
-			deltuple.t_data = oldtuple;
-			deltuple.t_len = HeapTupleHeaderGetDatumLength(oldtuple);
-			ItemPointerSetInvalid(&(deltuple.t_self));
-			deltuple.t_tableOid = InvalidOid;
-#ifdef PGXC
-			deltuple.t_xc_node_id = 0;
-#endif
-=======
 			/* FDW must have provided a slot containing the deleted row */
 			Assert(!TupIsNull(slot));
->>>>>>> e472b921406407794bab911c64655b8b82375196
 			delbuffer = InvalidBuffer;
 		}
 		else
@@ -1345,18 +1329,6 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		estate->es_result_relation_info = resultRelInfo;
 		mtstate->mt_plans[i] = ExecInitNode(subplan, estate, eflags);
 
-<<<<<<< HEAD
-#ifdef PGXC
-		if (remoteplan)
-		{
-			/* 
-			 * Init the plan for the remote execution for this result rel. This is
-			 * used to execute data modification queries on the remote nodes
-			 */
-			mtstate->mt_remoterels[i] = ExecInitNode(remoteplan, estate, eflags);
-		}
-#endif		
-=======
 		/* Also let FDWs init themselves for foreign-table result rels */
 		if (resultRelInfo->ri_FdwRoutine != NULL &&
 			resultRelInfo->ri_FdwRoutine->BeginForeignModify != NULL)
@@ -1369,7 +1341,16 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 															 i,
 															 eflags);
 		}
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+		if (remoteplan)
+		{
+			/* 
+			 * Init the plan for the remote execution for this result rel. This is
+			 * used to execute data modification queries on the remote nodes
+			 */
+			mtstate->mt_remoterels[i] = ExecInitNode(remoteplan, estate, eflags);
+		}
+#endif		
 
 		resultRelInfo++;
 		i++;

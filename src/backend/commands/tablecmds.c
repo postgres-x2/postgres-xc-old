@@ -10724,17 +10724,17 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 	}
 
 	heap_close(classRel, RowExclusiveLock);
-<<<<<<< HEAD
 
 #ifdef PGXC
 	/* Rename also sequence on GTM for a sequence */
 	if (IS_PGXC_COORDINATOR &&
 		!IsConnFromCoord() &&
 		rel->rd_rel->relkind == RELKIND_SEQUENCE &&
-		!IsTempSequence(relid))
+		!IsTempSequence(RelationGetRelid(rel)))
 	{
 		char *seqname = GetGlobalSeqName(rel, NULL, NULL);
-		char *newseqname = GetGlobalSeqName(rel, NULL, stmt->newschema);
+		char *newseqname = GetGlobalSeqName(rel, NULL, 
+											get_namespace_name(nspOid));
 
 		/* We also need to rename it on the GTM */
 		if (RenameSequenceGTM(seqname, newseqname) < 0)
@@ -10750,10 +10750,6 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 	}
 #endif
 
-	/* close rel, but keep lock until commit */
-	relation_close(rel, NoLock);
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 /*
@@ -10942,7 +10938,8 @@ AlterSeqNamespaces(Relation classRel, Relation rel,
 			!IsTempSequence(RelationGetRelid(seqRel)))
 		{
 			char *seqname = GetGlobalSeqName(seqRel, NULL, NULL);
-			char *newseqname = GetGlobalSeqName(seqRel, NULL, newNspName);
+			char *newseqname = GetGlobalSeqName(seqRel, NULL,
+												 get_namespace_name(newNspOid));
 
 			/* We also need to rename it on the GTM */
 			if (RenameSequenceGTM(seqname, newseqname) < 0)

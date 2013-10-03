@@ -19,6 +19,9 @@
 #include "catalog/pg_tablespace.h"
 #include "common/relpath.h"
 #include "storage/backendid.h"
+#ifdef PGXC
+#include "pgxc/pgxc.h"
+#endif
 
 #define FORKNAMECHARS	4		/* max chars for a fork name */
 
@@ -127,8 +130,25 @@ relpathbackend(RelFileNode rnode, BackendId backend, ForkNumber forknum)
 		{
 			pathlen = 9 + 1 + OIDCHARS + 1
 				+ strlen(TABLESPACE_VERSION_DIRECTORY) + 1 + OIDCHARS + 1
+#ifdef PGXC
+				/* Postgres-XC tablespaces include node name */
+				+ strlen(PGXCNodeName) + 1
+#endif
 				+ OIDCHARS + 1 + FORKNAMECHARS + 1;
 			path = (char *) palloc(pathlen);
+#ifdef PGXC
+			if (forknum != MAIN_FORKNUM)
+				snprintf(path, pathlen, "pg_tblspc/%u/%s_%s/%u/%u_%s",
+						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
+						 PGXCNodeName,
+						 rnode.dbNode, rnode.relNode,
+						 forkNames[forknum]);
+			else
+				snprintf(path, pathlen, "pg_tblspc/%u/%s_%s/%u/%u",
+						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
+						 PGXCNodeName,
+						 rnode.dbNode, rnode.relNode);
+#else
 			if (forknum != MAIN_FORKNUM)
 				snprintf(path, pathlen, "pg_tblspc/%u/%s/%u/%u_%s",
 						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
@@ -138,14 +158,31 @@ relpathbackend(RelFileNode rnode, BackendId backend, ForkNumber forknum)
 				snprintf(path, pathlen, "pg_tblspc/%u/%s/%u/%u",
 						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
 						 rnode.dbNode, rnode.relNode);
+#endif
 		}
 		else
 		{
 			/* OIDCHARS will suffice for an integer, too */
 			pathlen = 9 + 1 + OIDCHARS + 1
 				+ strlen(TABLESPACE_VERSION_DIRECTORY) + 1 + OIDCHARS + 2
+#ifdef PGXC
+				+ strlen(PGXCNodeName) + 1
+#endif
 				+ OIDCHARS + 1 + OIDCHARS + 1 + FORKNAMECHARS + 1;
 			path = (char *) palloc(pathlen);
+#ifdef PGXC
+			if (forknum != MAIN_FORKNUM)
+				snprintf(path, pathlen, "pg_tblspc/%u/%s_%s/%u/t%d_%u_%s",
+						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
+						 PGXCNodeName,
+						 rnode.dbNode, backend, rnode.relNode,
+						 forkNames[forknum]);
+			else
+				snprintf(path, pathlen, "pg_tblspc/%u/%s_%s/%u/t%d_%u",
+						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
+						 PGXCNodeName,
+						 rnode.dbNode, backend, rnode.relNode);
+#else
 			if (forknum != MAIN_FORKNUM)
 				snprintf(path, pathlen, "pg_tblspc/%u/%s/%u/t%d_%u_%s",
 						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
@@ -155,6 +192,7 @@ relpathbackend(RelFileNode rnode, BackendId backend, ForkNumber forknum)
 				snprintf(path, pathlen, "pg_tblspc/%u/%s/%u/t%d_%u",
 						 rnode.spcNode, TABLESPACE_VERSION_DIRECTORY,
 						 rnode.dbNode, backend, rnode.relNode);
+#endif
 		}
 	}
 	return path;

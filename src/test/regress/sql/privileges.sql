@@ -159,10 +159,7 @@ SET SESSION AUTHORIZATION regressuser4;
 
 SELECT * FROM atestv1; -- ok
 SELECT * FROM atestv2; -- fail
-<<<<<<< HEAD
 SELECT * FROM atestv3; -- fail due to issue 3520503, see above
-=======
-SELECT * FROM atestv3; -- ok
 SELECT * FROM atestv0; -- fail
 
 -- Appendrels excluded by constraints failed to check permissions in 8.4-9.2.
@@ -179,7 +176,6 @@ select * from
    (select b.q2 as x, random() from int8_tbl b where q2 > 0)) ss
 where x < 0;
 reset constraint_exclusion;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 CREATE VIEW atestv4 AS SELECT * FROM atestv3; -- nested view
 SELECT * FROM atestv4; -- fail due to issue 3520503, see above

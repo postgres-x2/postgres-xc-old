@@ -38,12 +38,8 @@
  *
  * This code is released under the terms of the PostgreSQL License.
  *
-<<<<<<< HEAD
- * Portions Copyright (c) 1996-2012, PostgreSQL Global Development Group
- * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
-=======
  * Portions Copyright (c) 1996-2013, PostgreSQL Global Development Group
->>>>>>> e472b921406407794bab911c64655b8b82375196
+ * Portions Copyright (c) 2010-2013 Postgres-XC Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/bin/initdb/initdb.c
@@ -2910,38 +2906,6 @@ get_restricted_token(void)
 	 * Before we execute another program, make sure that we are running with a
 	 * restricted token. If not, re-execute ourselves with one.
 	 */
-<<<<<<< HEAD
-	static struct option long_options[] = {
-		{"pgdata", required_argument, NULL, 'D'},
-		{"encoding", required_argument, NULL, 'E'},
-		{"locale", required_argument, NULL, 1},
-		{"lc-collate", required_argument, NULL, 2},
-		{"lc-ctype", required_argument, NULL, 3},
-		{"lc-monetary", required_argument, NULL, 4},
-		{"lc-numeric", required_argument, NULL, 5},
-		{"lc-time", required_argument, NULL, 6},
-		{"lc-messages", required_argument, NULL, 7},
-		{"no-locale", no_argument, NULL, 8},
-		{"text-search-config", required_argument, NULL, 'T'},
-		{"auth", required_argument, NULL, 'A'},
-		{"auth-local", required_argument, NULL, 10},
-		{"auth-host", required_argument, NULL, 11},
-		{"pwprompt", no_argument, NULL, 'W'},
-		{"pwfile", required_argument, NULL, 9},
-		{"username", required_argument, NULL, 'U'},
-		{"help", no_argument, NULL, '?'},
-		{"version", no_argument, NULL, 'V'},
-		{"debug", no_argument, NULL, 'd'},
-		{"show", no_argument, NULL, 's'},
-		{"noclean", no_argument, NULL, 'n'},
-		{"xlogdir", required_argument, NULL, 'X'},
-#ifdef PGXC
-		{"nodename", required_argument, NULL, 12},
-#endif
-		{NULL, 0, NULL, 0}
-	};
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	if ((restrict_env = getenv("PG_RESTRICT_EXEC")) == NULL
 		|| strcmp(restrict_env, "1") != 0)
@@ -3007,164 +2971,7 @@ setup_pgdata(void)
 		}
 	}
 
-<<<<<<< HEAD
-				/*
-				 * When ident is specified, use peer for local connections.
-				 * Mirrored, when peer is specified, use ident for TCP/IP
-				 * connections.
-				 */
-				if (strcmp(authmethodhost, "ident") == 0)
-					authmethodlocal = "peer";
-				else if (strcmp(authmethodlocal, "peer") == 0)
-					authmethodhost = "ident";
-				break;
-			case 10:
-				authmethodlocal = xstrdup(optarg);
-				break;
-			case 11:
-				authmethodhost = xstrdup(optarg);
-				break;
-			case 'D':
-				pg_data = xstrdup(optarg);
-				break;
-			case 'E':
-				encoding = xstrdup(optarg);
-				break;
-			case 'W':
-				pwprompt = true;
-				break;
-			case 'U':
-				username = xstrdup(optarg);
-				break;
-			case 'd':
-				debug = true;
-				printf(_("Running in debug mode.\n"));
-				break;
-			case 'n':
-				noclean = true;
-				printf(_("Running in noclean mode.  Mistakes will not be cleaned up.\n"));
-				break;
-			case 'L':
-				share_path = xstrdup(optarg);
-				break;
-			case 1:
-				locale = xstrdup(optarg);
-				break;
-			case 2:
-				lc_collate = xstrdup(optarg);
-				break;
-			case 3:
-				lc_ctype = xstrdup(optarg);
-				break;
-			case 4:
-				lc_monetary = xstrdup(optarg);
-				break;
-			case 5:
-				lc_numeric = xstrdup(optarg);
-				break;
-			case 6:
-				lc_time = xstrdup(optarg);
-				break;
-			case 7:
-				lc_messages = xstrdup(optarg);
-				break;
-			case 8:
-				locale = "C";
-				break;
-			case 9:
-				pwfilename = xstrdup(optarg);
-				break;
-			case 's':
-				show_setting = true;
-				break;
-			case 'T':
-				default_text_search_config = xstrdup(optarg);
-				break;
-			case 'X':
-				xlog_dir = xstrdup(optarg);
-				break;
-#ifdef PGXC
-			case 12:
-				nodename = xstrdup(optarg);
-				break;
-#endif
-			default:
-				/* getopt_long already emitted a complaint */
-				fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
-						progname);
-				exit(1);
-		}
-	}
-
-
-	/*
-	 * Non-option argument specifies data directory as long as it wasn't
-	 * already specified with -D / --pgdata
-	 */
-	if (optind < argc && strlen(pg_data) == 0)
-	{
-		pg_data = xstrdup(argv[optind]);
-		optind++;
-	}
-
-	if (optind < argc)
-	{
-		fprintf(stderr, _("%s: too many command-line arguments (first is \"%s\")\n"),
-				progname, argv[optind]);
-		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
-				progname);
-		exit(1);
-	}
-
-	if (pwprompt && pwfilename)
-	{
-		fprintf(stderr, _("%s: password prompt and password file cannot be specified together\n"), progname);
-		exit(1);
-	}
-
-#ifdef PGXC
-	if (!nodename)
-	{
-		fprintf(stderr, _("%s: Postgres-XC node name is mandatory\n"), progname);
-		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
-				progname);
-		exit(1);
-	}
-#endif
-
-	check_authmethod_unspecified(&authmethodlocal);
-	check_authmethod_unspecified(&authmethodhost);
-
-	check_authmethod_valid(authmethodlocal, auth_methods_local, "local");
-	check_authmethod_valid(authmethodhost, auth_methods_host, "host");
-
-	check_need_password(authmethodlocal);
-	check_need_password(authmethodhost);
-
-	if (strlen(pg_data) == 0)
-	{
-		pgdenv = getenv("PGDATA");
-		if (pgdenv && strlen(pgdenv))
-		{
-			/* PGDATA found */
-			pg_data = xstrdup(pgdenv);
-		}
-		else
-		{
-			fprintf(stderr,
-					_("%s: no data directory specified\n"
-					  "You must identify the directory where the data for this database system\n"
-					  "will reside.  Do this with either the invocation option -D or the\n"
-					  "environment variable PGDATA.\n"),
-					progname);
-			exit(1);
-		}
-	}
-
-	pg_data_native = pg_data;
-=======
 	pgdata_native = pg_strdup(pg_data);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	canonicalize_path(pg_data);
 
 	/*
@@ -3712,6 +3519,9 @@ main(int argc, char *argv[])
 		{"sync-only", no_argument, NULL, 'S'},
 		{"xlogdir", required_argument, NULL, 'X'},
 		{"data-checksums", no_argument, NULL, 'k'},
+#ifdef PGXC
+		{"nodename", required_argument, NULL, 12},
+#endif
 		{NULL, 0, NULL, 0}
 	};
 
@@ -3834,6 +3644,11 @@ main(int argc, char *argv[])
 			case 'X':
 				xlog_dir = pg_strdup(optarg);
 				break;
+#ifdef PGXC
+			case 12:
+				nodename = pg_strdup(optarg);
+				break;
+#endif
 			default:
 				/* getopt_long already emitted a complaint */
 				fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
@@ -3875,6 +3690,16 @@ main(int argc, char *argv[])
 		fprintf(stderr, _("%s: password prompt and password file cannot be specified together\n"), progname);
 		exit(1);
 	}
+
+#ifdef PGXC
+	if (!nodename)
+	{
+		fprintf(stderr, _("%s: Postgres-XC node name is mandatory\n"), progname);
+		fprintf(stderr, _("Try \"%s --help\" for more information.\n"),
+				progname);
+		exit(1);
+	}
+#endif
 
 	check_authmethod_unspecified(&authmethodlocal);
 	check_authmethod_unspecified(&authmethodhost);
@@ -3945,27 +3770,23 @@ main(int argc, char *argv[])
 			 "or \n"
 			 "    %s%s%spg_ctl%s start -D %s%s%s -Z datanode -l logfile\n\n"),
 	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-		   QUOTE_PATH, pg_data_native, QUOTE_PATH,
-	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-		   QUOTE_PATH, pg_data_native, QUOTE_PATH,
+		   QUOTE_PATH, pgdata_native, QUOTE_PATH,
 	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
 		   QUOTE_PATH, pgdata_native, QUOTE_PATH,
 	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-<<<<<<< HEAD
-		   QUOTE_PATH, pg_data_native, QUOTE_PATH);
+		   QUOTE_PATH, pgdata_native, QUOTE_PATH,
+	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
+		   QUOTE_PATH, pgdata_native, QUOTE_PATH);
 #else
 	printf(_("\nSuccess. You can now start the database server of datanode using:\n\n"
              "    %s%s%spostgres%s -D %s%s%s\n"
              "or\n"
              "    %s%s%spg_ctl%s -D %s%s%s -l logfile start\n\n"),
 	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-		   QUOTE_PATH, pg_data_native, QUOTE_PATH,
+		   QUOTE_PATH, pgdata_native, QUOTE_PATH,
 	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-		   QUOTE_PATH, pg_data_native, QUOTE_PATH);
-#endif
-=======
 		   QUOTE_PATH, pgdata_native, QUOTE_PATH);
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#endif
 
 	return 0;
 }

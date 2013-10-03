@@ -39,24 +39,12 @@ LOCALOBJS += utils/probes.o
 endif
 endif
 
-<<<<<<< HEAD
-OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
-	$(top_builddir)/src/interfaces/libpq/fe-connect.o \
-	$(top_builddir)/src/interfaces/libpq/fe-secure.o \
-	$(top_builddir)/src/interfaces/libpq/fe-misc.o \
-	$(top_builddir)/src/interfaces/libpq/fe-protocol3.o \
-	$(top_builddir)/src/interfaces/libpq/fe-protocol2.o \
-	$(top_builddir)/src/interfaces/libpq/fe-exec.o \
-	$(top_builddir)/src/interfaces/libpq/fe-auth.o \
-	$(top_builddir)/src/interfaces/libpq/pqexpbuffer.o \
-	$(top_builddir)/src/port/libpgport_srv.a \
-	$(top_builddir)/src/gtm/client/libgtmclient.a \
-	$(top_builddir)/src/gtm/common/libgtmcommon.a \
-	$(top_builddir)/src/interfaces/libpq/libpq.a
-=======
 OBJS = $(SUBDIROBJS) $(LOCALOBJS) $(top_builddir)/src/port/libpgport_srv.a \
-       $(top_builddir)/src/common/libpgcommon_srv.a
->>>>>>> e472b921406407794bab911c64655b8b82375196
+	   $(top_builddir)/src/common/libpgcommon_srv.a \
+	   $(top_builddir)/src/gtm/client/libgtmclient.a \
+       $(top_builddir)/src/gtm/common/libgtmcommon.a \
+       $(top_builddir)/src/interfaces/libpq/libpq.a
+
 
 # We put libpgport and libpgcommon into OBJS, so remove it from LIBS; also add
 # libldap

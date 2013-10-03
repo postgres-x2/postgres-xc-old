@@ -4728,7 +4728,6 @@ DESCR("SP-GiST support for radix tree over text");
 DATA(insert OID = 4030 (  spg_text_inner_consistent PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 2278 "2281 2281" _null_ _null_ _null_ _null_  spg_text_inner_consistent _null_ _null_ _null_ ));
 DESCR("SP-GiST support for radix tree over text");
 DATA(insert OID = 4031 (  spg_text_leaf_consistent	PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 16 "2281 2281" _null_ _null_ _null_ _null_  spg_text_leaf_consistent _null_ _null_ _null_ ));
-<<<<<<< HEAD
 DESCR("SP-GiST support for suffix tree over text");
 
 #ifdef PGXC
@@ -4743,9 +4742,6 @@ DESCR("is given GXID committed or aborted?");
 DATA(insert OID = 3204 ( pgxc_lock_for_backup	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 16 "" _null_ _null_ _null_ _null_ pgxc_lock_for_backup _null_ _null_ _null_ ));
 DESCR("lock the cluster for taking backup");
 #endif
-
-=======
-DESCR("SP-GiST support for radix tree over text");
 
 DATA(insert OID = 3469 (  spg_range_quad_config PGNSP PGUID 12 1 0 0 0 f f f f t f i 2 0 2278 "2281 2281" _null_ _null_ _null_ _null_  spg_range_quad_config _null_ _null_ _null_ ));
 DESCR("SP-GiST support for quad tree over range");
@@ -4762,7 +4758,6 @@ DESCR("SP-GiST support for quad tree over range");
 /* event triggers */
 DATA(insert OID = 3566 (  pg_event_trigger_dropped_objects		PGNSP PGUID 12 10 100 0 0 f f f f t t s 0 0 2249 "" "{26,26,23,25,25,25,25}" "{o,o,o,o,o,o,o}" "{classid, objid, objsubid, object_type, schema_name, object_name, object_identity}" _null_ pg_event_trigger_dropped_objects _null_ _null_ _null_ ));
 DESCR("list objects dropped by the current command");
->>>>>>> e472b921406407794bab911c64655b8b82375196
 /*
  * Symbolic values for provolatile column: these indicate whether the result
  * of a function is dependent *only* on the values of its explicit arguments,

@@ -13,12 +13,8 @@ top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
 OBJS = clog.o transam.o varsup.o xact.o rmgr.o slru.o subtrans.o multixact.o \
-<<<<<<< HEAD
-	twophase.o twophase_rmgr.o xlog.o xlogfuncs.o xlogutils.o gtm.o
-=======
 	timeline.o twophase.o twophase_rmgr.o xlog.o xlogarchive.o xlogfuncs.o \
-	xlogreader.o xlogutils.o
->>>>>>> e472b921406407794bab911c64655b8b82375196
+	xlogreader.o xlogutils.o gtm.o
 
 include $(top_srcdir)/src/backend/common.mk
 

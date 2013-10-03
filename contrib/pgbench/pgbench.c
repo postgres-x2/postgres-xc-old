@@ -151,11 +151,9 @@ char	   *index_tablespace = NULL;
 #define ntellers	10
 #define naccounts	100000
 
-<<<<<<< HEAD
 #ifdef PGXC
 bool		use_branch = false;	/* use branch id in DDL and DML */
 #endif
-=======
 /*
  * The scale factor at/beyond which 32bit integers are incapable of storing
  * 64bit values.
@@ -165,7 +163,6 @@ bool		use_branch = false;	/* use branch id in DDL and DML */
  */
 #define SCALE_32BIT_THRESHOLD 20000
 
->>>>>>> e472b921406407794bab911c64655b8b82375196
 bool		use_log;			/* log transaction latencies to a file */
 bool		use_quiet;			/* quiet logging onto stderr */
 int			agg_interval;		/* log aggregates instead of individual
@@ -374,14 +371,11 @@ usage(void)
 		   "\nInitialization options:\n"
 		   "  -i           invokes initialization mode\n"
 		   "  -F NUM       fill factor\n"
-<<<<<<< HEAD
 #ifdef PGXC
 		   "  -k           distribute by primary key branch id - bid\n"
 #endif
-=======
 		   "  -n           do not run VACUUM after initialization\n"
 		   "  -q           quiet logging (one message each 5 seconds)\n"
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		   "  -s NUM       scaling factor\n"
 		   "  --foreign-keys\n"
 		   "               create foreign key constraints between tables\n"
@@ -1524,20 +1518,17 @@ init(bool is_no_vacuum)
 	};
 	struct ddlinfo DDLs[] = {
 		{
-<<<<<<< HEAD
 			"pgbench_branches",
 			"bid int not null,bbalance int,filler char(88)",
 			1
 #ifdef PGXC
 			, "distribute by hash (bid)"
 #endif
-=======
 			"pgbench_history",
 			scale >= SCALE_32BIT_THRESHOLD
 			? "tid int,bid int,aid bigint,delta int,mtime timestamp,filler char(22)"
 			: "tid int,bid int,aid    int,delta int,mtime timestamp,filler char(22)",
 			0
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		},
 		{
 			"pgbench_tellers",
@@ -1558,18 +1549,12 @@ init(bool is_no_vacuum)
 #endif
 		},
 		{
-<<<<<<< HEAD
-			"pgbench_history",
-			"tid int,bid int,aid int,delta int,mtime timestamp,filler char(22)",
-			0
-#ifdef PGXC
-			, "distribute by hash (bid)"
-#endif
-=======
 			"pgbench_branches",
 			"bid int not null,bbalance int,filler char(88)",
 			1
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+			, "distribute by hash (bid)"
+#endif
 		}
 	};
 
@@ -1760,8 +1745,7 @@ init(bool is_no_vacuum)
 	/*
 	 * create indexes
 	 */
-<<<<<<< HEAD
-	fprintf(stderr, "set primary key...\n");
+	fprintf(stderr, "set primary keys...\n");
 #ifdef PGXC
 	/*
 	 * If all the tables are distributed according to bid, create an index on it
@@ -1791,9 +1775,6 @@ init(bool is_no_vacuum)
 	}
 	else
 #endif
-=======
-	fprintf(stderr, "set primary keys...\n");
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	for (i = 0; i < lengthof(DDLAFTERs); i++)
 	{
 		char		buffer[256];
@@ -2310,15 +2291,11 @@ main(int argc, char **argv)
 	state = (CState *) pg_malloc(sizeof(CState));
 	memset(state, 0, sizeof(CState));
 
-<<<<<<< HEAD
 #ifdef PGXC
 	while ((c = getopt_long(argc, argv, "ih:knvp:dSNc:j:Crs:t:T:U:lf:D:F:M:", long_options, &optindex)) != -1)
 #else
-	while ((c = getopt_long(argc, argv, "ih:nvp:dSNc:j:Crs:t:T:U:lf:D:F:M:", long_options, &optindex)) != -1)
-#endif
-=======
 	while ((c = getopt_long(argc, argv, "ih:nvp:dqSNc:j:Crs:t:T:U:lf:D:F:M:", long_options, &optindex)) != -1)
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#endif
 	{
 		switch (c)
 		{

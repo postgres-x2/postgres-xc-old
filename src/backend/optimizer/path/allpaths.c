@@ -380,12 +380,6 @@ set_plain_rel_size(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 static void
 set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 {
-<<<<<<< HEAD
-#ifdef PGXC
-	if (!create_plainrel_rqpath(root, rel, rte))
-	{
-#endif
-=======
 	Relids		required_outer;
 
 	/*
@@ -395,7 +389,10 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	 * pulled up out of a UNION ALL appendrel.)
 	 */
 	required_outer = rel->lateral_relids;
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+	if (!create_plainrel_rqpath(root, rel, rte))
+	{
+#endif
 
 	/* Consider sequential scan */
 	add_path(rel, create_seqscan_path(root, rel, required_outer));

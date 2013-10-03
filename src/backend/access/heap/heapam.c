@@ -3344,17 +3344,12 @@ l2:
 	newtup->t_data->t_infomask2 &= ~(HEAP2_XACT_MASK);
 	HeapTupleHeaderSetXmin(newtup->t_data, xid);
 	HeapTupleHeaderSetCmin(newtup->t_data, cid);
-<<<<<<< HEAD
-	HeapTupleHeaderSetXmax(newtup->t_data, 0);	/* for cleanliness */
-	newtup->t_tableOid = RelationGetRelid(relation);
-#ifdef PGXC
-	newtup->t_xc_node_id = PGXCNodeIdentifier;
-#endif
-=======
 	newtup->t_data->t_infomask |= HEAP_UPDATED | infomask_new_tuple;
 	newtup->t_data->t_infomask2 |= infomask2_new_tuple;
 	HeapTupleHeaderSetXmax(newtup->t_data, xmax_new_tuple);
->>>>>>> e472b921406407794bab911c64655b8b82375196
+#ifdef PGXC
+	newtup->t_xc_node_id = PGXCNodeIdentifier;
+#endif
 
 	/*
 	 * Replace cid with a combo cid if necessary.  Note that we already put

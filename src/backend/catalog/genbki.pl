@@ -107,144 +107,6 @@ our @types;
 # produce output, one catalog at a time
 foreach my $catname (@{ $catalogs->{names} })
 {
-<<<<<<< HEAD
-    # .bki CREATE command for this catalog
-    my $catalog = $catalogs->{$catname};
-    print BKI "create $catname $catalog->{relation_oid}"
-      . $catalog->{shared_relation}
-      . $catalog->{bootstrap}
-      . $catalog->{without_oids}
-      . $catalog->{rowtype_oid}. "\n";
-
-    my %bki_attr;
-    my @attnames;
-    foreach my $column ( @{ $catalog->{columns} } )
-    {
-        my ($attname, $atttype) = %$column;
-        $bki_attr{$attname} = $atttype;
-        push @attnames, $attname;
-    }
-    print BKI " (\n";
-    print BKI join " ,\n", map(" $_ = $bki_attr{$_}", @attnames);
-    print BKI "\n )\n";
-
-    # open it, unless bootstrap case (create bootstrap does this automatically)
-    if ($catalog->{bootstrap} eq '')
-    {
-        print BKI "open $catname\n";
-    }
-
-    if (defined $catalog->{data})
-    {
-        # Ordinary catalog with DATA line(s)
-        foreach my $row ( @{ $catalog->{data} } )
-        {
-            # substitute constant values we acquired above
-            $row->{bki_values} =~ s/\bPGUID\b/$BOOTSTRAP_SUPERUSERID/g;
-            $row->{bki_values} =~ s/\bPGNSP\b/$PG_CATALOG_NAMESPACE/g;
-
-            # Save pg_type info for pg_attribute processing below
-            if ($catname eq 'pg_type')
-            {
-                my %type;
-                $type{oid} = $row->{oid};
-                @type{@attnames} = split /\s+/, $row->{bki_values};
-                push @types, \%type;
-            }
-
-            # Write to postgres.bki
-            my $oid = $row->{oid} ? "OID = $row->{oid} " : '';
-            printf BKI "insert %s( %s)\n", $oid, $row->{bki_values};
-
-            # Write comments to postgres.description and postgres.shdescription
-            if (defined $row->{descr})
-            {
-                printf DESCR "%s\t%s\t0\t%s\n", $row->{oid}, $catname, $row->{descr};
-            }
-            if (defined $row->{shdescr})
-            {
-                printf SHDESCR  "%s\t%s\t%s\n", $row->{oid}, $catname, $row->{shdescr};
-            }
-        }
-    }
-    if ($catname eq 'pg_attribute')
-    {
-        # For pg_attribute.h, we generate DATA entries ourselves.
-        # NB: pg_type.h must come before pg_attribute.h in the input list
-        # of catalog names, since we use info from pg_type.h here.
-        foreach my $table_name ( @{ $catalogs->{names} } )
-        {
-            my $table = $catalogs->{$table_name};
-
-            # Currently, all bootstrapped relations also need schemapg.h
-            # entries, so skip if the relation isn't to be in schemapg.h.
-            next if $table->{schema_macro} ne 'True';
-
-            $schemapg_entries{$table_name} = [];
-            push @tables_needing_macros, $table_name;
-            my $is_bootstrap = $table->{bootstrap};
-
-            # Generate entries for user attributes.
-            my $attnum = 0;
-            my $priornotnull = 1;
-            my @user_attrs = @{ $table->{columns} };
-            foreach my $attr (@user_attrs)
-            {
-                $attnum++;
-                my $row = emit_pgattr_row($table_name, $attr, $priornotnull);
-                $row->{attnum} = $attnum;
-                $row->{attstattarget} = '-1';
-                $priornotnull &= ($row->{attnotnull} eq 't');
-
-                # If it's bootstrapped, put an entry in postgres.bki.
-                if ($is_bootstrap eq ' bootstrap')
-                {
-                    bki_insert($row, @attnames);
-                }
-
-                # Store schemapg entries for later.
-                $row = emit_schemapg_row($row, grep { $bki_attr{$_} eq 'bool' } @attnames);
-                push @{ $schemapg_entries{$table_name} },
-					'{ ' . join(', ', grep { defined $_ }
-					map $row->{$_}, @attnames) . ' }';
-            }
-
-            # Generate entries for system attributes.
-            # We only need postgres.bki entries, not schemapg.h entries.
-            if ($is_bootstrap eq ' bootstrap')
-            {
-                $attnum = 0;
-                my @SYS_ATTRS = (
-                    {ctid      => 'tid'},
-                    {oid       => 'oid'},
-                    {xmin      => 'xid'},
-                    {cmin      => 'cid'},
-                    {xmax      => 'xid'},
-                    {cmax      => 'cid'},
-                    {tableoid  => 'oid'}
-#PGXC_BEGIN
-                    ,{xc_node_id  => 'int4'}
-#PGXC_END
-                );
-                foreach my $attr (@SYS_ATTRS)
-                {
-                    $attnum--;
-                    my $row = emit_pgattr_row($table_name, $attr, 1);
-                    $row->{attnum} = $attnum;
-                    $row->{attstattarget} = '0';
-
-                    # some catalogs don't have oids
-                    next if $table->{without_oids} eq ' without_oids' &&
-                      $row->{attname} eq 'oid';
-
-                    bki_insert($row, @attnames);
-                }
-            }
-        }
-    }
-
-    print BKI "close $catname\n";
-=======
 
 	# .bki CREATE command for this catalog
 	my $catalog = $catalogs->{$catname};
@@ -367,7 +229,11 @@ foreach my $catname (@{ $catalogs->{names} })
 					{ cmin     => 'cid' },
 					{ xmax     => 'xid' },
 					{ cmax     => 'cid' },
-					{ tableoid => 'oid' });
+                    { tableoid => 'oid' }
+#PGXC_BEGIN
+				   ,{ xc_node_id  => 'int4' }
+#PGXC_END
+                );
 				foreach my $attr (@SYS_ATTRS)
 				{
 					$attnum--;
@@ -387,7 +253,6 @@ foreach my $catname (@{ $catalogs->{names} })
 	}
 
 	print BKI "close $catname\n";
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 # Any information needed for the BKI that is not contained in a pg_*.h header

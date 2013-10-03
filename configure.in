@@ -17,11 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-<<<<<<< HEAD
-AC_INIT([Postgres-XC], [1.1devel], [pgsql-bugs@postgresql.org])
-=======
-AC_INIT([PostgreSQL], [9.3beta1], [pgsql-bugs@postgresql.org])
->>>>>>> e472b921406407794bab911c64655b8b82375196
+AC_INIT([Postgres-XC], [1.2devel], [pgsql-bugs@postgresql.org])
 
 m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.63], [], [m4_fatal([Autoconf version 2.63 is required.
 Untested combinations of 'autoconf' and PostgreSQL versions are not
@@ -83,7 +79,7 @@ PostgreSQL has apparently not been ported to your platform yet.
 To try a manual configuration, look into the src/template directory
 for a similar platform and use the '--with-template=' option.
 
-Please also contact <pgsql-bugs@postgresql.org> to see about
+Please also contact <postgres-xc-bugs@lists.sourceforge.net> to see about
 rectifying this.  Include the above 'checking host system type...'
 line.
 *******************************************************************

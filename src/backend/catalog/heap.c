@@ -198,7 +198,7 @@ static FormData_pg_attribute a7 = {
  * at the Coordinator
  */
 static FormData_pg_attribute a8 = {
-	0, {"xc_node_id"}, INT4OID, 0, sizeof(int4),
+	0, {"xc_node_id"}, INT4OID, 0, sizeof(int32),
 	XC_NodeIdAttributeNumber, 0, -1, -1,
 	true, 'p', 'i', true, false, false, true, 0
 };

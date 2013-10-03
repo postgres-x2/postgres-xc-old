@@ -1269,15 +1269,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 						   "Index Cond", planstate, ancestors, es);
 			break;
 #ifdef PGXC
-		case T_ModifyTable:
-			{
-				/* Remote query planning on DMLs */
-				ModifyTable *mt = (ModifyTable *)plan;
-				ListCell *elt;
-				foreach(elt, mt->remote_plans)
-					ExplainRemoteQuery((RemoteQuery *) lfirst(elt), planstate, ancestors, es);
-			}
-			break;
 		case T_RemoteQuery:
 			/* Remote query */
 			ExplainRemoteQuery((RemoteQuery *)plan, planstate, ancestors, es);
@@ -1396,7 +1387,17 @@ ExplainNode(PlanState *planstate, List *ancestors,
 										   planstate, es);
 			break;
 		case T_ModifyTable:
+#ifdef PGXC
+			{
+				/* Remote query planning on DMLs */
+				ModifyTable *mt = (ModifyTable *)plan;
+				ListCell *elt;
+				foreach(elt, mt->remote_plans)
+					ExplainRemoteQuery((RemoteQuery *) lfirst(elt), planstate, ancestors, es);
+			}
+#else
 			show_modifytable_info((ModifyTableState *) planstate, es);
+#endif
 			break;
 		case T_Hash:
 			show_hash_info((HashState *) planstate, es);

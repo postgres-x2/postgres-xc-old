@@ -18,13 +18,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-<<<<<<< HEAD
+#include "access/htup_details.h"
 #ifdef PGXC
 #include "access/reloptions.h"
 #endif /* PGXC */
-=======
-#include "access/htup_details.h"
->>>>>>> e472b921406407794bab911c64655b8b82375196
 #include "access/sysattr.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
@@ -359,16 +356,12 @@ static void make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 static void make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 			 int prettyFlags, int wrapColumn);
 static void get_query_def(Query *query, StringInfo buf, List *parentnamespace,
-<<<<<<< HEAD
-			  TupleDesc resultDesc, int prettyFlags, int startIndent
+			  TupleDesc resultDesc,
+			  int prettyFlags, int wrapColumn, int startIndent
 #ifdef PGXC
 			  , bool finalise_aggregates, bool sortgroup_colno
 #endif /* PGXC */
 				);
-=======
-			  TupleDesc resultDesc,
-			  int prettyFlags, int wrapColumn, int startIndent);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 static void get_values_def(List *values_lists, deparse_context *context);
 static void get_with_clause(Query *query, deparse_context *context);
 static void get_select_query_def(Query *query, deparse_context *context,
@@ -889,15 +882,11 @@ pg_get_triggerdef_worker(Oid trigid, bool pretty)
 		context.windowClause = NIL;
 		context.windowTList = NIL;
 		context.varprefix = true;
-<<<<<<< HEAD
-		context.prettyFlags = pretty ? PRETTYFLAG_PAREN : 0;
+		context.prettyFlags = pretty ? PRETTYFLAG_PAREN | PRETTYFLAG_INDENT : PRETTYFLAG_INDENT;
+		context.wrapColumn = WRAP_COLUMN_DEFAULT;
 #ifdef PGXC
 		context.finalise_aggs = false;
 #endif /* PGXC */
-=======
-		context.prettyFlags = pretty ? PRETTYFLAG_PAREN | PRETTYFLAG_INDENT : PRETTYFLAG_INDENT;
-		context.wrapColumn = WRAP_COLUMN_DEFAULT;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		context.indentLevel = PRETTYINDENT_STD;
 
 		get_rule_expr(qual, &context, false);
@@ -2356,13 +2345,10 @@ deparse_expression_pretty(Node *expr, List *dpcontext,
 	context.windowTList = NIL;
 	context.varprefix = forceprefix;
 	context.prettyFlags = prettyFlags;
-<<<<<<< HEAD
+	context.wrapColumn = WRAP_COLUMN_DEFAULT;
 #ifdef PGXC
 	context.finalise_aggs = false;
 #endif /* PGXC */
-=======
-	context.wrapColumn = WRAP_COLUMN_DEFAULT;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	context.indentLevel = startIndent;
 
 	get_rule_expr(expr, &context, showimplicit);
@@ -2400,14 +2386,11 @@ deparse_context_for(const char *aliasname, Oid relid)
 	/* Build one-element rtable */
 	dpns->rtable = list_make1(rte);
 	dpns->ctes = NIL;
-<<<<<<< HEAD
 #ifdef PGXC
 	dpns->remotequery = false;
 #endif
-=======
 	set_rtable_names(dpns, NIL, NULL);
 	set_simple_column_names(dpns);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	/* Return a one-deep namespace stack */
 	return list_make1(dpns);
@@ -2612,6 +2595,9 @@ set_deparse_for_query(deparse_namespace *dpns, Query *query,
 	memset(dpns, 0, sizeof(deparse_namespace));
 	dpns->rtable = query->rtable;
 	dpns->ctes = query->cteList;
+#ifdef PGXC
+	dpns->remotequery = false;
+#endif
 
 	/* Assign a unique relation alias to each RTE */
 	set_rtable_names(dpns, parent_namespaces, NULL);
@@ -4008,17 +3994,8 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		context.finalise_aggs = false;
 #endif /* PGXC */
 
-<<<<<<< HEAD
-		memset(&dpns, 0, sizeof(dpns));
-		dpns.rtable = query->rtable;
-		dpns.ctes = query->cteList;
-#ifdef PGXC
-		dpns.remotequery = false;
-#endif
-=======
 		set_deparse_for_query(&dpns, query, NIL);
 
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		get_rule_expr(qual, &context, false);
 	}
 
@@ -4038,16 +4015,12 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		foreach(action, actions)
 		{
 			query = (Query *) lfirst(action);
-<<<<<<< HEAD
-			get_query_def(query, buf, NIL, NULL, prettyFlags, 0
-#ifdef PGXC
-			, false, false
-#endif /* PGXC */
-			);
-=======
 			get_query_def(query, buf, NIL, NULL,
-						  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
->>>>>>> e472b921406407794bab911c64655b8b82375196
+						  prettyFlags, WRAP_COLUMN_DEFAULT, 0
+#ifdef PGXC
+						  , false, false
+#endif /* PGXC */
+				);
 			if (prettyFlags)
 				appendStringInfo(buf, ";\n");
 			else
@@ -4064,16 +4037,12 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		Query	   *query;
 
 		query = (Query *) linitial(actions);
-<<<<<<< HEAD
-		get_query_def(query, buf, NIL, NULL, prettyFlags, 0
+		get_query_def(query, buf, NIL, NULL,
+					  prettyFlags, WRAP_COLUMN_DEFAULT, 0
 #ifdef PGXC
 						, false, false
 #endif /* PGXC */
 		);
-=======
-		get_query_def(query, buf, NIL, NULL,
-					  prettyFlags, WRAP_COLUMN_DEFAULT, 0);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		appendStringInfo(buf, ";");
 	}
 }
@@ -4141,15 +4110,11 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	ev_relation = heap_open(ev_class, AccessShareLock);
 
 	get_query_def(query, buf, NIL, RelationGetDescr(ev_relation),
-<<<<<<< HEAD
-				  prettyFlags, 0
+				  prettyFlags, wrapColumn, 0
 #ifdef PGXC
 				  , false, false
 #endif /* PGXC */
 				  );
-=======
-				  prettyFlags, wrapColumn, 0);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	appendStringInfo(buf, ";");
 
 	heap_close(ev_relation, AccessShareLock);
@@ -4213,8 +4178,8 @@ deparse_query(Query *query, StringInfo buf, List *parentnamespace,
 	tmp_search_path->schemas = NIL;
 	PushOverrideSearchPath(tmp_search_path);
 
-	get_query_def(query, buf, parentnamespace, NULL, 0, 0, finalise_aggs,
-					sortgroup_colno);
+    get_query_def(query, buf, parentnamespace, NULL, 0, WRAP_COLUMN_DEFAULT,
+				  0, finalise_aggs, sortgroup_colno);
 
 	PopOverrideSearchPath();
 }
@@ -4228,16 +4193,12 @@ deparse_query(Query *query, StringInfo buf, List *parentnamespace,
  */
 static void
 get_query_def(Query *query, StringInfo buf, List *parentnamespace,
-<<<<<<< HEAD
-			  TupleDesc resultDesc, int prettyFlags, int startIndent
+			  TupleDesc resultDesc,
+			  int prettyFlags, int wrapColumn, int startIndent
 #ifdef PGXC
 				, bool finalise_aggs, bool sortgroup_colno
 #endif /* PGXC */
 			  )
-=======
-			  TupleDesc resultDesc,
-			  int prettyFlags, int wrapColumn, int startIndent)
->>>>>>> e472b921406407794bab911c64655b8b82375196
 {
 	deparse_context context;
 	deparse_namespace dpns;
@@ -4264,16 +4225,7 @@ get_query_def(Query *query, StringInfo buf, List *parentnamespace,
 	context.sortgroup_colno = sortgroup_colno;
 #endif /* PGXC */
 
-<<<<<<< HEAD
-	memset(&dpns, 0, sizeof(dpns));
-	dpns.rtable = query->rtable;
-	dpns.ctes = query->cteList;
-#ifdef PGXC
-	dpns.remotequery = false;
-#endif
-=======
 	set_deparse_for_query(&dpns, query, parentnamespace);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	switch (query->commandType)
 	{
@@ -4404,16 +4356,12 @@ get_with_clause(Query *query, deparse_context *context)
 		if (PRETTY_INDENT(context))
 			appendContextKeyword(context, "", 0, 0, 0);
 		get_query_def((Query *) cte->ctequery, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		if (PRETTY_INDENT(context))
 			appendContextKeyword(context, "", 0, 0, 0);
 		appendStringInfoChar(buf, ')');
@@ -4689,16 +4637,12 @@ get_target_list(List *targetList, deparse_context *context,
 	char	   *sep;
 	int			colno;
 	ListCell   *l;
-<<<<<<< HEAD
-	bool		last_was_multiline = false;
 #ifdef PGXC
 	bool no_targetlist = true;
 #endif
-=======
 
 	/* we use targetbuf to hold each TLE's text temporarily */
 	initStringInfo(&targetbuf);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	sep = " ";
 	colno = 0;
@@ -4818,7 +4762,6 @@ get_target_list(List *targetList, deparse_context *context,
 		appendStringInfoString(buf, targetbuf.data);
 	}
 
-<<<<<<< HEAD
 #ifdef PGXC
 	/*
 	 * Because the empty target list can generate invalid SQL
@@ -4829,10 +4772,8 @@ get_target_list(List *targetList, deparse_context *context,
 	if (no_targetlist)
 		appendStringInfo(buf, " *");
 #endif
-=======
 	/* clean up */
 	pfree(targetbuf.data);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 }
 
 static void
@@ -4859,16 +4800,12 @@ get_setop_query(Node *setOp, Query *query, deparse_context *context,
 		if (need_paren)
 			appendStringInfoChar(buf, '(');
 		get_query_def(subquery, buf, context->namespaces, resultDesc,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 		if (need_paren)
 			appendStringInfoChar(buf, ')');
 	}
@@ -5322,16 +5259,12 @@ get_insert_query_def(Query *query, deparse_context *context)
 	{
 		/* Add the SELECT */
 		get_query_def(select_rte->subquery, buf, NIL, NULL,
-<<<<<<< HEAD
-					  context->prettyFlags, context->indentLevel
+					  context->prettyFlags, context->wrapColumn,
+					  context->indentLevel
 #ifdef PGXC
 					  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 					  );
-=======
-					  context->prettyFlags, context->wrapColumn,
-					  context->indentLevel);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	}
 	else if (values_rte)
 	{
@@ -5875,7 +5808,6 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 		return NULL;
 	}
 
-<<<<<<< HEAD
 #ifdef PGXC
 	if (rte->rtekind == RTE_REMOTE_DUMMY &&
 		attnum > list_length(rte->eref->colnames) &&
@@ -5909,13 +5841,6 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 	}
 #endif /* PGXC */
 
-	/* Identify names to use */
-	schemaname = NULL;			/* default assumptions */
-	refname = rte->eref->aliasname;
-
-	/* Exceptions occur only if the RTE is alias-less */
-	if (rte->alias == NULL)
-=======
 	/*
 	 * If it's an unnamed join, look at the expansion of the alias variable.
 	 * If it's a simple reference to one of the input vars, then recursively
@@ -5930,8 +5855,7 @@ get_variable(Var *var, int levelsup, bool istoplevel, deparse_context *context)
 	 * contain a join alias variable.
 	 */
 	if (rte->rtekind == RTE_JOIN && rte->alias == NULL)
->>>>>>> e472b921406407794bab911c64655b8b82375196
-	{
+{
 		if (rte->joinaliasvars == NIL)
 			elog(ERROR, "cannot decompile join alias var in plan tree");
 		if (attnum > 0)
@@ -6197,17 +6121,8 @@ get_name_for_var_field(Var *var, int fieldno,
 						deparse_namespace mydpns;
 						const char *result;
 
-<<<<<<< HEAD
-						memset(&mydpns, 0, sizeof(mydpns));
-						mydpns.rtable = rte->subquery->rtable;
-						mydpns.ctes = rte->subquery->cteList;
-#ifdef PGXC
-						mydpns.remotequery = false;
-#endif
-=======
 						set_deparse_for_query(&mydpns, rte->subquery,
 											  context->namespaces);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 						context->namespaces = lcons(&mydpns,
 													context->namespaces);
@@ -6322,17 +6237,8 @@ get_name_for_var_field(Var *var, int fieldno,
 						deparse_namespace mydpns;
 						const char *result;
 
-<<<<<<< HEAD
-						memset(&mydpns, 0, sizeof(mydpns));
-						mydpns.rtable = ctequery->rtable;
-						mydpns.ctes = ctequery->cteList;
-#ifdef PGXC
-						mydpns.remotequery = false;
-#endif
-=======
 						set_deparse_for_query(&mydpns, ctequery,
 											  context->namespaces);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 						new_nslist = list_copy_tail(context->namespaces,
 													ctelevelsup);
@@ -8037,7 +7943,7 @@ get_agg_expr(Aggref *aggref, deparse_context *context)
 		if (OidIsValid(aggform->aggfinalfn))
 		{
 			appendStringInfo(buf, "%s(", generate_function_name(aggform->aggfinalfn, 0,
-													NULL, NULL, NULL));
+																NULL, NULL, false, NULL));
 			added_finalfn = true;
 		}
 		ReleaseSysCache(aggTuple);
@@ -8473,16 +8379,12 @@ get_sublink_expr(SubLink *sublink, deparse_context *context)
 		appendStringInfoChar(buf, '(');
 
 	get_query_def(query, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-				  context->prettyFlags, context->indentLevel
+				  context->prettyFlags, context->wrapColumn,
+				  context->indentLevel
 #ifdef PGXC
 				  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 				  );
-=======
-				  context->prettyFlags, context->wrapColumn,
-				  context->indentLevel);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 
 	if (need_paren)
 		appendStringInfo(buf, "))");
@@ -8613,16 +8515,12 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 				/* Subquery RTE */
 				appendStringInfoChar(buf, '(');
 				get_query_def(rte->subquery, buf, context->namespaces, NULL,
-<<<<<<< HEAD
-							  context->prettyFlags, context->indentLevel,
+							  context->prettyFlags, context->wrapColumn,
+							  context->indentLevel
 #ifdef PGXC
-							  context->finalise_aggs, context->sortgroup_colno
+							  , context->finalise_aggs, context->sortgroup_colno
 #endif /* PGXC */
 							  );
-=======
-							  context->prettyFlags, context->wrapColumn,
-							  context->indentLevel);
->>>>>>> e472b921406407794bab911c64655b8b82375196
 				appendStringInfoChar(buf, ')');
 				break;
 			case RTE_FUNCTION:
@@ -8676,7 +8574,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			 */
 			appendStringInfo(buf, " %s",
 							 quote_identifier(rte->eref->aliasname));
-			gavealias = true;
+			printalias = true;
 		}
 #endif
 		else if (rte->rtekind == RTE_FUNCTION)

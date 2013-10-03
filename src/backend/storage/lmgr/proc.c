@@ -538,16 +538,18 @@ InitAuxiliaryProcess(void)
 	MyProc->backendId = InvalidBackendId;
 	MyProc->databaseId = InvalidOid;
 	MyProc->roleId = InvalidOid;
-<<<<<<< HEAD
 #ifdef PGXC
 	MyProc->isPooler = false;
 	if (IsPGXCPoolerProcess())
 		MyProc->isPooler = true;
 #endif
-	MyPgXact->inCommit = false;
-=======
+	/* 
+	 * K.Suzuki memo, Sep.2ne, 2013.
+	 *
+	 * Setting up MyPgXact->delayChkpt setting is new.
+	 * We don't have inCommit member in PGXACT struct.
+	 */
 	MyPgXact->delayChkpt = false;
->>>>>>> e472b921406407794bab911c64655b8b82375196
 	MyPgXact->vacuumFlags = 0;
 	MyProc->lwWaiting = false;
 	MyProc->lwWaitMode = 0;

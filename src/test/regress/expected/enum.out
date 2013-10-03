@@ -540,10 +540,7 @@ DROP FUNCTION echo_me(rainbow);
 -- RI triggers on enum types
 --
 CREATE TABLE enumtest_parent (id rainbow PRIMARY KEY);
-<<<<<<< HEAD
 ERROR:  Column id is not a hash distributable data type
-=======
->>>>>>> e472b921406407794bab911c64655b8b82375196
 CREATE TABLE enumtest_child (parent rainbow REFERENCES enumtest_parent);
 ERROR:  relation "enumtest_parent" does not exist
 INSERT INTO enumtest_parent VALUES ('red');
