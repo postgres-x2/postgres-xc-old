@@ -1989,20 +1989,6 @@ ProcessUtilitySlow(Node *parsetree,
 				break;
 
 			case T_AlterEnumStmt:		/* ALTER TYPE (enum) */
-				/*
-				 * K.Suzuki, Sep.2nd, 2013
-				 * Moved from sgtandard_ProcessUtility().
-				 */
-#ifdef PGXC
-				/*
-				 * We disallow this in transaction blocks, because we can't cope
-				 * with enum OID values getting into indexes and then having their
-				 * defining pg_enum entries go away.
-				 */
-				/* Allow this to be run inside transaction block on remote nodes */
-				if (IS_PGXC_COORDINATOR && !IsConnFromCoord())
-#endif
-					PreventTransactionChain(isTopLevel, "ALTER TYPE ... ADD");
 				AlterEnum((AlterEnumStmt *) parsetree, isTopLevel);
 #ifdef PGXC
 				/*
