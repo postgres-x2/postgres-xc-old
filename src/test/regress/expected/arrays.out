@@ -993,7 +993,6 @@ select 33 = all ('{33,null,33}');
 -- distribution cannot be safely used to check constraints on remote nodes.
 -- When global constraints are supported, this replication distribution should be removed.
 create temp table arr_tbl (f1 int[] unique) distribute by replication;
-NOTICE:  CREATE TABLE / UNIQUE will create implicit index "arr_tbl_f1_key" for table "arr_tbl"
 insert into arr_tbl values ('{1,2,3}');
 insert into arr_tbl values ('{1,2}');
 -- failure expected:
