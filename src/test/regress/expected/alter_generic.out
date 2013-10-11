@@ -148,28 +148,34 @@ SELECT n.nspname, c.conname, a.rolname
 -- Foreign Data Wrapper and Foreign Server
 --
 CREATE FOREIGN DATA WRAPPER alt_fdw1;
+ERROR:  Postgres-XC does not support FOREIGN DATA WRAPPER yet
+DETAIL:  The feature is not currently supported
 CREATE FOREIGN DATA WRAPPER alt_fdw2;
+ERROR:  Postgres-XC does not support FOREIGN DATA WRAPPER yet
+DETAIL:  The feature is not currently supported
 CREATE SERVER alt_fserv1 FOREIGN DATA WRAPPER alt_fdw1;
+ERROR:  Postgres-XC does not support SERVER yet
+DETAIL:  The feature is not currently supported
 CREATE SERVER alt_fserv2 FOREIGN DATA WRAPPER alt_fdw2;
+ERROR:  Postgres-XC does not support SERVER yet
+DETAIL:  The feature is not currently supported
 ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw2;  -- failed (name conflict)
-ERROR:  foreign-data wrapper "alt_fdw2" already exists
+ERROR:  foreign-data wrapper "alt_fdw1" does not exist
 ALTER FOREIGN DATA WRAPPER alt_fdw1 RENAME TO alt_fdw3;  -- OK
+ERROR:  foreign-data wrapper "alt_fdw1" does not exist
 ALTER SERVER alt_fserv1 RENAME TO alt_fserv2;   -- failed (name conflict)
-ERROR:  server "alt_fserv2" already exists
+ERROR:  server "alt_fserv1" does not exist
 ALTER SERVER alt_fserv1 RENAME TO alt_fserv3;   -- OK
+ERROR:  server "alt_fserv1" does not exist
 SELECT fdwname FROM pg_foreign_data_wrapper WHERE fdwname like 'alt_fdw%';
- fdwname  
-----------
- alt_fdw2
- alt_fdw3
-(2 rows)
+ fdwname 
+---------
+(0 rows)
 
 SELECT srvname FROM pg_foreign_server WHERE srvname like 'alt_fserv%';
-  srvname   
-------------
- alt_fserv2
- alt_fserv3
-(2 rows)
+ srvname 
+---------
+(0 rows)
 
 --
 -- Procedural Language
@@ -455,9 +461,9 @@ SELECT nspname, prsname
 --- Cleanup resources
 ---
 DROP FOREIGN DATA WRAPPER alt_fdw2 CASCADE;
-NOTICE:  drop cascades to server alt_fserv2
+ERROR:  foreign-data wrapper "alt_fdw2" does not exist
 DROP FOREIGN DATA WRAPPER alt_fdw3 CASCADE;
-NOTICE:  drop cascades to server alt_fserv3
+ERROR:  foreign-data wrapper "alt_fdw3" does not exist
 DROP LANGUAGE alt_lang2 CASCADE;
 DROP LANGUAGE alt_lang3 CASCADE;
 DROP LANGUAGE alt_lang4 CASCADE;
