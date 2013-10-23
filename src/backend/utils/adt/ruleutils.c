@@ -2539,6 +2539,40 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 				sprintf(modname, "%s_%d", refname, ++i);
 			} while (!refname_is_unique(modname, dpns, parent_namespaces));
 			refname = modname;
+
+			#ifdef PGXC
+			/*
+			 * Just changing the refname won't suffice, we have to change the
+			 * alias too, but before we do that we should free any alias
+			 * that was there previously
+			 * For example
+			 *
+			 * CREATE TABLE a (aa TEXT) distribute by roundrobin;
+			 * CREATE TABLE b (bb TEXT) INHERITS (a) distribute by roundrobin;
+			 * INSERT INTO a(aa) VALUES('aa');
+			 * INSERT INTO b(aa) VALUES('bb');
+			 * explain verbose UPDATE a SET aa='zzzz' WHERE aa='aa';
+			 * prints queries like
+			 * UPDATE ONLY public.a SET aa = $1 WHERE ((a_1.ctid = $2) AND
+			 *                                      (a_1.xc_node_id = $3))
+			 * The reason of these erroneous queries is as follows
+			 * While planning the optimizer would try and expand each rangetable
+			 * entry that represents an inheritance set,resulting into dupliate
+			 * entries in the rtable member of the query structure.
+			 * The above query would have "a a b" in rtable after expansion.
+			 * At the time of deparsing the function set_rtable_names would
+			 * notice duplicate entries in the rtable and would try to generate
+			 * unique reference names for each, but that results in missing
+			 * alias in the generated query.
+			 */
+			if (rte->alias)
+			{
+				pfree(rte->alias->aliasname);
+				list_free(rte->alias->colnames);
+				pfree(rte->alias);
+			}
+			rte->alias = makeAlias(refname, NIL);
+			#endif
 		}
 
 		dpns->rtable_names = lappend(dpns->rtable_names, refname);

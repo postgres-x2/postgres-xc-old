@@ -1,12 +1,10 @@
 --
 -- Test inheritance features
 --
--- Enforce use of COMMIT instead of 2PC for temporary objects
-SET enforce_two_phase_commit TO off;
-CREATE TABLE a (aa TEXT) distribute by round robin;
-CREATE TABLE b (bb TEXT) INHERITS (a) distribute by round robin;
-CREATE TABLE c (cc TEXT) INHERITS (a) distribute by round robin;
-CREATE TABLE d (dd TEXT) INHERITS (b,c,a) distribute by round robin;
+CREATE TABLE a (aa TEXT) distribute by roundrobin;
+CREATE TABLE b (bb TEXT) INHERITS (a) distribute by roundrobin;
+CREATE TABLE c (cc TEXT) INHERITS (a) distribute by roundrobin;
+CREATE TABLE d (dd TEXT) INHERITS (b,c,a) distribute by roundrobin;
 NOTICE:  merging multiple inherited definitions of column "aa"
 NOTICE:  merging multiple inherited definitions of column "aa"
 INSERT INTO a(aa) VALUES('aaa');
@@ -1542,6 +1540,8 @@ Indexes:
     "test_constraints_val1_val2_key" UNIQUE CONSTRAINT, btree (val1, val2)
 Child tables: test_constraints_inh
 Has OIDs: no
+Distribute By: HASH(val1)
+Location Nodes: ALL DATANODES
 
 ALTER TABLE ONLY test_constraints DROP CONSTRAINT test_constraints_val1_val2_key;
 \d+ test_constraints
@@ -1553,6 +1553,8 @@ ALTER TABLE ONLY test_constraints DROP CONSTRAINT test_constraints_val1_val2_key
  val2   | integer           |           | plain    |              | 
 Child tables: test_constraints_inh
 Has OIDs: no
+Distribute By: HASH(val1)
+Location Nodes: ALL DATANODES
 
 \d+ test_constraints_inh
                       Table "public.test_constraints_inh"
@@ -1563,6 +1565,8 @@ Has OIDs: no
  val2   | integer           |           | plain    |              | 
 Inherits: test_constraints
 Has OIDs: no
+Distribute By: HASH(id)
+Location Nodes: ALL DATANODES
 
 DROP TABLE test_constraints_inh;
 DROP TABLE test_constraints;
@@ -1614,6 +1618,8 @@ Indexes:
 Referenced by:
     TABLE "test_foreign_constraints" CONSTRAINT "test_foreign_constraints_id1_fkey" FOREIGN KEY (id1) REFERENCES test_primary_constraints(id)
 Has OIDs: no
+Distribute By: HASH(id)
+Location Nodes: ALL DATANODES
 
 \d+ test_foreign_constraints
                Table "public.test_foreign_constraints"
@@ -1624,6 +1630,8 @@ Foreign-key constraints:
     "test_foreign_constraints_id1_fkey" FOREIGN KEY (id1) REFERENCES test_primary_constraints(id)
 Child tables: test_foreign_constraints_inh
 Has OIDs: no
+Distribute By: HASH(id1)
+Location Nodes: ALL DATANODES
 
 ALTER TABLE test_foreign_constraints DROP CONSTRAINT test_foreign_constraints_id1_fkey;
 \d+ test_foreign_constraints
@@ -1633,6 +1641,8 @@ ALTER TABLE test_foreign_constraints DROP CONSTRAINT test_foreign_constraints_id
  id1    | integer |           | plain   |              | 
 Child tables: test_foreign_constraints_inh
 Has OIDs: no
+Distribute By: HASH(id1)
+Location Nodes: ALL DATANODES
 
 \d+ test_foreign_constraints_inh
              Table "public.test_foreign_constraints_inh"
@@ -1641,6 +1651,8 @@ Has OIDs: no
  id1    | integer |           | plain   |              | 
 Inherits: test_foreign_constraints
 Has OIDs: no
+Distribute By: HASH(id1)
+Location Nodes: ALL DATANODES
 
 DROP TABLE test_foreign_constraints_inh;
 DROP TABLE test_foreign_constraints;
@@ -1667,11 +1679,11 @@ select * from patest0 join (select f1 from int4_tbl where f1 >= 0 order by f1 li
                             QUERY PLAN                             
 -------------------------------------------------------------------
  Hash Join
-   Hash Cond: (pg_temp_2.patest0.id = int4_tbl.f1)
+   Hash Cond: (patest0_1.id = int4_tbl.f1)
    ->  Append
          ->  Data Node Scan on patest0 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on patest1 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on patest2 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on patest1 "_REMOTE_TABLE_QUERY__1"
+         ->  Data Node Scan on patest2 "_REMOTE_TABLE_QUERY__2"
    ->  Hash
          ->  Limit
                ->  Sort
@@ -1693,11 +1705,11 @@ select * from patest0 join (select f1 from int4_tbl where f1 >= 0 order by f1 li
                             QUERY PLAN                             
 -------------------------------------------------------------------
  Hash Join
-   Hash Cond: (pg_temp_2.patest0.id = int4_tbl.f1)
+   Hash Cond: (patest0_1.id = int4_tbl.f1)
    ->  Append
          ->  Data Node Scan on patest0 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on patest1 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on patest2 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on patest1 "_REMOTE_TABLE_QUERY__1"
+         ->  Data Node Scan on patest2 "_REMOTE_TABLE_QUERY__2"
    ->  Hash
          ->  Limit
                ->  Sort
@@ -1739,26 +1751,26 @@ insert into matest3 (name) values ('Test 5');
 insert into matest3 (name) values ('Test 6');
 set enable_indexscan = off;  -- force use of seqscan/sort, so no merge
 explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
-                                          QUERY PLAN                                           
-----------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
-   Output: matest0.id, matest0.name, ((1 - matest0.id))
-   Sort Key: ((1 - matest0.id))
+   Output: matest0_1.id, matest0_1.name, ((1 - matest0_1.id))
+   Sort Key: ((1 - matest0_1.id))
    ->  Result
-         Output: matest0.id, matest0.name, (1 - matest0.id)
+         Output: matest0_1.id, matest0_1.name, (1 - matest0_1.id)
          ->  Append
                ->  Data Node Scan on matest0 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
+                     Output: matest0_1.id, matest0_1.name
                      Remote query: SELECT id, name FROM ONLY public.matest0 WHERE true
-               ->  Data Node Scan on matest1 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest1 matest0 WHERE true
-               ->  Data Node Scan on matest2 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest2 matest0 WHERE true
-               ->  Data Node Scan on matest3 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest3 matest0 WHERE true
+               ->  Data Node Scan on matest1 "_REMOTE_TABLE_QUERY__1"
+                     Output: matest1.id, matest1.name
+                     Remote query: SELECT id, name FROM ONLY public.matest1 WHERE true
+               ->  Data Node Scan on matest2 "_REMOTE_TABLE_QUERY__2"
+                     Output: matest2.id, matest2.name
+                     Remote query: SELECT id, name FROM ONLY public.matest2 WHERE true
+               ->  Data Node Scan on matest3 "_REMOTE_TABLE_QUERY__3"
+                     Output: matest3.id, matest3.name
+                     Remote query: SELECT id, name FROM ONLY public.matest3 WHERE true
 (18 rows)
 
 select * from matest0 order by 1-id;
@@ -1775,26 +1787,26 @@ select * from matest0 order by 1-id;
 reset enable_indexscan;
 set enable_seqscan = off;  -- plan with fewest seqscans should be merge
 explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
-                                          QUERY PLAN                                           
-----------------------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Sort
-   Output: public.matest0.id, public.matest0.name, ((1 - public.matest0.id))
-   Sort Key: ((1 - public.matest0.id))
+   Output: matest0_1.id, matest0_1.name, ((1 - matest0_1.id))
+   Sort Key: ((1 - matest0_1.id))
    ->  Result
-         Output: public.matest0.id, public.matest0.name, (1 - public.matest0.id)
+         Output: matest0_1.id, matest0_1.name, (1 - matest0_1.id)
          ->  Append
                ->  Data Node Scan on matest0 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
+                     Output: matest0_1.id, matest0_1.name
                      Remote query: SELECT id, name FROM ONLY public.matest0 WHERE true
-               ->  Data Node Scan on matest1 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest1 matest0 WHERE true
-               ->  Data Node Scan on matest2 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest2 matest0 WHERE true
-               ->  Data Node Scan on matest3 "_REMOTE_TABLE_QUERY_"
-                     Output: public.matest0.id, public.matest0.name
-                     Remote query: SELECT id, name FROM ONLY public.matest3 matest0 WHERE true
+               ->  Data Node Scan on matest1 "_REMOTE_TABLE_QUERY__1"
+                     Output: matest1.id, matest1.name
+                     Remote query: SELECT id, name FROM ONLY public.matest1 WHERE true
+               ->  Data Node Scan on matest2 "_REMOTE_TABLE_QUERY__2"
+                     Output: matest2.id, matest2.name
+                     Remote query: SELECT id, name FROM ONLY public.matest2 WHERE true
+               ->  Data Node Scan on matest3 "_REMOTE_TABLE_QUERY__3"
+                     Output: matest3.id, matest3.name
+                     Remote query: SELECT id, name FROM ONLY public.matest3 WHERE true
 (18 rows)
 
 select * from matest0 order by 1-id;
@@ -1826,45 +1838,42 @@ SELECT thousand, tenthous FROM tenk1
 UNION ALL
 SELECT thousand, thousand FROM tenk1
 ORDER BY thousand, tenthous;
-                            QUERY PLAN                            
-------------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Sort
-   Sort Key: public.tenk1.thousand, public.tenk1.tenthous
-   ->  Result
-         ->  Append
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-(6 rows)
+   Sort Key: tenk1.thousand, tenk1.tenthous
+   ->  Append
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
+(5 rows)
 
 explain (costs off, num_nodes off, nodes off)
 SELECT thousand, tenthous, thousand+tenthous AS x FROM tenk1
 UNION ALL
 SELECT 42, 42, hundred FROM tenk1
 ORDER BY thousand, tenthous;
-                            QUERY PLAN                            
-------------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Sort
-   Sort Key: public.tenk1.thousand, public.tenk1.tenthous
-   ->  Result
-         ->  Append
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-(6 rows)
+   Sort Key: tenk1.thousand, tenk1.tenthous
+   ->  Append
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
+(5 rows)
 
 explain (costs off, num_nodes off, nodes off)
 SELECT thousand, tenthous FROM tenk1
 UNION ALL
 SELECT thousand, random()::integer FROM tenk1
 ORDER BY thousand, tenthous;
-                            QUERY PLAN                            
-------------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Sort
-   Sort Key: public.tenk1.thousand, public.tenk1.tenthous
-   ->  Result
-         ->  Append
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-(6 rows)
+   Sort Key: tenk1.thousand, tenk1.tenthous
+   ->  Append
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
+(5 rows)
 
 -- Check min/max aggregate optimization
 explain (costs off, num_nodes off, nodes off)
@@ -1872,12 +1881,12 @@ SELECT min(x) FROM
   (SELECT unique1 AS x FROM tenk1 a
    UNION ALL
    SELECT unique2 AS x FROM tenk1 b) s;
-                         QUERY PLAN                         
-------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Aggregate
    ->  Append
          ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
 (4 rows)
 
 explain (costs off, num_nodes off, nodes off)
@@ -1885,12 +1894,12 @@ SELECT min(y) FROM
   (SELECT unique1 AS x, unique1 AS y FROM tenk1 a
    UNION ALL
    SELECT unique2 AS x, unique2 AS y FROM tenk1 b) s;
-                         QUERY PLAN                         
-------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Aggregate
    ->  Append
          ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
 (4 rows)
 
 -- XXX planner doesn't recognize that index on unique2 is sufficiently sorted
@@ -1900,15 +1909,14 @@ SELECT x, y FROM
    UNION ALL
    SELECT unique2 AS x, unique2 AS y FROM tenk1 b) s
 ORDER BY x, y;
-                            QUERY PLAN                            
-------------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Sort
    Sort Key: a.thousand, a.tenthous
-   ->  Result
-         ->  Append
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-               ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
-(6 rows)
+   ->  Append
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY_"
+         ->  Data Node Scan on tenk1 "_REMOTE_TABLE_QUERY__1"
+(5 rows)
 
 reset enable_seqscan;
 reset enable_indexscan;
