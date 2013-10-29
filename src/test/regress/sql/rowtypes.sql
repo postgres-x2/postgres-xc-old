@@ -110,7 +110,7 @@ where (unique1, unique2) < any (select ten, ten from tenk1 where hundred < 3)
 order by 1;
 
 -- Also check row comparison with an indexable condition
-explain (costs off)
+explain (num_nodes off, nodes off, costs off)
 select thousand, tenthous from tenk1
 where (thousand, tenthous) >= (997, 5000)
 order by thousand, tenthous;
@@ -122,12 +122,12 @@ order by thousand, tenthous;
 -- Check row comparisons with IN
 select * from int8_tbl i8 where i8 in (row(123,456));  -- fail, type mismatch
 
-explain (costs off)
+explain (num_nodes off, nodes off, costs off)
 select * from int8_tbl i8
 where i8 in (row(123,456)::int8_tbl, '(4567890123456789,123)');
 
 select * from int8_tbl i8
-where i8 in (row(123,456)::int8_tbl, '(4567890123456789,123)');
+where i8 in (row(123,456)::int8_tbl, '(4567890123456789,123)') order by 1, 2;
 
 -- Check some corner cases involving empty rowtypes
 select ROW();
