@@ -41,6 +41,9 @@
 #include "utils/tqual.h"
 #include "utils/syscache.h"
 #include "tcop/utility.h"
+#ifdef PGXC
+#include "pgxc/pgxc.h"
+#endif
 
 
 typedef struct EventTriggerQueryState
@@ -708,6 +711,12 @@ EventTriggerDDLCommandStart(Node *parsetree)
 	if (!IsUnderPostmaster)
 		return;
 
+#ifdef PGXC
+	/* Event trigger is fired only at originating coordinator */
+	if (!IS_PGXC_COORDINATOR || IsConnFromCoord())
+		return;
+#endif
+
 	runlist = EventTriggerCommonSetup(parsetree,
 									  EVT_DDLCommandStart,
 									  "ddl_command_start",
@@ -744,6 +753,12 @@ EventTriggerDDLCommandEnd(Node *parsetree)
 	if (!IsUnderPostmaster)
 		return;
 
+#ifdef PGXC
+	/* Event trigger is fired only at originating coordinator */
+	if (!IS_PGXC_COORDINATOR || IsConnFromCoord())
+		return;
+#endif
+
 	runlist = EventTriggerCommonSetup(parsetree,
 									  EVT_DDLCommandEnd, "ddl_command_end",
 									  &trigdata);
@@ -778,6 +793,12 @@ EventTriggerSQLDrop(Node *parsetree)
 	 */
 	if (!IsUnderPostmaster)
 		return;
+
+#ifdef PGXC
+	/* Event trigger is fired only at originating coordinator */
+	if (!IS_PGXC_COORDINATOR || IsConnFromCoord())
+		return;
+#endif
 
 	/*
 	 * Use current state to determine whether this event fires at all.	If

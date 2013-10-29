@@ -1031,6 +1031,10 @@ standard_ProcessUtility(Node *parsetree,
 			 * Need design decision how to support event trigger in XC.
 			 */
 			CreateEventTrigger((CreateEventTrigStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
+#endif
 			break;
 
 		case T_AlterEventTrigStmt:
@@ -1040,6 +1044,10 @@ standard_ProcessUtility(Node *parsetree,
 			 * Need design decision how to support event trigger in XC.
 			 */
 			AlterEventTrigger((AlterEventTrigStmt *) parsetree);
+#ifdef PGXC
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
+#endif
 			break;
 
 			/*
@@ -1370,6 +1378,23 @@ standard_ProcessUtility(Node *parsetree,
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
 #endif
 			break;
+
+#ifdef PGXC
+		case T_RemoteQuery:
+			Assert(IS_PGXC_COORDINATOR);
+
+			if (!IsConnFromCoord())
+				ExecRemoteUtility((RemoteQuery *) parsetree);
+			break;
+
+		case T_CleanConnStmt:
+			Assert(IS_PGXC_COORDINATOR);
+			CleanConnection((CleanConnStmt *) parsetree);
+
+			if (IS_PGXC_COORDINATOR)
+				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_COORDS, false);
+			break;
+#endif
 
 		default:
 			/* All other statement types have event trigger support */
@@ -1918,31 +1943,6 @@ ProcessUtilitySlow(Node *parsetree,
 				AlterUserMapping((AlterUserMappingStmt *) parsetree);
 				break;
 
-#ifdef PGXC
-			case T_RemoteQuery:
-				/* K.Suzuki, Sep.2nd, 2013
-				 * Moved from standard_ProcessUtility().
-				 */
-				Assert(IS_PGXC_COORDINATOR);
-				/*                                                                                                                            
-				 * Do not launch query on Other Datanodes if remote connection is a Coordinator one                                           
-				 * it will cause a deadlock in the cluster at Datanode levels.                                                                
-				 */
-				if (!IsConnFromCoord())
-					ExecRemoteUtility((RemoteQuery *) parsetree);
-				break;
-
-			case T_CleanConnStmt:
-				/* K.Suzuki, Sep.2nd, 2013
-				 * Moved from standard_ProcessUtility().
-				 */
-				Assert(IS_PGXC_COORDINATOR);
-				CleanConnection((CleanConnStmt *) parsetree);
-
-				if (IS_PGXC_COORDINATOR)
-					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_COORDS, false);
-				break;
-#endif
 
 			case T_DropUserMappingStmt:
 				RemoveUserMapping((DropUserMappingStmt *) parsetree);
