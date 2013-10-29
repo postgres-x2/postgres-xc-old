@@ -110,7 +110,7 @@ CREATE SCHEMA schema_two authorization regression_bob;
 CREATE SCHEMA audit_tbls authorization regression_bob;
 SET SESSION AUTHORIZATION regression_bob;
 
-CREATE TABLE schema_one.table_one(a int);
+CREATE TABLE schema_one.table_one(a int) distribute by replication;
 CREATE TABLE schema_one."table two"(a int);
 CREATE TABLE schema_one.table_three(a int);
 CREATE TABLE audit_tbls.schema_one_table_two(the_value text);
@@ -197,7 +197,8 @@ DROP SCHEMA schema_one, schema_two CASCADE;
 DELETE FROM undroppable_objs WHERE object_identity = 'schema_one.table_three';
 DROP SCHEMA schema_one, schema_two CASCADE;
 
-SELECT * FROM dropped_objects WHERE schema IS NULL OR schema <> 'pg_toast';
+SELECT * FROM dropped_objects WHERE (schema IS NULL OR schema <> 'pg_toast') AND type <> 'pgxc_class'
+	ORDER BY type, object using ~<~;
 
 DROP OWNED BY regression_bob;
 SELECT * FROM dropped_objects WHERE type = 'schema';
