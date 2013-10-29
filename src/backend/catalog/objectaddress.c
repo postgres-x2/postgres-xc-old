@@ -2143,6 +2143,13 @@ getObjectDescription(const ObjectAddress *object)
 				break;
 			}
 
+#ifdef PGXC
+		case OCLASS_PGXC_CLASS:
+			appendStringInfo(&buffer, "pgxc_class %u",
+							 object->objectId);
+			break;
+#endif
+
 		default:
 			appendStringInfo(&buffer, "unrecognized object %u %u %d",
 							 object->classId,
@@ -2553,6 +2560,12 @@ getObjectTypeDescription(const ObjectAddress *object)
 		case OCLASS_EVENT_TRIGGER:
 			appendStringInfo(&buffer, "event trigger");
 			break;
+
+#ifdef PGXC
+		case OCLASS_PGXC_CLASS:
+			appendStringInfo(&buffer, "pgxc_class");
+			break;
+#endif
 
 		default:
 			appendStringInfo(&buffer, "unrecognized %u", object->classId);
@@ -3296,6 +3309,13 @@ getObjectIdentity(const ObjectAddress *object)
 				ReleaseSysCache(tup);
 				break;
 			}
+
+#ifdef PGXC
+		case OCLASS_PGXC_CLASS:
+			appendStringInfo(&buffer, "pgxc_class %u",
+							 object->objectId);
+			break;
+#endif
 
 		default:
 			appendStringInfo(&buffer, "unrecognized object %u %u %d",
