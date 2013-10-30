@@ -354,6 +354,7 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	List			*join_clauses;
 	List			*other_clauses;
 	List			*varlist;
+	RangeTblEntry	*join_rte;
 	/* Variables for the left side of the JOIN */
 	Query			*left_query;
 	List			*left_us_quals;
@@ -366,6 +367,8 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 										 * tree
 										 */
 	RangeTblRef		*left_rtr;
+	List			*left_colvars;
+
 	/* Variables for the right side of the JOIN */
 	Query			*right_query;
 	List			*right_us_quals;
@@ -375,6 +378,7 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	List			*right_colnames;
 	char			*right_aname = "r";
 	RangeTblRef		*right_rtr;
+	List			*right_colvars;
 	/* Miscellaneous variables */
 	ListCell		*lcell;
 
@@ -390,7 +394,8 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 													&left_rep_tlist);
 	left_colnames = pgxc_generate_colnames("a", list_length(left_rep_tlist));
 	left_alias = makeAlias(left_aname, left_colnames);
-	left_rte = addRangeTableEntryForSubquery(NULL, left_query, left_alias, true, false); /* Tentative fix.   Need Ashutosh's review (K.Suzuki) */
+	left_rte = addRangeTableEntryForSubquery(NULL, left_query, left_alias,
+												false, false);
 	rtable = lappend(rtable, left_rte);
 	left_rtr = makeNode(RangeTblRef);
 	left_rtr->rtindex = list_length(rtable);
@@ -404,7 +409,7 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	right_colnames = pgxc_generate_colnames("a", list_length(right_rep_tlist));
 	right_alias = makeAlias(right_aname, right_colnames);
 	right_rte = addRangeTableEntryForSubquery(NULL, right_query, right_alias,
-											  true, false); /* Tentative fix.   Need Ashutosh's review (K.Suzuki) */
+											  false, false);
 	rtable = lappend(rtable, right_rte);
 	right_rtr = makeNode(RangeTblRef);
 	right_rtr->rtindex = list_length(rtable);
@@ -486,6 +491,21 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	join_expr->larg = (Node *)left_rtr;
 	join_expr->rarg = (Node *)right_rtr;
 	join_expr->quals = (Node *)make_ands_explicit(join_clauses);
+
+	/* Build the RTE for JOIN query being created and add it to the rtable */
+	/* We need to construct joinaliasvars from the joining RTEs */
+	expandRTE(left_rte, left_rtr->rtindex, 0, -1, false, NULL, &left_colvars);
+	expandRTE(right_rte, right_rtr->rtindex, 0, -1, false, NULL, &right_colvars);
+	join_rte = addRangeTableEntryForJoin(NULL,
+										list_concat(copyObject(left_colnames),
+													copyObject(right_colnames)),
+										rqpath->jointype,
+										list_concat(left_colvars, right_colvars),
+										NULL, false);
+	rtable = lappend(rtable, join_rte);
+	/* Put the index of this RTE in Join expression */
+	join_expr->rtindex = list_length(rtable);
+
 
 	/* Build the From clause of the JOIN query */
 	from_expr = makeNode(FromExpr);
