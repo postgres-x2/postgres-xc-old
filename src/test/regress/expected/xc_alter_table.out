@@ -3,7 +3,6 @@
 --
 -- Check on dropped columns
 CREATE TABLE xc_alter_table_1 (id serial, name varchar(80), code varchar(80)) DISTRIBUTE BY HASH(id);
-NOTICE:  CREATE TABLE will create implicit sequence "xc_alter_table_1_id_seq" for serial column "xc_alter_table_1.id"
 EXPLAIN (VERBOSE true, COSTS false, NODES false) INSERT INTO xc_alter_table_1(name) VALUES ('aaa'),('bbb'),('ccc');
                                                 QUERY PLAN                                                 
 -----------------------------------------------------------------------------------------------------------
