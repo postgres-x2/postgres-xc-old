@@ -11,8 +11,6 @@ set search_path to xc_trigship,public;
 -----------------
 -- Base table on which the DML operations would be fired.
 create table xctrigemp1 (id int unique, empname varchar unique, empsal float, empadd varchar, trigop varchar) distribute by replication;
-NOTICE:  CREATE TABLE / UNIQUE will create implicit index "xctrigemp1_id_key" for table "xctrigemp1"
-NOTICE:  CREATE TABLE / UNIQUE will create implicit index "xctrigemp1_empname_key" for table "xctrigemp1"
 -- Table where all the logs of DML operations would be dumped.
 create table xc_auditlog (trigdata varchar, nodename varchar) distribute by replication;
 -- Convenience function to be used by all the trigger functions to dump all the trigger
