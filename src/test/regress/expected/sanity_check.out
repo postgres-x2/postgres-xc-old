@@ -169,7 +169,7 @@ SELECT relname, relhasindex
  timetz_tbl              | f
  tinterval_tbl           | f
  varchar_tbl             | f
-(156 rows)
+(158 rows)
 
 --
 -- another sanity check: every system catalog that has OIDs should have
