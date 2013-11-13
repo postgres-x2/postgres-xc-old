@@ -181,6 +181,9 @@ COPY testnull FROM stdin WITH NULL AS E'\\0';
 
 SELECT * FROM testnull ORDER BY 1,2;
 
+-- The following block fails in Postgres-XC because it does not suport
+-- Savepoint yet.
+-- Leave the test as is.
 BEGIN;
 CREATE TABLE vistest (LIKE testeoc);
 COPY vistest FROM stdin CSV;
@@ -188,23 +191,23 @@ a0
 b
 \.
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 BEGIN;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV;
 a1
 b
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 SAVEPOINT s1;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV;
 d1
 e
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 
 BEGIN;
 TRUNCATE vistest;
@@ -212,16 +215,16 @@ COPY vistest FROM stdin CSV FREEZE;
 a2
 b
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 SAVEPOINT s1;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV FREEZE;
 d2
 e
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 
 BEGIN;
 TRUNCATE vistest;
@@ -229,7 +232,7 @@ COPY vistest FROM stdin CSV FREEZE;
 x
 y
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 COMMIT;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV FREEZE;
@@ -270,11 +273,14 @@ COPY vistest FROM stdin CSV FREEZE;
 d4
 e
 \.
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
 DROP TABLE vistest;
 DROP FUNCTION truncate_in_subxact();
+--
+-- End of unsupported savepoint block
+--
 DROP TABLE x, y;
 DROP FUNCTION fn_x_before();
 DROP FUNCTION fn_x_after();

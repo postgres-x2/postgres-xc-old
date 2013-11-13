@@ -260,7 +260,7 @@ BEGIN;
 CREATE TABLE vistest (LIKE testeoc);
 COPY vistest FROM stdin CSV;
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  a0
@@ -270,7 +270,7 @@ SELECT * FROM vistest;
 BEGIN;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  a1
@@ -280,7 +280,7 @@ SELECT * FROM vistest;
 SAVEPOINT s1;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d1
@@ -288,7 +288,7 @@ SELECT * FROM vistest;
 (2 rows)
 
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d1
@@ -298,7 +298,7 @@ SELECT * FROM vistest;
 BEGIN;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV FREEZE;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  a2
@@ -308,7 +308,7 @@ SELECT * FROM vistest;
 SAVEPOINT s1;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV FREEZE;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d2
@@ -316,7 +316,7 @@ SELECT * FROM vistest;
 (2 rows)
 
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d2
@@ -326,7 +326,7 @@ SELECT * FROM vistest;
 BEGIN;
 TRUNCATE vistest;
 COPY vistest FROM stdin CSV FREEZE;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a 
 ---
  x
@@ -369,7 +369,7 @@ SELECT truncate_in_subxact();
 (1 row)
 
 COPY vistest FROM stdin CSV FREEZE;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d4
@@ -377,7 +377,7 @@ SELECT * FROM vistest;
 (2 rows)
 
 COMMIT;
-SELECT * FROM vistest;
+SELECT * FROM vistest ORDER BY 1;
  a  
 ----
  d4
