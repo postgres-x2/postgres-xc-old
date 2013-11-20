@@ -38,6 +38,7 @@
 #include "optimizer/restrictinfo.h"
 #include "optimizer/tlist.h"
 #include "optimizer/var.h"
+#include "optimizer/pathnode.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_oper.h"
@@ -2446,6 +2447,20 @@ pgxc_FQS_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 		if (!ExecSupportsBackwardScan(top_plan))
 			top_plan = materialize_finished_plan(top_plan);
 	}
+
+	/*
+	 * Make a flattened version of the rangetable for faster access (this is
+	 * OK because the rangetable won't change any more), and set up an empty
+	 * array for indexing base relations.
+	 * setup_simple_rel_arrays() function does not check whether the array has
+	 * been already setup or not. If it's already setup, there will be wastage
+	 * of memory. We might call standard_planner() after calling
+	 * pgxc_FQS_planner() in case the later fails.
+	 * In such case, there might be a possibility that setup_simple_rel_arrays()
+	 * gets called twice. Therefore we call this function only after we have
+	 * decided that there will be FQS plan for given query.
+	 */
+	setup_simple_rel_arrays(root);
 
 	/*
 	 * Just before creating the PlannedStmt, do some final cleanup
