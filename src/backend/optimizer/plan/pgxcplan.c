@@ -1017,6 +1017,7 @@ pgxc_build_dml_statement(PlannerInfo *root, CmdType cmdtype,
 	bool			node_id_found = false;
 	int				col_att = 0;
 	int				ctid_param_num;
+	ListCell		*lc;
 
 	/* Make sure we are dealing with DMLs */
 	if (cmdtype != CMD_UPDATE &&
@@ -1034,8 +1035,41 @@ pgxc_build_dml_statement(PlannerInfo *root, CmdType cmdtype,
 	query_to_deparse->commandType = cmdtype;
 	query_to_deparse->resultRelation = resultRelationIndex;
 
-	/* We will modify the RTE, so make a copy */
-	query_to_deparse->rtable = list_copy(root->parse->rtable);
+	/*
+	 * While copying the range table to the query to deparse make sure we do
+	 * not copy RTE's of type RTE_JOIN because set_deparse_for_query
+	 * function expects that each RTE_JOIN is accompanied by a JoinExpr in
+	 * Query's jointree, which is not true in case of XC's DML planning.
+	 * We therefore fill the RTE's of type RTE_JOIN with dummy RTE entries.
+	 * If each RTE of type RTE_JOIN is not accompanied by a corresponding
+	 * JoinExpr in Query's jointree then set_deparse_for_query crashes
+	 * when trying to set_join_column_names, because set_using_names did not
+	 * call identify_join_columns to put valid values in
+	 * deparse_columns::leftrti & deparse_columns::rightrti
+	 * Instead of putting a check in set_join_column_names to return in case
+	 * of invalid values in leftrti or rightrti, it is preferable to change
+	 * code here and skip RTE's of type RTE_JOIN while copying
+	 */
+	foreach(lc, root->parse->rtable)
+	{
+		RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
+
+		if (rte->rtekind == RTE_JOIN)
+		{
+			RangeTblEntry	*dummy_rte;
+			char			*rte_name;
+
+			rte_name = "_DUMMY_RTE_";
+			dummy_rte = make_dummy_remote_rte(rte_name,
+									makeAlias("_DUMMY_RTE_", NIL));
+
+			query_to_deparse->rtable = lappend(query_to_deparse->rtable, dummy_rte);
+		}
+		else
+		{
+			query_to_deparse->rtable = lappend(query_to_deparse->rtable, rte);
+		}
+	}
 
 	res_rel = rt_fetch(resultRelationIndex, query_to_deparse->rtable);
 	Assert(res_rel->rtekind == RTE_RELATION);
