@@ -2492,6 +2492,9 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 {
 	ListCell   *lc;
 	int			rtindex = 1;
+#ifdef PGXC
+	Alias		*alias;
+#endif
 
 	dpns->rtable_names = NIL;
 	foreach(lc, dpns->rtable)
@@ -2565,13 +2568,19 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 			 * unique reference names for each, but that results in missing
 			 * alias in the generated query.
 			 */
-			if (rte->alias)
+			if (rte->alias && rte->alias->colnames)
 			{
+				alias = makeAlias(refname, list_copy(rte->alias->colnames));
+
 				pfree(rte->alias->aliasname);
 				list_free(rte->alias->colnames);
 				pfree(rte->alias);
 			}
-			rte->alias = makeAlias(refname, NIL);
+			else
+			{
+				alias = makeAlias(refname, NIL);
+			}
+			rte->alias = alias;
 			#endif
 		}
 
