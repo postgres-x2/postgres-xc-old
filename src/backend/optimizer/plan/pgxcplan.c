@@ -1073,20 +1073,6 @@ pgxc_build_dml_statement(PlannerInfo *root, CmdType cmdtype,
 
 	res_rel = rt_fetch(resultRelationIndex, query_to_deparse->rtable);
 	Assert(res_rel->rtekind == RTE_RELATION);
-	/*
-	 * If this is RTE for an inherited table, we will have
-	 * res_rel->eref->aliasname set to the name of the parent table.
-	 * Query deparsing logic fully qualifies such relation names while
-	 * generating strings for Var nodes. To avoid this, set the alias
-	 * node to the eref node temporarily. See code in get_variable for ref.
-	 * PGXC_TODO: if get_variable() starts correctly using the aliasname set in
-	 * inherited tables, we don't need this hack here.
-	 * Similarly we do not need schema qualification for temp tables
-	 */
-	if (IsTempTable(res_rel->relid) ||
-		(!res_rel->alias && res_rel->eref && res_rel->eref->aliasname &&
-		strcmp(res_rel->eref->aliasname, get_rel_name(res_rel->relid)) != 0))
-		res_rel->alias = res_rel->eref;
 
 	/* This RTE should appear in FROM clause of the SQL statement constructed */
 	res_rel->inFromCl = true;
