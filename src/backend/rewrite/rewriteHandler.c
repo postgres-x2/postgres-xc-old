@@ -2808,7 +2808,11 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 		RangeTblEntry *rt_entry;
 		Relation	rt_entry_relation;
 		List	   *locks;
+#ifdef PGXC
+		List	   *product_queries = NIL;
+#else
 		List	   *product_queries;
+#endif
 
 		result_relation = parsetree->resultRelation;
 		Assert(result_relation != 0);
@@ -2883,6 +2887,9 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 		locks = matchLocks(event, rt_entry_relation->rd_rules,
 						   result_relation, parsetree);
 
+#ifdef PGXC
+		if (IS_PGXC_COORDINATOR)
+#endif
 		product_queries = fireRules(parsetree,
 									result_relation,
 									event,
@@ -2903,13 +2910,6 @@ RewriteQuery(Query *parsetree, List *rewrite_events)
 			rt_entry_relation->rd_rel->relkind == RELKIND_VIEW &&
 			!view_has_instead_trigger(rt_entry_relation, event))
 		{
-#ifdef PGXC
-			List	   *product_queries = NIL;
-
-			if (IS_PGXC_COORDINATOR)
-#else
-			List	   *product_queries;
-#endif
 			/*
 			 * This throws an error if the view can't be automatically
 			 * updated, but that's OK since the query would fail at runtime
