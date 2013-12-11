@@ -391,11 +391,11 @@ $$begin return 3;end $$ language plpgsql;
          Coordinator quals: (e.salary > (SubPlan 1))
          SubPlan 1
            ->  Aggregate
-                 Output: avg(xcrem_employee.salary)
+                 Output: avg(salary)
                  ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
-                       Output: xcrem_employee.salary
+                       Output: salary
                        Remote query: SELECT salary, workdept FROM ONLY public.xcrem_employee WHERE true
-                       Coordinator quals: ("substring"((e.workdept)::text, 1, 1) = "substring"((xcrem_employee.workdept)::text, 1, 1))
+                       Coordinator quals: ("substring"((e.workdept)::text, 1, 1) = "substring"((workdept)::text, 1, 1))
 (14 rows)
 
 :SEL;
@@ -433,11 +433,11 @@ $$begin return 3;end $$ language plpgsql;
          Coordinator quals: ((e.edlevel)::numeric > (SubPlan 1))
          SubPlan 1
            ->  Aggregate
-                 Output: avg(xcrem_employee.edlevel)
+                 Output: avg(edlevel)
                  ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
-                       Output: xcrem_employee.edlevel
+                       Output: edlevel
                        Remote query: SELECT edlevel, workdept FROM ONLY public.xcrem_employee WHERE true
-                       Coordinator quals: (xcrem_employee.workdept = e.workdept)
+                       Coordinator quals: (workdept = e.workdept)
 (14 rows)
 
 :SEL;
@@ -568,11 +568,11 @@ insert into xcrem_employee select * from xcrem_temptable;
          Coordinator quals: ((e.edlevel)::numeric > (SubPlan 1))
          SubPlan 1
            ->  Aggregate
-                 Output: avg(xcrem_employee.edlevel)
+                 Output: avg(edlevel)
                  ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
-                       Output: xcrem_employee.edlevel
+                       Output: edlevel
                        Remote query: SELECT edlevel, workdept FROM ONLY public.xcrem_employee WHERE true
-                       Coordinator quals: (xcrem_employee.workdept = e.workdept)
+                       Coordinator quals: (workdept = e.workdept)
 (13 rows)
 
 :SEL;
@@ -596,8 +596,8 @@ insert into xcrem_employee select * from xcrem_temptable;
 \set stmt 'DELETE FROM xcrem_employee E WHERE SALARY > ( SELECT AVG(SALARY) FROM xcrem_employee WHERE SUBSTRING(E.WORKDEPT,1,1) = SUBSTRING(WORKDEPT, 1,1) )'
 :stmt;
 :EXP :stmt;
-                                                              QUERY PLAN                                                               
----------------------------------------------------------------------------------------------------------------------------------------
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
  Delete on public.xcrem_employee e
    Remote query: DELETE FROM ONLY public.xcrem_employee e WHERE ((e.ctid = $1) AND (e.xc_node_id = $2))
    ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
@@ -606,11 +606,11 @@ insert into xcrem_employee select * from xcrem_temptable;
          Coordinator quals: (e.salary > (SubPlan 1))
          SubPlan 1
            ->  Aggregate
-                 Output: avg(xcrem_employee.salary)
+                 Output: avg(salary)
                  ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
-                       Output: xcrem_employee.salary
+                       Output: salary
                        Remote query: SELECT salary, workdept FROM ONLY public.xcrem_employee WHERE true
-                       Coordinator quals: ("substring"((e.workdept)::text, 1, 1) = "substring"((xcrem_employee.workdept)::text, 1, 1))
+                       Coordinator quals: ("substring"((e.workdept)::text, 1, 1) = "substring"((workdept)::text, 1, 1))
 (13 rows)
 
 :SEL;
