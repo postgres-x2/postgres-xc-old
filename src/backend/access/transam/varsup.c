@@ -208,7 +208,8 @@ GetNewTransactionId(bool isSubXact)
 		else
 		{
 			/* Fallback to default */
-			elog(LOG, "Falling back to local Xid. Was = %d, now is = %d",
+			if (!useLocalXid)
+				elog(LOG, "Falling back to local Xid. Was = %d, now is = %d",
 					next_xid, ShmemVariableCache->nextXid);
 			xid = ShmemVariableCache->nextXid;
 		}
