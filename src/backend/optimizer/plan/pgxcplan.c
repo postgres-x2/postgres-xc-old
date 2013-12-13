@@ -2353,6 +2353,14 @@ pgxc_handle_exec_direct(Query *query, int cursorOptions,
 
 			result->planTree = (Plan *)pgxc_FQS_create_remote_plan(query, NULL, true);
 			result->rtable = query->rtable;
+
+			/*
+			 * Make a flattened version of the rangetable for faster access (this is
+			 * OK because the rangetable won't change any more), and set up an empty
+			 * array for indexing base relations.
+			 */
+			setup_simple_rel_arrays(root);
+
 			/*
 			 * We need to save plan dependencies, so that dropping objects will
 			 * invalidate the cached plan if it depends on those objects. Table
