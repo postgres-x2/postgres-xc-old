@@ -348,7 +348,6 @@ static bool CopyGetInt16(CopyState cstate, int16 *val);
 
 #ifdef PGXC
 static RemoteCopyOptions *GetRemoteCopyOptions(CopyState cstate);
-static void pgxc_datanode_copybegin(RemoteCopyData *remoteCopyState);
 static void append_defvals(Datum *values, CopyState cstate);
 #endif
 
@@ -1734,7 +1733,7 @@ CopyTo(CopyState cstate)
 	/* Send COPY command to datanode */
 	if (IS_PGXC_COORDINATOR &&
 		cstate->remoteCopyState && cstate->remoteCopyState->rel_loc)
-		pgxc_datanode_copybegin(cstate->remoteCopyState);
+		pgxc_node_copybegin(cstate->remoteCopyState, PGXC_NODE_DATANODE);
 #endif
 
 	if (cstate->rel)
@@ -2342,7 +2341,7 @@ CopyFrom(CopyState cstate)
 		RemoteCopyData *remoteCopyState = cstate->remoteCopyState;
 
 		/* Send COPY command to datanode */
-		pgxc_datanode_copybegin(remoteCopyState);
+		pgxc_node_copybegin(remoteCopyState, PGXC_NODE_DATANODE);
 
 		/* In case of binary COPY FROM, send the header */
 		if (cstate->binary)
@@ -2564,10 +2563,10 @@ CopyFrom(CopyState cstate)
 		RemoteCopyData *remoteCopyState = cstate->remoteCopyState;
 		bool replicated = (remoteCopyState->rel_loc->locatorType
 						   == LOCATOR_TYPE_REPLICATED);
-		DataNodeCopyFinish(
+		pgxcNodeCopyFinish(
 				remoteCopyState->connections,
 				replicated ? PGXCNodeGetNodeId(primary_data_node, PGXC_NODE_DATANODE) : -1,
-				replicated ? COMBINE_TYPE_SAME : COMBINE_TYPE_SUM);
+				replicated ? COMBINE_TYPE_SAME : COMBINE_TYPE_SUM, PGXC_NODE_DATANODE);
 	}
 #endif
 
@@ -4743,12 +4742,12 @@ GetRemoteCopyOptions(CopyState cstate)
 }
 
 /* Convenience wrapper around DataNodeCopyBegin() */
-static void
-pgxc_datanode_copybegin(RemoteCopyData *remoteCopyState)
+extern void
+pgxc_node_copybegin(RemoteCopyData *remoteCopyState, char node_type)
 {
-	remoteCopyState->connections = DataNodeCopyBegin(remoteCopyState->query_buf.data,
+	remoteCopyState->connections = pgxcNodeCopyBegin(remoteCopyState->query_buf.data,
 												 remoteCopyState->exec_nodes->nodeList,
-												 GetActiveSnapshot());
+												 GetActiveSnapshot(), node_type);
 	if (!remoteCopyState->connections)
 		ereport(ERROR,
 				(errcode(ERRCODE_CONNECTION_EXCEPTION),

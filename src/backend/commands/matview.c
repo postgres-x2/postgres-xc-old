@@ -20,17 +20,33 @@
 #include "catalog/catalog.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
+#ifdef PGXC
+#include "catalog/pgxc_node.h"
+#endif /* PGXC */
 #include "commands/cluster.h"
+#ifdef PGXC
+#include "commands/copy.h"
+#include "commands/createas.h"
+#endif /* PGXC */
 #include "commands/matview.h"
 #include "commands/tablecmds.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
+#ifdef PGXC
+#include "pgxc/pgxc.h"
+#include "pgxc/execRemote.h"
+#include "pgxc/remotecopy.h"
+#include "pgxc/copyops.h"
+#endif /* PGXC */
 #include "rewrite/rewriteHandler.h"
 #include "storage/smgr.h"
 #include "tcop/tcopprot.h"
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
+#ifdef PGXC
+#include "utils/tqual.h"
+#endif /* PGXC */
 
 
 typedef struct
@@ -205,6 +221,18 @@ ExecRefreshMatView(RefreshMatViewStmt *stmt, const char *queryString,
 	OIDNewHeap = make_new_heap(matviewOid, tableSpace);
 	dest = CreateTransientRelDestReceiver(OIDNewHeap);
 
+#ifdef PGXC
+	/*
+	 * If the REFRESH command was received from other coordinator, it will also send
+	 * the data to be filled in the materialized view, using COPY protocol.
+	 */
+	if (IsConnFromCoord())
+	{
+		Assert(IS_PGXC_COORDINATOR);
+		pgxc_fill_matview_by_copy(dest, stmt->skipData, 0, NULL);
+	}
+	else
+#endif /* PGXC */
 	/* Generate the data, if wanted. */
 	if (!stmt->skipData)
 		refresh_matview_datafill(dest, dataQuery, queryString);
@@ -369,3 +397,180 @@ transientrel_destroy(DestReceiver *self)
 {
 	pfree(self);
 }
+
+#ifdef PGXC
+/*
+ * This function accepts the data from the coordinator which initiated the
+ * REFRESH MV command and inserts it into the transient relation created for the
+ * materialized view.
+ * The caller provides the materialized view receiver and the argument values to
+ * be passed to the startup function of this receiver.
+ */
+extern void
+pgxc_fill_matview_by_copy(DestReceiver *mv_dest, bool skipdata, int operation,
+							TupleDesc tupdesc)
+{
+	CopyState	cstate;
+	Relation	mv_rel;
+	TupleDesc	tupDesc;
+	Datum		*values;
+	bool		*isnulls;
+	TupleTableSlot	*slot = MakeTupleTableSlot();
+
+	Assert(IS_PGXC_COORDINATOR && IsConnFromCoord());
+
+	/*
+	 * We need to provide the Relation where to copy to BeginCopyFrom. The
+	 * Relation is populated by startup method of the DestReceiver. The startup
+	 * method also creates the relation (in this case the materialized view
+	 * itself or heap thereof), so irrespective of whether we are going to
+	 * populate the MV or not, always fire the starup function.
+	 */
+	mv_dest->rStartup(mv_dest, operation, tupdesc);
+
+	/*
+	 * If we are to populate the the materialized view, only then start copy
+	 * protocol and accept the data. The initiating coordinator too, will send
+	 * the data only when the MV is to be populated.
+	 */
+	if (!skipdata)
+	{
+		if (mv_dest->mydest == DestTransientRel)
+			mv_rel = ((DR_transientrel *)mv_dest)->transientrel;
+		else if (mv_dest->mydest == DestIntoRel)
+			mv_rel = get_dest_into_rel(mv_dest);
+
+		tupDesc = RelationGetDescr(mv_rel);
+		values = (Datum *) palloc0(sizeof(Datum) * tupDesc->natts);
+		isnulls = (bool *) palloc0(sizeof(bool) * tupDesc->natts);
+		ExecSetSlotDescriptor(slot, tupDesc);
+		/*
+		 * Prepare structures to start receiving the data sent by the other
+		 * coordinator through COPY protocol.
+		 */
+		cstate = BeginCopyFrom(mv_rel, NULL, false, NULL, NULL);
+		/* Read the rows one by one and insert into the materialized view */
+		for(;;)
+		{
+			Oid				tupleOid; /* Temporary variable passed to NextCopyFrom() */
+			HeapTuple		tuple;
+			ExecClearTuple(slot);
+			/*
+			 * Pull next row. The expression context is not used here, since there
+			 * are no default expressions expected. Tuple OID too is not expected
+			 * for materialized view.
+			 */
+			if (!NextCopyFrom(cstate, NULL, values, isnulls, &tupleOid))
+				break;
+
+			/* Create the tuple and slot out of the values read */
+			tuple = heap_form_tuple(tupDesc, values, isnulls);
+			ExecStoreTuple(tuple, slot, 0, false);
+
+			/* Insert the row in the materialized view */
+			mv_dest->receiveSlot(slot, mv_dest);
+		}
+		ReleaseTupleDesc(tupDesc);
+		EndCopyFrom(cstate);
+	}
+
+	/* Done, close the receiver and flag the end of COPY FROM */
+	mv_dest->rShutdown(mv_dest);
+
+}
+
+/*
+ * The function scans the recently refreshed materialized view and send the data
+ * to the other coordinators to "refresh" materialized views at those
+ * coordinators.
+ * The query_string is expected to contain the DDL which requires this data
+ * transfer e.g. CREATE MV or REFRSH MV. The DDL is sent to the other
+ * coordinators, which in turn start receiving the data to populate the
+ * materialized view.
+ */
+extern void
+pgxc_send_matview_data(RangeVar *matview_rv, const char *query_string)
+{
+	Oid				matviewOid;
+	Relation		matviewRel;
+	RemoteCopyData	*copyState;
+	TupleDesc 		tupdesc;
+	HeapScanDesc 	scandesc;
+	HeapTuple		tuple;
+	Datum			*values;
+	bool			*nulls;
+
+	/*
+	 * This function should be called only from the coordinator where the
+	 * REFRESH MV command is fired.
+	 */
+	Assert (IS_PGXC_COORDINATOR && !IsConnFromCoord());
+	/*
+	 * The other coordinator will start accepting data through COPY protocol in
+	 * response to the DDL. So, start sending the data with COPY
+	 * protocol to the other coordinators.
+	 */
+
+	/* Prepare the RemoteCopyData for the COPYing data to the other coordinators */
+	copyState = (RemoteCopyData *) palloc0(sizeof(RemoteCopyData));
+	copyState->exec_nodes = makeNode(ExecNodes);
+	/* We are copying the data from the materialized view */
+	copyState->is_from = false;
+	/* Materialized views are available on all the coordinators. */
+	copyState->exec_nodes->nodeList = GetAllCoordNodes();
+	initStringInfo(&(copyState->query_buf));
+	appendStringInfoString(&(copyState->query_buf), query_string);
+	/* Begin redistribution on remote nodes */
+	copyState->connections = pgxcNodeCopyBegin(copyState->query_buf.data,
+											   copyState->exec_nodes->nodeList,
+											   GetActiveSnapshot(),
+											   PGXC_NODE_COORDINATOR);
+
+	/*
+	 * Open the relation for reading.
+	 * Get a lock until end of transaction.
+	 */
+	matviewOid = RangeVarGetRelidExtended(matview_rv,
+										  AccessShareLock, false, false,
+										  RangeVarCallbackOwnsTable, NULL);
+	matviewRel = heap_open(matviewOid, NoLock);
+	tupdesc = RelationGetDescr(matviewRel);
+	values = (Datum *) palloc(tupdesc->natts * sizeof(Datum));
+	nulls = (bool *) palloc(tupdesc->natts * sizeof(bool));
+	scandesc = heap_beginscan(matviewRel, SnapshotAny, 0, NULL);
+
+	/* Send each tuple to the other coordinators in COPY format */
+	while ((tuple = heap_getnext(scandesc, ForwardScanDirection)) != NULL)
+	{
+		char *data;
+		int len;
+
+		CHECK_FOR_INTERRUPTS();
+		/* Deconstruct the tuple to get the values for the attributes */
+		heap_deform_tuple(tuple, tupdesc, values, nulls);
+
+		/* Format and send the data */
+		data = CopyOps_BuildOneRowTo(tupdesc, values, nulls, &len);
+
+		DataNodeCopyIn(data,
+					   len,
+					   copyState->exec_nodes,
+					   copyState->connections);
+		pfree(data);
+	}
+
+	heap_endscan(scandesc);
+	pfree(values);
+	pfree(nulls);
+
+	/*
+	 * Finish the redistribution process. There is no primary node for
+	 * Materialized view and it's replicated on all the coordinators
+	 */
+	pgxcNodeCopyFinish(copyState->connections, -1, COMBINE_TYPE_SAME, PGXC_NODE_COORDINATOR);
+
+	/* Lock is maintained until transaction commits */
+	relation_close(matviewRel, NoLock);
+	return;
+}
+#endif /* PGXC */

@@ -22,6 +22,7 @@
 #include "parser/parsetree.h"
 #include "pgxc/pgxc.h"
 #include "optimizer/pgxcplan.h"
+#include "tcop/tcopprot.h"
 
 static RemoteQueryPath *pgxc_find_remotequery_path(RelOptInfo *rel);
 static RemoteQueryPath *create_remotequery_path(PlannerInfo *root, RelOptInfo *rel,

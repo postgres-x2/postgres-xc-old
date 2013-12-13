@@ -35,5 +35,9 @@ extern bool NextCopyFromRawFields(CopyState cstate,
 extern void CopyFromErrorCallback(void *arg);
 
 extern DestReceiver *CreateCopyDestReceiver(void);
+#ifdef PGXC
+extern CopyState pgxcMatViewBeginCopyTo(Relation mvrel);
+extern int64 pgxcDoCopyTo(CopyState cstate);
+#endif /* PGXC */
 
 #endif   /* COPY_H */

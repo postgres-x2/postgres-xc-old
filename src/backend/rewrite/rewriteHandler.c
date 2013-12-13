@@ -3342,6 +3342,7 @@ QueryRewrite(Query *parsetree)
  * INSERT INTO .. SELECT query. The target table must be created first using
  * utility command processing. This takes care of creating the target table on
  * all the Coordinators and the Datanodes.
+ * This function is not used for CTAS statements for materialized views.
  */
 List *
 QueryRewriteCTAS(Query *parsetree)

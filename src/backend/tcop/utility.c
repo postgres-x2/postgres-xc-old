@@ -24,6 +24,9 @@
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
+#ifdef PGXC
+#include "catalog/index.h"
+#endif /* PGXC */
 #include "commands/alter.h"
 #include "commands/async.h"
 #include "commands/cluster.h"
@@ -2113,11 +2116,32 @@ ProcessUtilitySlow(Node *parsetree,
 			case T_CreateTableAsStmt:
 				ExecCreateTableAs((CreateTableAsStmt *) parsetree,
 								  queryString, params, completionTag);
+#ifdef PGXC
+				/* Send CREATE MATERIALIZED VIEW command to all coordinators. */
+				Assert(((CreateTableAsStmt *) parsetree)->relkind == OBJECT_MATVIEW);
+				if (!((CreateTableAsStmt *) parsetree)->into->skipData && !IsConnFromCoord())
+					pgxc_send_matview_data(((CreateTableAsStmt *) parsetree)->into->rel,
+											queryString);
+				else
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_COORDS, false);
+
+#endif /* PGXC */
 				break;
 
 			case T_RefreshMatViewStmt:
 				ExecRefreshMatView((RefreshMatViewStmt *) parsetree,
 								   queryString, params, completionTag);
+#ifdef PGXC
+				Assert(IS_PGXC_COORDINATOR);
+				/* Send REFRESH MATERIALIZED VIEW command and the data to be populated
+				 * to all coordinators.
+				 */
+				if (!((RefreshMatViewStmt *)parsetree)->skipData && !IsConnFromCoord())
+					pgxc_send_matview_data(((RefreshMatViewStmt *)parsetree)->relation,
+											queryString);
+				else
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_COORDS, false);
+#endif /* PGXC */
 				break;
 
 			case T_CreateTrigStmt:
@@ -2345,7 +2369,12 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 #ifdef PGXC
 			{
 				bool		is_temp = false;
-				RemoteQueryExecType exec_type = EXEC_ON_ALL_NODES;
+				RemoteQueryExecType exec_type;
+
+				if (stmt->removeType == OBJECT_MATVIEW)
+					exec_type = EXEC_ON_COORDS;
+				else
+					exec_type = EXEC_ON_ALL_NODES;
 
 				/* Check restrictions on objects dropped */
 				DropStmtPreTreatment(stmt, queryString, sentToRemote,
@@ -2595,8 +2624,22 @@ ExecUtilityFindNodes(ObjectType object_type,
 			/* Check if given index uses temporary tables */
 			if ((*is_temp = IsTempTable(object_id)))
 				exec_type = EXEC_ON_DATANODES;
+			/*
+			 * Materialized views and hence index on those are located on
+			 * coordinators
+			 */
+			else if (get_rel_relkind(object_id) == RELKIND_MATVIEW ||
+						(get_rel_relkind(object_id) == RELKIND_INDEX &&
+							get_rel_relkind(IndexGetRelation(object_id, false)) == RELKIND_MATVIEW))
+				exec_type = EXEC_ON_COORDS;
 			else
 				exec_type = EXEC_ON_ALL_NODES;
+			break;
+
+		case OBJECT_MATVIEW:
+			/* Materialized views are located only on the coordinators */
+			*is_temp = false;
+			exec_type = EXEC_ON_COORDS;
 			break;
 
 		default:
@@ -4403,7 +4446,7 @@ DropStmtPreTreatment(DropStmt *stmt, const char *queryString, bool sentToRemote,
 
 		default:
 			res_is_temp = false;
-			res_exec_type = EXEC_ON_ALL_NODES;
+			res_exec_type = *exec_type;
 			break;
 	}
 

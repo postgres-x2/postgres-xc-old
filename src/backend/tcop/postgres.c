@@ -756,14 +756,16 @@ pg_rewrite_query(Query *query)
 
 #ifdef PGXC
 	if (query->commandType == CMD_UTILITY &&
-		IsA(query->utilityStmt, CreateTableAsStmt))
+		IsA(query->utilityStmt, CreateTableAsStmt) &&
+		((CreateTableAsStmt *)query->utilityStmt)->relkind != OBJECT_MATVIEW)
 	{
 		/*
 		 * CREATE TABLE AS SELECT and SELECT INTO are rewritten so that the
 		 * target table is created first. The SELECT query is then transformed
-		 * into an INSERT INTO statement
+		 * into an INSERT INTO statement. This step is not carried out for
+		 * materialized views.
 		 */
-		querytree_list = QueryRewriteCTAS(query);
+			querytree_list = QueryRewriteCTAS(query);
 	}
 	else
 #endif
