@@ -28,6 +28,7 @@
 #include "pgxc/nodemgr.h"
 #include "pgxc/pgxc.h"
 #include "access/htup_details.h"
+#include "pg_config.h"
 
 /*
  * How many times should we try to find a unique indetifier
@@ -536,7 +537,7 @@ PgxcNodeCreate(CreateNodeStmt *stmt)
 	 */
 	if (node_port == 0)
 	{
-		node_port = 5432;
+		node_port = DEF_PGPORT;
 		elog(NOTICE, "PGXC node %s: Applying default port value: %d",
 			 node_name, node_port);
 	}
