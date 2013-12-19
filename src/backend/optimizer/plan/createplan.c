@@ -4895,4 +4895,11 @@ pgxc_create_gating_plan(PlannerInfo *root, Plan *plan, List *quals)
 {
 	return create_gating_plan(root, plan, quals);
 }
+
+extern Node *
+pgxc_replace_nestloop_params(PlannerInfo *root, Node *expr)
+{
+	return replace_nestloop_params(root, expr);
+}
+
 #endif /* PGXC */

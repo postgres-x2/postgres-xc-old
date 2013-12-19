@@ -258,6 +258,14 @@ pgxc_build_shippable_query_baserel(PlannerInfo *root, RemoteQueryPath *rqpath,
 	scan_clauses = pgxc_order_qual_clauses(root, baserel->baserestrictinfo);
 	scan_clauses = list_concat(extract_actual_clauses(scan_clauses, false),
 								extract_actual_clauses(scan_clauses, true));
+
+	/* Replace any outer-relation variables with nestloop params */
+	if (rqpath->path.param_info)
+	{
+		scan_clauses = (List *)
+			pgxc_replace_nestloop_params(root, (Node *) scan_clauses);
+	}
+
 	shippable_quals = pgxc_separate_quals(scan_clauses, unshippable_quals, false);
 	shippable_quals = copyObject(shippable_quals);
 
@@ -266,6 +274,10 @@ pgxc_build_shippable_query_baserel(PlannerInfo *root, RemoteQueryPath *rqpath,
 	 * start with.
 	 */
 	tlist = pgxc_build_relation_tlist(baserel);
+	/* Take care of parameterization in the target list */
+	if (rqpath->path.param_info)
+		tlist = (List *) pgxc_replace_nestloop_params(root, (Node *) tlist);
+
 	tlist = pull_var_clause((Node *)tlist, PVC_REJECT_AGGREGATES,
 										PVC_RECURSE_PLACEHOLDERS);
 	tlist = list_concat(tlist, pull_var_clause((Node *)*unshippable_quals,
@@ -395,6 +407,11 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 													&left_rep_tlist);
 	left_colnames = pgxc_generate_colnames("a", list_length(left_rep_tlist));
 	left_alias = makeAlias(left_aname, left_colnames);
+	/*
+	 * As of now (1st Nov. 2013) we do not expect a LATERAL query to be shipped
+	 * through this function. See notes in prologue of
+	 * create_remotequery_path().
+	 */
 	left_rte = addRangeTableEntryForSubquery(NULL, left_query, left_alias,
 												false, false);
 	rtable = lappend(rtable, left_rte);
@@ -409,6 +426,11 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 													&right_rep_tlist);
 	right_colnames = pgxc_generate_colnames("a", list_length(right_rep_tlist));
 	right_alias = makeAlias(right_aname, right_colnames);
+	/*
+	 * As of now (1st Nov. 2013) we do not expect a LATERAL query to be shipped
+	 * through this function. See notes in prologue of
+	 * create_remotequery_path().
+	 */
 	right_rte = addRangeTableEntryForSubquery(NULL, right_query, right_alias,
 											  false, false);
 	rtable = lappend(rtable, right_rte);
@@ -425,15 +447,28 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	 */
 	extract_actual_join_clauses(rqpath->join_restrictlist, &join_clauses,
 									&other_clauses);
-	if (!pgxc_is_expr_shippable((Expr *)join_clauses, NULL))
-		elog(ERROR, "join with unshippable join clauses can not be shipped");
 	join_clauses = copyObject(join_clauses);
 	other_clauses = list_concat(other_clauses,
 								extract_actual_clauses(rqpath->join_restrictlist,
 														true));
+	/*
+	 * Replace any outer-relation variables with nestloop params.
+	 * Do this before separating shippable and unshippable quals.
+	 * The quals with nested loop parameters are not shippable.
+	 */
+	if (rqpath->path.param_info)
+	{
+		join_clauses = (List *)
+			pgxc_replace_nestloop_params(root, (Node *) join_clauses);
+		other_clauses = (List *)
+			pgxc_replace_nestloop_params(root, (Node *) other_clauses);
+	}
 	other_clauses = pgxc_separate_quals(other_clauses, unshippable_quals, false);
 	other_clauses = copyObject(other_clauses);
 
+	/* Assert what we checked back in pgxc_is_join_shippable() */
+	if (!pgxc_is_expr_shippable((Expr *)join_clauses, NULL))
+		elog(ERROR, "join with unshippable join clauses can not be shipped");
 	/*
 	 * Build the targetlist for this relation and also the targetlist
 	 * representing the query targetlist. The representative target list is in
@@ -506,7 +541,6 @@ pgxc_build_shippable_query_jointree(PlannerInfo *root, RemoteQueryPath *rqpath,
 	rtable = lappend(rtable, join_rte);
 	/* Put the index of this RTE in Join expression */
 	join_expr->rtindex = list_length(rtable);
-
 
 	/* Build the From clause of the JOIN query */
 	from_expr = makeNode(FromExpr);
@@ -690,6 +724,9 @@ create_remotequery_plan(PlannerInfo *root, RemoteQueryPath *best_path)
 
 	/* Get the target list required from this plan */
 	tlist = pgxc_build_relation_tlist(rel);
+	/* Replace the lateral refrences if any */
+	if (best_path->path.param_info)
+		tlist = (List *)pgxc_replace_nestloop_params(root, (Node *)tlist);
 	result_node = makeNode(RemoteQuery);
 	result_node->scan.plan.targetlist = tlist;
 	pgxc_build_shippable_query(root, best_path, result_node);

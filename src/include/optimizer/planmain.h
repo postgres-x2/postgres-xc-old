@@ -151,6 +151,7 @@ extern List *pgxc_order_qual_clauses(PlannerInfo *root, List *clauses);
 extern List *pgxc_build_relation_tlist(RelOptInfo *rel);
 extern void pgxc_copy_path_costsize(Plan *dest, Path *src);
 extern Plan *pgxc_create_gating_plan(PlannerInfo *root, Plan *plan, List *quals);
+extern Node *pgxc_replace_nestloop_params(PlannerInfo *root, Node *expr);
 #endif
 
 #endif   /* PLANMAIN_H */

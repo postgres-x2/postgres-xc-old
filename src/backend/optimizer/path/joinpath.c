@@ -225,7 +225,7 @@ add_paths_to_joinrel(PlannerInfo *root,
 	 * corresponding to the this JOIN.
 	 */
 	create_joinrel_rqpath(root, joinrel, outerrel, innerrel, restrictlist,
-								jointype, sjinfo);
+								jointype, sjinfo, param_source_rels);
 #endif /* PGXC */
 }
 
