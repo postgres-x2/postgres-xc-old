@@ -8615,8 +8615,6 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			 * columns can be referred to as view_name.col1, so it should
 			 * be possible to refer to this subquery object.
 			 */
-			appendStringInfo(buf, " %s",
-							 quote_identifier(rte->eref->aliasname));
 			printalias = true;
 		}
 #endif
