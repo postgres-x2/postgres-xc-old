@@ -384,56 +384,56 @@ SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
 
 -- Now check the results from bitmap indexscan
 SET enable_seqscan = OFF;
@@ -513,56 +513,56 @@ SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
 
 RESET enable_seqscan;
 RESET enable_indexscan;

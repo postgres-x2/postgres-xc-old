@@ -906,7 +906,7 @@ SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -919,7 +919,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -932,7 +932,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -945,7 +945,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -959,7 +959,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -973,7 +973,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -987,7 +987,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1001,7 +1001,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1014,7 +1014,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1027,7 +1027,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1041,7 +1041,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1055,7 +1055,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1069,7 +1069,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1341,7 +1341,7 @@ SELECT count(*) FROM kd_point_tbl WHERE p ~= '(4585, 365)';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdef';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1354,7 +1354,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdef';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcde';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1367,7 +1367,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcde';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t = 'P0123456789abcdefF';
+SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1380,7 +1380,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t = 'P0123456789abcdefF';
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1394,7 +1394,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t <    'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1408,7 +1408,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~<~  'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t <=   'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1422,7 +1422,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t <=   'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         Ct  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1436,7 +1436,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~<=~ 'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Aztec                         Ct  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         Ct  ';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1449,7 +1449,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t =    'Aztec                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t =    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         St  ';
                 QUERY PLAN                
 ------------------------------------------
  Data Node Scan on "__REMOTE_FQS_QUERY__"
@@ -1462,7 +1462,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t =    'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >=   'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1476,7 +1476,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t >=   'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1490,7 +1490,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t ~>=~ 'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t >    'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -1504,7 +1504,7 @@ SELECT count(*) FROM radix_text_tbl WHERE t >    'Worth                         
 (1 row)
 
 EXPLAIN (NUM_NODES OFF, NODES OFF, COSTS OFF)
-SELECT count(*) FROM suffix_text_tbl WHERE t ~>~  'Worth                         St  ';
+SELECT count(*) FROM radix_text_tbl WHERE t ~>~  'Worth                         St  ';
                     QUERY PLAN                    
 --------------------------------------------------
  Aggregate
@@ -2161,27 +2161,36 @@ Indexes:
 -- Try some concurrent index drops
 --
 DROP INDEX CONCURRENTLY "concur_index2";				-- works
-ERROR:  index "concur_index2" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 DROP INDEX CONCURRENTLY IF EXISTS "concur_index2";		-- notice
-NOTICE:  index "concur_index2" does not exist, skipping
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 -- failures
 DROP INDEX CONCURRENTLY "concur_index2", "concur_index3";
-ERROR:  index "concur_index2" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 BEGIN;
 DROP INDEX CONCURRENTLY "concur_index5";
-ERROR:  DROP INDEX CONCURRENTLY cannot run inside a transaction block
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 ROLLBACK;
 -- successes
 DROP INDEX CONCURRENTLY IF EXISTS "concur_index3";
-ERROR:  index "concur_index3" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 DROP INDEX CONCURRENTLY "concur_index4";
-ERROR:  index "concur_index4" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 DROP INDEX CONCURRENTLY "concur_index5";
-ERROR:  index "concur_index5" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 DROP INDEX CONCURRENTLY "concur_index1";
-ERROR:  index "concur_index1" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 DROP INDEX CONCURRENTLY "concur_heap_expr_idx";
-ERROR:  index "concur_heap_expr_idx" does not exist
+ERROR:  PGXC does not support concurrent INDEX yet
+DETAIL:  The feature is not currently supported
 \d concur_heap
 Table "public.concur_heap"
  Column | Type | Modifiers 
@@ -2512,11 +2521,13 @@ explain (costs off)
 SELECT unique1 FROM tenk1
 WHERE unique1 IN (1,42,7)
 ORDER BY unique1;
-                      QUERY PLAN                       
--------------------------------------------------------
- Index Only Scan using tenk1_unique1 on tenk1
-   Index Cond: (unique1 = ANY ('{1,42,7}'::integer[]))
-(2 rows)
+                   QUERY PLAN                    
+-------------------------------------------------
+ Sort
+   Sort Key: tenk1.unique1
+   ->  Data Node Scan on "__REMOTE_SORT_QUERY__"
+         Node/s: dn1, dn2
+(4 rows)
 
 SELECT unique1 FROM tenk1
 WHERE unique1 IN (1,42,7)
@@ -2532,12 +2543,12 @@ explain (costs off)
 SELECT thousand, tenthous FROM tenk1
 WHERE thousand < 2 AND tenthous IN (1001,3000)
 ORDER BY thousand;
-                                      QUERY PLAN                                      
---------------------------------------------------------------------------------------
+                   QUERY PLAN                    
+-------------------------------------------------
  Sort
-   Sort Key: thousand
-   ->  Index Only Scan using tenk1_thous_tenthous on tenk1
-         Index Cond: ((thousand < 2) AND (tenthous = ANY ('{1001,3000}'::integer[])))
+   Sort Key: tenk1.thousand
+   ->  Data Node Scan on "__REMOTE_SORT_QUERY__"
+         Node/s: dn1, dn2
 (4 rows)
 
 SELECT thousand, tenthous FROM tenk1
