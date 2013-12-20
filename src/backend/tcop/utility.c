@@ -2357,8 +2357,16 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 	{
 		case OBJECT_INDEX:
 			if (stmt->concurrent)
+#ifdef PGXC
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("PGXC does not support concurrent INDEX yet"),
+						 errdetail("The feature is not currently supported")));
+
+#else
 				PreventTransactionChain(isTopLevel,
 										"DROP INDEX CONCURRENTLY");
+#endif
 			/* fall through */
 
 		case OBJECT_TABLE:
