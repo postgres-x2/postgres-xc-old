@@ -740,7 +740,7 @@ SELECT name(equipment_named_ambiguous_2a(text 'skywalking'));
  guts
 (1 row)
 
-SELECT name(equipment_named_ambiguous_2b(text 'skywalking'));
+SELECT name(equipment_named_ambiguous_2b(text 'skywalking')) ORDER BY 1;
      name      
 ---------------
  advil

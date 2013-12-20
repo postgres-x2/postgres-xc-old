@@ -628,7 +628,6 @@ SELECT user_relns() AS user_relns
  hash_name_heap
  hash_txt_heap
  hobbies_r
- hogeview
  iexit
  ihighway
  inet_tbl
@@ -646,8 +645,6 @@ SELECT user_relns() AS user_relns
  lseg_tbl
  main_table
  money_data
- mv_test2
- mv_test3
  num_data
  num_exp_add
  num_exp_div
@@ -677,6 +674,7 @@ SELECT user_relns() AS user_relns
  street
  stud_emp
  student
+ subselect_tbl
  t
  tenk1
  tenk2
@@ -701,7 +699,7 @@ SELECT user_relns() AS user_relns
  tvvmv
  varchar_tbl
  xacttest
-(121 rows)
+(119 rows)
 
 SELECT name(equipment(hobby_construct(text 'skywalking', text 'mer')));
  name 
