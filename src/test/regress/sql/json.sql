@@ -111,7 +111,7 @@ SELECT json_agg(q)
          FROM generate_series(1,2) x,
               generate_series(4,5) y) q;
 
-SELECT json_agg(q)
+SELECT json_agg(q order by 1)
   FROM rows q;
 
 -- non-numeric output
