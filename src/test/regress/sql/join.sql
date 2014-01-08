@@ -793,7 +793,7 @@ select b.unique1 from
   right join int4_tbl i2 on i2.f1 = b.tenthous
   order by 1;
 
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
 select * from
 (
   select unique1, q1, coalesce(unique1, -1) + q1 as fault
@@ -814,7 +814,7 @@ order by fault;
 -- test handling of potential equivalence clauses above outer joins
 --
 
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
 select q1, unique2, thousand, hundred
   from int8_tbl a left join tenk1 b on q1 = unique2
   where coalesce(thousand,123) = q1 and q1 = coalesce(hundred,123);
@@ -823,7 +823,7 @@ select q1, unique2, thousand, hundred
   from int8_tbl a left join tenk1 b on q1 = unique2
   where coalesce(thousand,123) = q1 and q1 = coalesce(hundred,123);
 
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
 select f1, unique2, case when unique2 is null then f1 else 0 end
   from int4_tbl a left join tenk1 b on f1 = unique2
   where (case when unique2 is null then f1 else 0 end) = 0;
@@ -836,10 +836,10 @@ select f1, unique2, case when unique2 is null then f1 else 0 end
 -- test ability to push constants through outer join clauses
 --
 
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select * from int4_tbl a left join tenk1 b on f1 = unique2 where f1 = 0;
 
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select * from tenk1 a full join tenk1 b using(unique2) where unique2 = 42;
 
 --
@@ -940,40 +940,40 @@ rollback;
 
 select unique2, x.*
 from tenk1 a, lateral (select * from int4_tbl b where f1 = a.unique1) x;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select unique2, x.*
   from tenk1 a, lateral (select * from int4_tbl b where f1 = a.unique1) x;
 select unique2, x.*
 from int4_tbl x, lateral (select unique2 from tenk1 where f1 = unique1) ss;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select unique2, x.*
   from int4_tbl x, lateral (select unique2 from tenk1 where f1 = unique1) ss;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select unique2, x.*
   from int4_tbl x cross join lateral (select unique2 from tenk1 where f1 = unique1) ss;
 select unique2, x.*
 from int4_tbl x left join lateral (select unique1, unique2 from tenk1 where f1 = unique1) ss on true;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select unique2, x.*
   from int4_tbl x left join lateral (select unique1, unique2 from tenk1 where f1 = unique1) ss on true;
 
 -- check scoping of lateral versus parent references
 -- the first of these should return int8_tbl.q2, the second int8_tbl.q1
-select *, (select r from (select q1 as q2) x, (select q2 as r) y) from int8_tbl;
-select *, (select r from (select q1 as q2) x, lateral (select q2 as r) y) from int8_tbl;
+select *, (select r from (select q1 as q2) x, (select q2 as r) y) from int8_tbl order by 1,2,3;
+select *, (select r from (select q1 as q2) x, lateral (select q2 as r) y) from int8_tbl order by 1,2,3;
 
 -- lateral with function in FROM
 select count(*) from tenk1 a, lateral generate_series(1,two) g;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select count(*) from tenk1 a, lateral generate_series(1,two) g;
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select count(*) from tenk1 a cross join lateral generate_series(1,two) g;
 -- don't need the explicit LATERAL keyword for functions
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select count(*) from tenk1 a, generate_series(1,two) g;
 
 -- lateral with UNION ALL subselect
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select * from generate_series(100,200) g,
     lateral (select * from int8_tbl a where g = q1 union all
              select * from int8_tbl b where g = q2) ss;
@@ -982,26 +982,26 @@ select * from generate_series(100,200) g,
            select * from int8_tbl b where g = q2) ss;
 
 -- lateral with VALUES
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select count(*) from tenk1 a,
     tenk1 b join lateral (values(a.unique1)) ss(x) on b.unique2 = ss.x;
 select count(*) from tenk1 a,
   tenk1 b join lateral (values(a.unique1)) ss(x) on b.unique2 = ss.x;
 
 -- lateral injecting a strange outer join condition
-explain (costs off)
+explain (costs off, num_nodes off, nodes off)
   select * from int8_tbl a,
     int8_tbl x left join lateral (select a.q1 from int4_tbl y) ss(z)
       on x.q2 = ss.z;
 select * from int8_tbl a,
   int8_tbl x left join lateral (select a.q1 from int4_tbl y) ss(z)
-    on x.q2 = ss.z;
+    on x.q2 = ss.z order by 1,2,3,4,5;
 
 -- lateral reference to a join alias variable
 select * from (select f1/2 as x from int4_tbl) ss1 join int4_tbl i4 on x = f1,
   lateral (select x) ss2(y);
 select * from (select f1 as x from int4_tbl) ss1 join int4_tbl i4 on x = f1,
-  lateral (values(x)) ss2(y);
+  lateral (values(x)) ss2(y) ORDER BY 1,2,3;
 select * from ((select f1/2 as x from int4_tbl) ss1 join int4_tbl i4 on x = f1) j,
   lateral (select x) ss2(y);
 
@@ -1009,38 +1009,38 @@ select * from ((select f1/2 as x from int4_tbl) ss1 join int4_tbl i4 on x = f1) 
 select * from (values(1)) x(lb),
   lateral generate_series(lb,4) x4;
 select * from (select f1/1000000000 from int4_tbl) x(lb),
-  lateral generate_series(lb,4) x4;
+  lateral generate_series(lb,4) x4 ORDER BY 1, 2;
 select * from (values(1)) x(lb),
   lateral (values(lb)) y(lbcopy);
 select * from (values(1)) x(lb),
   lateral (select lb from int4_tbl) y(lbcopy);
 select * from
   int8_tbl x left join (select q1,coalesce(q2,0) q2 from int8_tbl) y on x.q2 = y.q1,
-  lateral (values(x.q1,y.q1,y.q2)) v(xq1,yq1,yq2);
+  lateral (values(x.q1,y.q1,y.q2)) v(xq1,yq1,yq2) ORDER BY 1,2,3,4,5,6,7;
 select * from
   int8_tbl x left join (select q1,coalesce(q2,0) q2 from int8_tbl) y on x.q2 = y.q1,
-  lateral (select x.q1,y.q1,y.q2) v(xq1,yq1,yq2);
+  lateral (select x.q1,y.q1,y.q2) v(xq1,yq1,yq2) ORDER BY 1,2,3,4,5,6,7;
 select x.* from
   int8_tbl x left join (select q1,coalesce(q2,0) q2 from int8_tbl) y on x.q2 = y.q1,
-  lateral (select x.q1,y.q1,y.q2) v(xq1,yq1,yq2);
+  lateral (select x.q1,y.q1,y.q2) v(xq1,yq1,yq2) ORDER BY 1,2;
 select v.* from
   (int8_tbl x left join (select q1,coalesce(q2,0) q2 from int8_tbl) y on x.q2 = y.q1)
   left join int4_tbl z on z.f1 = x.q2,
-  lateral (select x.q1,y.q1 union all select x.q2,y.q2) v(vx,vy);
+  lateral (select x.q1,y.q1 union all select x.q2,y.q2) v(vx,vy) ORDER BY 1,2;
 select v.* from
   (int8_tbl x left join (select q1,(select coalesce(q2,0)) q2 from int8_tbl) y on x.q2 = y.q1)
   left join int4_tbl z on z.f1 = x.q2,
-  lateral (select x.q1,y.q1 union all select x.q2,y.q2) v(vx,vy);
+  lateral (select x.q1,y.q1 union all select x.q2,y.q2) v(vx,vy) ORDER BY 1,2;
 create temp table dual();
 insert into dual default values;
 analyze dual;
 select v.* from
   (int8_tbl x left join (select q1,(select coalesce(q2,0)) q2 from int8_tbl) y on x.q2 = y.q1)
   left join int4_tbl z on z.f1 = x.q2,
-  lateral (select x.q1,y.q1 from dual union all select x.q2,y.q2 from dual) v(vx,vy);
+  lateral (select x.q1,y.q1 from dual union all select x.q2,y.q2 from dual) v(vx,vy) ORDER BY 1,2;
 
 -- case requiring nested PlaceHolderVars
-explain (verbose, costs off)
+explain (verbose, num_nodes off, nodes off, costs off)
 select * from
   int8_tbl c left join (
     int8_tbl a left join (select q1, coalesce(q2,42) as x from int8_tbl b) ss1
