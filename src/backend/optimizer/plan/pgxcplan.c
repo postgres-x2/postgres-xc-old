@@ -1174,75 +1174,38 @@ pgxc_build_dml_statement(PlannerInfo *root, CmdType cmdtype,
 	}
 
 	/*
-	 * For UPDATEs the targetList will specify the SET clause
-	 * The number of entries will be the same as the number
-	 * of enries in the target list of original query,
-	 * however their form has to be changed to col_name = $4
-	 * The query deparsing logic obtains the column names from
-	 * TargetEntry::resno, where as the parameter number is
-	 * set to be the same as its position in target table
+	 * In XC we will update *all* the table attributes to reduce code
+	 * complexity in finding the columns being updated, it works whether
+	 * we have before row triggers defined on the table or not.
+	 * The code complexity arises for the case of a table with child tables,
+	 * where columns are added to parent using ALTER TABLE. The attribute
+	 * number of the added column is different in parnet and child table.
+	 * In this case we first have to use TargetEntry::resno to find the name
+	 * of the column being updated in parent table, and then find the attribute
+	 * number of that particular column in the child. This makes code complex.
+	 * In comaprison if we choose to update all the columns of the table
+	 * irrespective of the columns being updated, the code becomes simple
+	 * and easy to read.
+	 * Performance comparison between the two approaches (updating all columns
+	 * and updating only the columns that were in the target list) shows that
+	 * both the approaches give similar TPS in hour long runs of DBT1.
+	 * In XC UPDATE will look like :
+	 * UPDATE ... SET att1 = $1, att1 = $2, .... attn = $n WHERE ctid = $(n+1)
 	 */
 	if (cmdtype == CMD_UPDATE)
 	{
 		int			natts = get_relnatts(res_rel->relid);
-		Relation	rel = relation_open(res_rel->relid, AccessShareLock);
-		bool		br_triggers = pgxc_should_exec_br_trigger(rel,
-										pgxc_get_trigevent(cmdtype));
+		int			attnum;
 
-		relation_close(rel, AccessShareLock);
-
-		/*
-		 * If we are going to execute BR triggers on coordinator, we need to
-		 * update *all* the table attributes because the trigger execution might
-		 * have changed any of the tuple attributes. So the UPDATE will look
-		 * like :
-		 * UPDATE ... SET att1 = $1, att1 = $2, .... attn = $n WHERE ctid = $(n+1)
-		 */
-		if (br_triggers)
+		for (attnum = 1; attnum <= natts; attnum++)
 		{
-			int attnum;
-			for (attnum = 1; attnum <= natts; attnum++)
-			{
-				pgxc_add_param_as_tle(query_to_deparse, attnum,
-			                      get_atttype(res_rel->relid, attnum),
-			                      get_attname(res_rel->relid, attnum));
-			}
-		}
-		else
-		{
-			foreach(elt, root->parse->targetList)
-			{
-				TargetEntry	*qtle = lfirst(elt);
-				AttrNumber	param_num = -1;
-		
-				/*
-				 * The entries of the SET clause will have resjusk false
-				 * and will have a valid resname
-				 */
-				if (qtle->resjunk || qtle->resname == NULL)
-					continue;
+			/* Make sure the column has not been dropped */
+			if (get_rte_attribute_is_dropped(res_rel, attnum))
+				continue;
 
-				/*
-				 * Assume all attributes will be there in the source target list
-				 * and in the same order as the attributes exist in the table
-				 * The paramter number for the set caluse would therefore
-				 * be same as its attribute number
-				 */
-				param_num = get_attnum(res_rel->relid, qtle->resname);
-				if (param_num == InvalidAttrNumber)
-				{
-					elog(ERROR, "cache lookup failed for attribute %s of relation %u",
-						qtle->resname, res_rel->relid);
-					return;
-				}
-
-				/*
-				 * Create the parameter using the parameter number found earlier
-				 * and add it to the target list of the query to deparse
-				 */
-				pgxc_add_param_as_tle(query_to_deparse, param_num,
-									exprType((Node *) qtle->expr), qtle->resname);
-			}
+			pgxc_add_param_as_tle(query_to_deparse, attnum,
+								get_atttype(res_rel->relid, attnum),
+								get_attname(res_rel->relid, attnum));
 		}
 
 		/*
@@ -1252,7 +1215,7 @@ pgxc_build_dml_statement(PlannerInfo *root, CmdType cmdtype,
 		 * we know that the ctid has to be n + 1.
 		 */
 		ctid_param_num = natts + 1;
-	} 
+	}
 	else if (cmdtype == CMD_DELETE)
 	{
 		/*

@@ -380,11 +380,11 @@ $$begin return 3;end $$ language plpgsql;
 \set stmt 'update xcrem_employee E set salary = salary + salary + 0.3 * bonus WHERE SALARY > ( SELECT AVG(SALARY) FROM xcrem_employee WHERE SUBSTRING(E.WORKDEPT,1,1) = SUBSTRING(WORKDEPT, 1,1) )'
 :stmt;
 :EXP :stmt;
-                                                                                                                  QUERY PLAN                                                                                                                  
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                                                               QUERY PLAN                                                                                                                                               
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.xcrem_employee e
    Node expr: e.empno
-   Remote query: UPDATE ONLY public.xcrem_employee e SET salary = $12 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
+   Remote query: UPDATE ONLY public.xcrem_employee e SET empno = $1, firstname = $2, midinit = $3, lastname = $4, workdept = $5, phoneno = $6, hiredate = $7, job = $8, edlevel = $9, sex = $10, birthdate = $11, salary = $12, bonus = $13, comm = $14 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
    ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
          Output: e.empno, e.firstname, e.midinit, e.lastname, e.workdept, e.phoneno, e.hiredate, e.job, e.edlevel, e.sex, e.birthdate, ((e.salary + e.salary) + (0.3 * e.bonus)), e.bonus, e.comm, e.salary, e.workdept, e.ctid, e.xc_node_id
          Remote query: SELECT empno, firstname, midinit, lastname, workdept, phoneno, hiredate, job, edlevel, sex, birthdate, salary, bonus, comm, ctid, xc_node_id FROM ONLY public.xcrem_employee e WHERE true
@@ -422,11 +422,11 @@ $$begin return 3;end $$ language plpgsql;
 \set stmt 'update xcrem_employee E set bonus = bonus + salary* 0.3 WHERE EDLEVEL > ( SELECT AVG(EDLEVEL) FROM xcrem_employee WHERE WORKDEPT = E.WORKDEPT )'
 :stmt;
 :EXP :stmt;
-                                                                                                            QUERY PLAN                                                                                                             
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                                                               QUERY PLAN                                                                                                                                               
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.xcrem_employee e
    Node expr: e.empno
-   Remote query: UPDATE ONLY public.xcrem_employee e SET bonus = $13 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
+   Remote query: UPDATE ONLY public.xcrem_employee e SET empno = $1, firstname = $2, midinit = $3, lastname = $4, workdept = $5, phoneno = $6, hiredate = $7, job = $8, edlevel = $9, sex = $10, birthdate = $11, salary = $12, bonus = $13, comm = $14 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
    ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
          Output: e.empno, e.firstname, e.midinit, e.lastname, e.workdept, e.phoneno, e.hiredate, e.job, e.edlevel, e.sex, e.birthdate, e.salary, (e.bonus + (e.salary * 0.3)), e.comm, e.edlevel, e.workdept, e.ctid, e.xc_node_id
          Remote query: SELECT empno, firstname, midinit, lastname, workdept, phoneno, hiredate, job, edlevel, sex, birthdate, salary, bonus, comm, ctid, xc_node_id FROM ONLY public.xcrem_employee e WHERE true
@@ -464,11 +464,11 @@ $$begin return 3;end $$ language plpgsql;
 \set stmt 'update xcrem_employee E set lastname = lastname || ''suf'' WHERE EDLEVEL > volatile_func(2)'
 :stmt;
 :EXP :stmt;
-                                                                                                        QUERY PLAN                                                                                                         
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                                                               QUERY PLAN                                                                                                                                               
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.xcrem_employee e
    Node expr: e.empno
-   Remote query: UPDATE ONLY public.xcrem_employee e SET lastname = $4 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
+   Remote query: UPDATE ONLY public.xcrem_employee e SET empno = $1, firstname = $2, midinit = $3, lastname = $4, workdept = $5, phoneno = $6, hiredate = $7, job = $8, edlevel = $9, sex = $10, birthdate = $11, salary = $12, bonus = $13, comm = $14 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
    ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
          Output: e.empno, e.firstname, e.midinit, ((e.lastname)::text || 'suf'::text), e.workdept, e.phoneno, e.hiredate, e.job, e.edlevel, e.sex, e.birthdate, e.salary, e.bonus, e.comm, e.edlevel, e.ctid, e.xc_node_id
          Remote query: SELECT empno, firstname, midinit, lastname, workdept, phoneno, hiredate, job, edlevel, sex, birthdate, salary, bonus, comm, ctid, xc_node_id FROM ONLY public.xcrem_employee e WHERE true
@@ -499,11 +499,11 @@ $$begin return 3;end $$ language plpgsql;
 \set stmt 'update xcrem_employee E set lastname = lastname || ''suf'', edlevel = edlevel+1  WHERE EDLEVEL > volatile_func(2)'
 :stmt;
 :EXP :stmt;
-                                                                                                           QUERY PLAN                                                                                                            
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                                                               QUERY PLAN                                                                                                                                               
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.xcrem_employee e
    Node expr: e.empno
-   Remote query: UPDATE ONLY public.xcrem_employee e SET lastname = $4, edlevel = $9 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
+   Remote query: UPDATE ONLY public.xcrem_employee e SET empno = $1, firstname = $2, midinit = $3, lastname = $4, workdept = $5, phoneno = $6, hiredate = $7, job = $8, edlevel = $9, sex = $10, birthdate = $11, salary = $12, bonus = $13, comm = $14 WHERE ((e.ctid = $15) AND (e.xc_node_id = $16))
    ->  Data Node Scan on xcrem_employee "_REMOTE_TABLE_QUERY_"
          Output: e.empno, e.firstname, e.midinit, ((e.lastname)::text || 'suf'::text), e.workdept, e.phoneno, e.hiredate, e.job, (e.edlevel + 1), e.sex, e.birthdate, e.salary, e.bonus, e.comm, e.edlevel, e.ctid, e.xc_node_id
          Remote query: SELECT empno, firstname, midinit, lastname, workdept, phoneno, hiredate, job, edlevel, sex, birthdate, salary, bonus, comm, ctid, xc_node_id FROM ONLY public.xcrem_employee e WHERE true

@@ -564,13 +564,13 @@ INSERT INTO fp_child VALUES(123,'child',999,-123);
 ALTER table fp ADD COLUMN f4 int8 DEFAULT 99;
 explain (costs off, num_nodes off, nodes off, verbose on)
 UPDATE fp SET f4 = f4 + f3 WHERE f4 = 99;
-                                                     QUERY PLAN                                                      
----------------------------------------------------------------------------------------------------------------------
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.fp fp_1
    Node expr: fp_1.f1
-   Remote query: UPDATE ONLY public.fp fp_1 SET f4 = $4 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6))
+   Remote query: UPDATE ONLY public.fp fp_1 SET f1 = $1, f2 = $2, f3 = $3, f4 = $4 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6))
    Node expr: f1
-   Remote query: UPDATE ONLY public.fp_child SET f4 = $5 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7))
+   Remote query: UPDATE ONLY public.fp_child SET f1 = $1, f2 = $2, f3 = $3, fc = $4, f4 = $5 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7))
    ->  Data Node Scan on fp "_REMOTE_TABLE_QUERY_"
          Output: fp_1.f1, fp_1.f2, fp_1.f3, (fp_1.f4 + fp_1.f3), fp_1.f4, fp_1.ctid, fp_1.xc_node_id
          Remote query: SELECT f1, f2, f3, f4, ctid, xc_node_id FROM ONLY public.fp WHERE (f4 = 99)
@@ -581,13 +581,13 @@ UPDATE fp SET f4 = f4 + f3 WHERE f4 = 99;
 
 explain (costs off, num_nodes off, nodes off, verbose on)
 UPDATE fp SET f3 = f3*2  FROM xc_int8_tbl i  WHERE fp.f1 = i.q2;
-                                                     QUERY PLAN                                                      
----------------------------------------------------------------------------------------------------------------------
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.fp fp_1
    Node expr: fp_1.f1
-   Remote query: UPDATE ONLY public.fp fp_1 SET f3 = $3 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6))
+   Remote query: UPDATE ONLY public.fp fp_1 SET f1 = $1, f2 = $2, f3 = $3, f4 = $4 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6))
    Node expr: f1
-   Remote query: UPDATE ONLY public.fp_child SET f3 = $3 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7))
+   Remote query: UPDATE ONLY public.fp_child SET f1 = $1, f2 = $2, f3 = $3, fc = $4, f4 = $5 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7))
    ->  Hash Join
          Output: fp_1.f1, fp_1.f2, (fp_1.f3 * 2), fp_1.f4, fp_1.f1, fp_1.ctid, fp_1.xc_node_id, ctid
          Hash Cond: (fp_1.f1 = q2)
@@ -614,12 +614,12 @@ UPDATE fp SET f3 = f3*2  FROM xc_int8_tbl i  WHERE fp.f1 = i.q2;
 
 explain (costs off, num_nodes off, nodes off, verbose on)
 update fp_child set fc=fc+2 returning *, f4-f1;
-                                                                                          QUERY PLAN                                                                                           
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                            QUERY PLAN                                                                                                             
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.fp_child
    Output: fp_child.f1, fp_child.f2, fp_child.f3, fp_child.fc, fp_child.f4, (fp_child.f4 - fp_child.f1)
    Node expr: fp_child.f1
-   Remote query: UPDATE ONLY public.fp_child SET fc = $4 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7)) RETURNING fp_child.f1, fp_child.f2, fp_child.f3, fp_child.fc, fp_child.f4
+   Remote query: UPDATE ONLY public.fp_child SET f1 = $1, f2 = $2, f3 = $3, fc = $4, f4 = $5 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7)) RETURNING fp_child.f1, fp_child.f2, fp_child.f3, fp_child.fc, fp_child.f4
    ->  Data Node Scan on fp_child "_REMOTE_TABLE_QUERY_"
          Output: fp_child.f1, fp_child.f2, fp_child.f3, (fp_child.fc + 2), fp_child.f4, fp_child.ctid, fp_child.xc_node_id
          Remote query: SELECT f1, f2, f3, fc, f4, ctid, xc_node_id FROM ONLY public.fp_child WHERE true
@@ -627,14 +627,14 @@ update fp_child set fc=fc+2 returning *, f4-f1;
 
 explain (costs off, num_nodes off, nodes off, verbose on)
 update fp set f3 = f3 + 1 where f1<2 returning *, f3-f1;
-                                                                                    QUERY PLAN                                                                                    
-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                                                                      QUERY PLAN                                                                                                      
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Update on public.fp fp_1
    Output: fp_1.f1, fp_1.f2, fp_1.f3, fp_1.f4, (fp_1.f3 - fp_1.f1)
    Node expr: fp_1.f1
-   Remote query: UPDATE ONLY public.fp fp_1 SET f3 = $3 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6)) RETURNING fp_1.f1, fp_1.f2, fp_1.f3, fp_1.f4
+   Remote query: UPDATE ONLY public.fp fp_1 SET f1 = $1, f2 = $2, f3 = $3, f4 = $4 WHERE ((fp_1.ctid = $5) AND (fp_1.xc_node_id = $6)) RETURNING fp_1.f1, fp_1.f2, fp_1.f3, fp_1.f4
    Node expr: f1
-   Remote query: UPDATE ONLY public.fp_child SET f3 = $3 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7)) RETURNING fp_child.f1, fp_child.f2, fp_child.f3, fp_child.f4
+   Remote query: UPDATE ONLY public.fp_child SET f1 = $1, f2 = $2, f3 = $3, fc = $4, f4 = $5 WHERE ((fp_child.ctid = $6) AND (fp_child.xc_node_id = $7)) RETURNING fp_child.f1, fp_child.f2, fp_child.f3, fp_child.f4
    ->  Data Node Scan on fp "_REMOTE_TABLE_QUERY_"
          Output: fp_1.f1, fp_1.f2, (fp_1.f3 + 1), fp_1.f4, fp_1.f1, fp_1.ctid, fp_1.xc_node_id
          Remote query: SELECT f1, f2, f3, f4, ctid, xc_node_id FROM ONLY public.fp WHERE (f1 < 2)
