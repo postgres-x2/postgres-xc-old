@@ -873,6 +873,24 @@ pgxc_add_returning_list(RemoteQuery *rq, List *ret_list, int rel_index)
 	}
 
 	/*
+	 * If the user query had RETURNING clause and here we find that
+	 * none of the items in the returning list are shippable
+	 * we intend to send RETURNING NULL to the datanodes
+	 * Otherwise no rows will be returned from the datanodes
+	 * and no rows will be projected to the upper nodes in the
+	 * execution tree.
+	 */
+	if ((shipableReturningList == NIL ||
+		list_length(shipableReturningList) <= 0) &&
+		list_length(ret_list) > 0)
+	{
+		Expr *null_const = (Expr *)makeNullConst(INT4OID, -1, InvalidOid);
+
+		shipableReturningList = add_to_flat_tlist(shipableReturningList,
+												list_make1(null_const));
+	}
+
+	/*
 	 * Copy the refined var list in plan target list as well as
 	 * base_tlist of the remote query node
 	 */
