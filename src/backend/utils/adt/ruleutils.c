@@ -165,6 +165,9 @@ typedef struct
 	List	   *index_tlist;	/* referent for INDEX_VAR Vars */
 #ifdef PGXC
 	bool		remotequery;	/* deparse context for remote query */
+	CmdType		dpns_cmdType;	/* Command type of the query being deparsed */
+	int			dpns_resRel;	/* rtable index of target relation */
+								/* in the query being deparsed */
 #endif
 } deparse_namespace;
 
@@ -2494,6 +2497,50 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 	int			rtindex = 1;
 #ifdef PGXC
 	Alias		*alias;
+	int			list_index = 0;
+	bool		use_list_index = false;
+
+	/*
+	 * Consider this test case taken from with.sql
+	 *
+	 * CREATE TABLE y (a INTEGER) DISTRIBUTE BY REPLICATION;
+	 * INSERT INTO y SELECT generate_series(1, 10);
+	 * CREATE RULE y_rule AS ON DELETE TO y DO INSTEAD
+	 *                          INSERT INTO y VALUES(42) RETURNING *;
+	 * DELETE FROM y RETURNING *;
+	 *
+	 * When the delete rule fires the query becomes an insert.
+	 * While setting range table names in deparse_namespace::rtable_names
+	 * this function makes sure that there are no duplicates
+	 * and appends digits to make them so.
+	 * For the above case the Query is such that it has
+	 * "y new old y" in the rtable
+	 * and deparse_namespace::rtable_names ends up having
+	 * "y new old y_1". The resultRelation in query points to last entry of
+	 * the above list. Hence after deparsing the insert query comes out to be
+	 * INSERT INTO public.y (a) VALUES ($1) RETURNING y_1.a
+	 * Notice that the returning list is using the changed rtable name.
+	 * This would not have been any problem had this been a non-insert query
+	 * because we could have simply used y_1 as the table alias but
+	 * the insert query does not support table alias.
+	 * To solve the problem we use a trick. Instead of changing the last entry
+	 * of the list deparse_namespace::rtable_names, we change the first entry
+	 * resulting in having "y_1 new old y" in the list
+	 * To implement the idea we start iterating the Query::rtable from the
+	 * entry at index Query::resultRelation-1, rather than first entry
+	 * and at end straighten the resulting list deparse_namespace::rtable_names
+	 */
+	/*
+	 * Is this an insert query and is it so that the result relation
+	 * is not the first relation of the rtable?
+	 * If yes, we would need to iterate rtable starting from list_index
+	 * rather than from the first entry
+	 */
+	if (dpns->dpns_cmdType == CMD_INSERT && dpns->dpns_resRel > 1)
+	{
+		list_index = dpns->dpns_resRel - 1;
+		use_list_index = true;
+	}
 #endif
 
 	dpns->rtable_names = NIL;
@@ -2501,6 +2548,20 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 	{
 		RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
 		char	   *refname;
+
+#ifdef PGXC
+		/*
+		 * Are we supposed to iterate the rtable list using list_index?
+		 * If yes forget what we just put in rte, and reinitialize
+		 * it by the element at the index list_index
+		 */
+		if (use_list_index)
+		{
+			rte = (RangeTblEntry *) list_nth(dpns->rtable, list_index++);
+			if (list_index >= list_length(dpns->rtable))
+				list_index = 0;
+		}
+#endif
 
 		if (rels_used && !bms_is_member(rtindex, rels_used))
 		{
@@ -2587,6 +2648,49 @@ set_rtable_names(deparse_namespace *dpns, List *parent_namespaces,
 		dpns->rtable_names = lappend(dpns->rtable_names, refname);
 		rtindex++;
 	}
+
+#ifdef PGXC
+	/*
+	 * Did we use list_index to iterate rtable?
+	 * If yes it means that we would have to shuffle the resulting
+	 * rtable_names bacause the above loop would have put the changed name
+	 * of the element at list_index at the first location. We need it to be
+	 * at the location list_index in the resulting list
+	 */
+	if (use_list_index)
+	{
+		char	   *name;
+		int			i;
+		List		*tmp_names = NIL;
+
+		/* Make a copy of the list to shuffle and free the original list */
+		tmp_names = list_copy(dpns->rtable_names);
+		list_free(dpns->rtable_names);
+		dpns->rtable_names = NIL;
+
+		/*
+		 * Start iterating the existing list from the element that we need
+		 * to put at the first location in the resulting list.
+		 * If list had 7 elements and we had started iterating from index 4
+		 * Then we would have iterated the list using indices
+		 * 4 5 6 0 1 2 3
+		 * In this case we need to put the element at index 3 at first
+		 * location in the resulting list
+		 * Knowing that dpns_resRel is one more than the index where we start
+		 * iterating we use the following formula
+		 * 7 - (5 - 1) = 3
+		 */
+		list_index = list_length(tmp_names) - (dpns->dpns_resRel - 1);
+
+		for (i = 0; i < list_length(tmp_names); i++)
+		{
+			name = (char *) list_nth(tmp_names, list_index++);
+			if (list_index >= list_length(tmp_names))
+				list_index = 0;
+			dpns->rtable_names = lappend(dpns->rtable_names, name);
+		}
+	}
+#endif
 }
 
 /*
@@ -2640,6 +2744,8 @@ set_deparse_for_query(deparse_namespace *dpns, Query *query,
 	dpns->ctes = query->cteList;
 #ifdef PGXC
 	dpns->remotequery = false;
+	dpns->dpns_cmdType = query->commandType;
+	dpns->dpns_resRel = query->resultRelation;
 #endif
 
 	/* Assign a unique relation alias to each RTE */
