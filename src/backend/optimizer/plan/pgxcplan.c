@@ -2709,13 +2709,34 @@ validate_part_col_updatable(const Query *query)
 				continue;
 
 			/*
-			 * See if we have a constant expression comparing against the
-			 * designated partitioned column
+			 * The TargetEntry::resno is the same as the attribute number
+			 * of the column being updated, if the attribute number of the
+			 * column being updated and the attribute on which the table is
+			 * distributed is same means this set clause entry is updating the
+			 * distribution column of the target table.
 			 */
-			if (strcmp(tle->resname, GetRelationDistribColumn(rel_loc_info)) == 0)
+			if (rel_loc_info->partAttrNum == tle->resno)
+			{
+				/*
+				 * The TargetEntry::expr contains the RHS of the SET clause
+				 * i.e. the expression that the target column should get
+				 * updated to. If that expression is such that it is not
+				 * changing the target column e.g. in case of a statement
+				 * UPDATE tab set dist_col = dist_col;
+				 * then this UPDATE should be allowed.
+				 */
+				if (IsA(tle->expr, Var))
+				{
+					Var *v = (Var *)tle->expr;
+					if (v->varno == query->resultRelation &&
+						v->varattno == tle->resno)
+						return;
+				}
+
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 						(errmsg("Partition column can't be updated in current version"))));
+			}
 		}
 	}
 }
