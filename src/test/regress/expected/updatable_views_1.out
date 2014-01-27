@@ -814,37 +814,32 @@ INSERT INTO base_tbl SELECT i, 'Row ' || i FROM generate_series(-2, 2) g(i);
 CREATE VIEW rw_view1 AS SELECT b AS bb, a AS aa FROM base_tbl;
 CREATE FUNCTION rw_view1_aa(x rw_view1)
   RETURNS int AS $$ SELECT x.aa $$ LANGUAGE sql;
+ERROR:  type rw_view1 does not exist
 UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v)=2
   RETURNING rw_view1_aa(v), v.bb;
- rw_view1_aa |      bb       
--------------+---------------
-           2 | Updated row 2
-(1 row)
-
-SELECT * FROM base_tbl;
- a  |       b       
-----+---------------
+ERROR:  function rw_view1_aa(rw_view1) does not exist
+LINE 1: UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v...
+                                                       ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+SELECT * FROM base_tbl order by 1;
+ a  |   b    
+----+--------
  -2 | Row -2
  -1 | Row -1
   0 | Row 0
   1 | Row 1
-  2 | Updated row 2
+  2 | Row 2
 (5 rows)
 
 EXPLAIN (verbose true, costs off, nodes false)
 UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v)=2
   RETURNING rw_view1_aa(v), v.bb;
-                    QUERY PLAN                    
---------------------------------------------------
- Update on base_tbl
-   ->  Index Scan using base_tbl_pkey on base_tbl
-         Index Cond: (a = 2)
-(3 rows)
-
+ERROR:  function rw_view1_aa(rw_view1) does not exist
+LINE 2: UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v...
+                                                       ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 DROP TABLE base_tbl CASCADE;
-NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to view rw_view1
-drop cascades to function rw_view1_aa(rw_view1)
+NOTICE:  drop cascades to view rw_view1
 -- permissions checks
 CREATE USER view_user1;
 CREATE USER view_user2;
@@ -891,9 +886,11 @@ UPDATE base_tbl SET a=a, c=c; -- ok
 UPDATE base_tbl SET b=b; -- not allowed
 ERROR:  permission denied for relation base_tbl
 UPDATE rw_view1 SET bb=bb, cc=cc; -- ok
+ERROR:  permission denied for relation base_tbl
 UPDATE rw_view1 SET aa=aa; -- not allowed
 ERROR:  permission denied for relation rw_view1
 UPDATE rw_view2 SET aa=aa, cc=cc; -- ok
+ERROR:  permission denied for relation base_tbl
 UPDATE rw_view2 SET bb=bb; -- not allowed
 ERROR:  permission denied for relation base_tbl
 DELETE FROM base_tbl; -- not allowed
@@ -931,18 +928,20 @@ SET SESSION AUTHORIZATION view_user2;
 INSERT INTO base_tbl VALUES (5, 'Row 5', 5.0); -- not allowed
 ERROR:  permission denied for relation base_tbl
 INSERT INTO rw_view1 VALUES ('Row 5', 5.0, 5); -- ok
+ERROR:  permission denied for relation base_tbl
 INSERT INTO rw_view2 VALUES ('Row 6', 6.0, 6); -- not allowed
 ERROR:  permission denied for relation base_tbl
 DELETE FROM base_tbl WHERE a=3; -- not allowed
 ERROR:  permission denied for relation base_tbl
 DELETE FROM rw_view1 WHERE aa=3; -- ok
+ERROR:  permission denied for relation base_tbl
 DELETE FROM rw_view2 WHERE aa=4; -- not allowed
 ERROR:  permission denied for relation base_tbl
 SELECT * FROM base_tbl order by 1;
  a |   b   | c 
 ---+-------+---
+ 3 | Row 3 | 3
  4 | Row 4 | 4
- 5 | Row 5 | 5
 (2 rows)
 
 RESET SESSION AUTHORIZATION;
