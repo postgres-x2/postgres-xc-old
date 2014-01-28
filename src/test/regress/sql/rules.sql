@@ -968,7 +968,7 @@ update rules_src set f2 = f2 * 10;
 select * from rules_src order by 1,2;
 select * from rules_log order by 1,2,3;
 create rule r2 as on update to rules_src do also
-  values(old.*, 'old'), (new.*, 'new');
+  values(old.*, 'old'), (new.*, 'new') order by 1,2,3;
 update rules_src set f2 = f2 / 10;
 select * from rules_src order by 1,2;
 select * from rules_log order by 1,2,3;

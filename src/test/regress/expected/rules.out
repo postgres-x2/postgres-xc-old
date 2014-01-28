@@ -2543,14 +2543,14 @@ select * from rules_log order by 1,2,3;
 (8 rows)
 
 create rule r2 as on update to rules_src do also
-  values(old.*, 'old'), (new.*, 'new');
+  values(old.*, 'old'), (new.*, 'new') order by 1,2,3;
 update rules_src set f2 = f2 / 10;
  column1 | column2 | column3 
 ---------+---------+---------
-       1 |      30 | old
        1 |       3 | new
-      11 |     130 | old
+       1 |      30 | old
       11 |      13 | new
+      11 |     130 | old
 (4 rows)
 
 select * from rules_src order by 1,2;
@@ -2591,6 +2591,7 @@ Rules:
   VALUES ("*VALUES*".column1, "*VALUES*".column2, "*VALUES*".column3)
     r2 AS
     ON UPDATE TO rules_src DO  VALUES (old.f1,old.f2,'old'::text), (new.f1,new.f2,'new'::text)
+  ORDER BY "*VALUES*".column1, "*VALUES*".column2, "*VALUES*".column3
 Has OIDs: no
 Distribute By: HASH(f1)
 Location Nodes: ALL DATANODES
