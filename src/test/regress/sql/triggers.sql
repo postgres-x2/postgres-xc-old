@@ -206,10 +206,13 @@ drop sequence ttdummy_seq;
 -- tests for per-statement triggers
 --
 
+SET enforce_two_phase_commit TO off;
+
 CREATE TABLE log_table (tstamp timestamp default timeofday()::timestamp);
 
 CREATE TABLE main_table (a int, b int) distribute by replication;
 
+/* -- XC does not support row triggers with COPY command.
 COPY main_table (a,b) FROM stdin;
 5	10
 20	20
@@ -217,6 +220,13 @@ COPY main_table (a,b) FROM stdin;
 50	35
 80	15
 \.
+*/
+INSERT INTO main_table (a, b) VALUES
+(5, 10),
+(20, 20),
+(30, 10),
+(50, 35),
+(80, 15);
 
 CREATE FUNCTION trigger_func() RETURNS trigger LANGUAGE plpgsql AS '
 BEGIN
@@ -247,10 +257,15 @@ UPDATE main_table SET a = a + 1 WHERE b < 30;
 UPDATE main_table SET a = a + 2 WHERE b > 100;
 
 -- COPY should fire per-row and per-statement INSERT triggers
+/* -- XC does not support row triggers with COPY.
 COPY main_table (a, b) FROM stdin;
 30	40
 50	60
 \.
+*/
+INSERT INTO main_table (a, b) VALUES
+(30, 40),
+(50, 60);
 
 SELECT * FROM main_table ORDER BY a, b;
 
@@ -271,11 +286,16 @@ FOR EACH STATEMENT WHEN (true) EXECUTE PROCEDURE trigger_func('insert_when');
 CREATE TRIGGER delete_when AFTER DELETE ON main_table
 FOR EACH STATEMENT WHEN (true) EXECUTE PROCEDURE trigger_func('delete_when');
 INSERT INTO main_table (a) VALUES (123), (456);
+/* -- XC does not support row triggers with COPY.
 COPY main_table FROM stdin;
 123	999
 456	999
 \.
 ;
+*/
+INSERT INTO main_table VALUES
+(123, 999),
+(456, 999);
 
 DELETE FROM main_table WHERE a IN (123, 456);
 UPDATE main_table SET a = 50, b = 60;
@@ -1175,3 +1195,5 @@ select * from self_ref_trigger;
 drop table self_ref_trigger;
 drop function self_ref_trigger_ins_func();
 drop function self_ref_trigger_del_func();
+
+RESET enforce_two_phase_commit;
